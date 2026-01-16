@@ -20,7 +20,7 @@ use crate::error::{Result, TransportError};
 use crate::traits::{TransportEvent, TransportReceiver, TransportSender};
 
 #[cfg(feature = "webrtc")]
-use webrtc::{
+use webrtc_rs::{
     api::{
         interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
     },
@@ -188,7 +188,9 @@ impl WebRtcTransport {
 
     /// Add ICE candidate from remote peer
     pub async fn add_ice_candidate(&self, candidate: &str) -> Result<()> {
-        let candidate = serde_json::from_str::<RTCIceCandidate>(candidate)
+        use webrtc_rs::ice_transport::ice_candidate::RTCIceCandidateInit;
+
+        let candidate = serde_json::from_str::<RTCIceCandidateInit>(candidate)
             .map_err(|e| TransportError::ConnectionFailed(format!("Invalid candidate: {}", e)))?;
 
         self.peer_connection

@@ -16,7 +16,8 @@ const specSections = ref([
   { id: 'bridges', title: '8. Protocol Bridges', open: false },
   { id: 'timing', title: '9. Clock Sync', open: false },
   { id: 'discovery', title: '10. Discovery', open: false },
-  { id: 'security', title: '11. Security', open: false }
+  { id: 'security', title: '11. Security', open: false },
+  { id: 'benchmarks', title: '12. Benchmarks', open: false }
 ])
 
 function toggleSection(section) {
@@ -313,6 +314,35 @@ const signalTypes = [
   { name: 'Gesture', qos: 'Fire', persist: 'No', desc: 'Phased input (start/move/end). For touch, pen, mouse drag.' },
   { name: 'Timeline', qos: 'Commit', persist: 'Yes', desc: 'Automation lanes. Time-indexed keyframes for playback.' }
 ]
+
+// Benchmark data (from cargo run -p clasp-test-suite --bin proof-tests --release)
+const benchmarks = {
+  encoding: [
+    { proto: 'MQTT', rate: '11.4M', winner: true },
+    { proto: 'OSC', rate: '4.5M', winner: false },
+    { proto: 'CLASP', rate: '1.8M', winner: false }
+  ],
+  decoding: [
+    { proto: 'MQTT', rate: '11.4M', winner: true },
+    { proto: 'OSC', rate: '5.7M', winner: false },
+    { proto: 'CLASP', rate: '1.5M', winner: false }
+  ],
+  size: [
+    { proto: 'MQTT', bytes: 19, winner: true },
+    { proto: 'OSC', bytes: 24, winner: false },
+    { proto: 'CLASP', bytes: 64, winner: false }
+  ],
+  features: [
+    { feature: 'State synchronization', clasp: true, osc: false, mqtt: false },
+    { feature: 'Late-joiner support', clasp: true, osc: false, mqtt: true },
+    { feature: 'Typed signals (Param/Event/Stream)', clasp: true, osc: false, mqtt: false },
+    { feature: 'QoS levels', clasp: '3', osc: '0', mqtt: '3' },
+    { feature: 'JWT security with scopes', clasp: true, osc: false, mqtt: true },
+    { feature: 'Multi-protocol bridging', clasp: true, osc: false, mqtt: false },
+    { feature: 'Clock sync', clasp: true, osc: true, mqtt: false },
+    { feature: 'Wildcard subscriptions', clasp: true, osc: false, mqtt: true }
+  ]
+}
 </script>
 
 <template>
@@ -614,6 +644,74 @@ const signalTypes = [
               <li>Production LAN: Use WSS (encrypted)</li>
               <li>Public internet: Use WSS + JWT tokens</li>
             </ul>
+          </div>
+        </section>
+
+        <!-- 12. Benchmarks -->
+        <section
+          :id="`spec-benchmarks`"
+          class="spec-section"
+          :class="{ open: specSections[12].open }"
+        >
+          <h3 @click="toggleSection(specSections[12])">12. Benchmarks</h3>
+          <div class="spec-content">
+            <p class="bench-intro"><b>Why CLASP when MQTT and OSC are faster?</b> Because raw serialization speed isn't everything. CLASP trades some encoding speed for features that matter in real-time creative applications:</p>
+
+            <div class="feature-table">
+              <div class="feature-row header">
+                <span>Feature</span>
+                <span>CLASP</span>
+                <span>OSC</span>
+                <span>MQTT</span>
+              </div>
+              <div class="feature-row" v-for="f in benchmarks.features" :key="f.feature">
+                <span>{{ f.feature }}</span>
+                <span :class="{ yes: f.clasp === true || f.clasp === '3' }">{{ f.clasp === true ? 'Yes' : f.clasp === false ? 'No' : f.clasp }}</span>
+                <span :class="{ yes: f.osc === true }">{{ f.osc === true ? 'Yes' : f.osc === false ? 'No' : f.osc }}</span>
+                <span :class="{ yes: f.mqtt === true || f.mqtt === '3' }">{{ f.mqtt === true ? 'Yes' : f.mqtt === false ? 'No' : f.mqtt }}</span>
+              </div>
+            </div>
+
+            <p style="margin-top: 1.5rem;"><b>Raw Performance (serialization only, no network):</b></p>
+
+            <div class="bench-grid">
+              <div class="bench-card">
+                <div class="bench-title">Encoding Speed</div>
+                <div class="bench-rows">
+                  <div v-for="b in benchmarks.encoding" :key="b.proto" class="bench-row" :class="{ winner: b.winner }">
+                    <span class="proto">{{ b.proto }}</span>
+                    <span class="rate">{{ b.rate }} msg/s</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bench-card">
+                <div class="bench-title">Decoding Speed</div>
+                <div class="bench-rows">
+                  <div v-for="b in benchmarks.decoding" :key="b.proto" class="bench-row" :class="{ winner: b.winner }">
+                    <span class="proto">{{ b.proto }}</span>
+                    <span class="rate">{{ b.rate }} msg/s</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bench-card">
+                <div class="bench-title">Message Size</div>
+                <div class="bench-rows">
+                  <div v-for="b in benchmarks.size" :key="b.proto" class="bench-row" :class="{ winner: b.winner }">
+                    <span class="proto">{{ b.proto }}</span>
+                    <span class="rate">{{ b.bytes }} bytes</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p class="bench-note">
+              <b>Bottom line:</b> MQTT and OSC win on raw speed. But CLASP's ~900ns latency is still well under a 60fps frame (16.6ms).
+              If you need state sync, typed signals, and multi-protocol bridging, CLASP delivers that without perceptible latency.
+            </p>
+
+            <p class="bench-run">
+              Run benchmarks yourself: <code>cargo run -p clasp-test-suite --bin proof-tests --release</code>
+            </p>
           </div>
         </section>
       </article>

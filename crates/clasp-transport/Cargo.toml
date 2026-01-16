@@ -9,7 +9,8 @@ description = "Transport layer implementations for CLASP"
 readme = "README.md"
 
 [features]
-default = ["websocket", "udp"]
+default = ["websocket", "udp", "quic"]
+full = ["websocket", "udp", "quic", "serial", "ble", "webrtc"]
 websocket = ["tokio-tungstenite", "futures-util"]
 udp = []
 quic = ["quinn", "rustls"]

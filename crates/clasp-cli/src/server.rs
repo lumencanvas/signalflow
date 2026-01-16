@@ -3,7 +3,6 @@
 use anyhow::Result;
 use colored::Colorize;
 use tokio::sync::mpsc;
-use tracing::info;
 
 /// Run a CLASP protocol server
 pub async fn run_server(
@@ -43,49 +42,60 @@ async fn run_quic_server(
     port: u16,
     shutdown_rx: &mut mpsc::Receiver<()>,
 ) -> Result<()> {
-    #[cfg(feature = "quic")]
-    {
-        use clasp_transport::{QuicConfig, QuicTransport};
+    use clasp_transport::quic::{QuicConfig, QuicTransport};
+    use std::net::SocketAddr;
 
-        let config = QuicConfig::default();
-        let addr = format!("{}:{}", bind, port);
+    let addr: SocketAddr = format!("{}:{}", bind, port).parse()?;
 
-        let transport = QuicTransport::bind(&addr, config).await?;
+    // Generate self-signed certificate for development
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()])?;
+    let cert_der = cert.serialize_der()?;
+    let key_der = cert.serialize_private_key_der();
 
-        println!(
-            "{} QUIC server listening on {}:{}",
-            "OK".green().bold(),
-            bind,
-            port
-        );
-        println!("  Protocol:  CLASP over QUIC");
-        println!("  TLS:       Self-signed certificate");
-        println!("  Press Ctrl+C to stop");
+    let config = QuicConfig::default();
+    let transport = QuicTransport::new_server_with_config(addr, cert_der, key_der, config)?;
 
-        // Run until shutdown
-        shutdown_rx.recv().await;
-        info!("QUIC server shutting down");
+    println!(
+        "{} QUIC server listening on {}:{}",
+        "OK".green().bold(),
+        bind,
+        port
+    );
+    println!("  Protocol:  CLASP over QUIC (TLS 1.3)");
+    println!("  TLS:       Self-signed certificate (dev mode)");
+    println!("  ALPN:      clasp/2");
+    println!("  Press Ctrl+C to stop");
 
-        drop(transport);
-        println!("{}", "Server stopped".yellow());
-
-        Ok(())
+    // Accept connections
+    loop {
+        tokio::select! {
+            result = transport.accept() => {
+                match result {
+                    Ok(conn) => {
+                        let remote = conn.remote_address();
+                        println!("{} Client connected: {}", "QUIC".cyan(), remote);
+                        tokio::spawn(async move {
+                            if let Ok((_, mut rx)) = conn.accept_bi().await {
+                                use clasp_transport::TransportReceiver;
+                                while let Some(event) = rx.recv().await {
+                                    println!("{} {:?}", "QUIC".cyan(), event);
+                                }
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        println!("{} Accept error: {}", "ERROR".red(), e);
+                    }
+                }
+            }
+            _ = shutdown_rx.recv() => {
+                break;
+            }
+        }
     }
 
-    #[cfg(not(feature = "quic"))]
-    {
-        println!(
-            "{}",
-            "QUIC support not compiled. Rebuild with --features quic".red()
-        );
-        println!(
-            "{} Falling back to WebSocket server on {}:{}",
-            "INFO".cyan(),
-            bind,
-            port
-        );
-        run_ws_server(bind, port, shutdown_rx).await
-    }
+    println!("{}", "Server stopped".yellow());
+    Ok(())
 }
 
 async fn run_tcp_server(bind: &str, port: u16, shutdown_rx: &mut mpsc::Receiver<()>) -> Result<()> {

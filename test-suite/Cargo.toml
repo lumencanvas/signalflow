@@ -17,6 +17,8 @@ clasp-discovery.workspace = true
 rosc.workspace = true
 midir.workspace = true
 artnet_protocol = "0.4"
+mqttbytes = "0.6"
+bytes = "1.0"
 
 # Async runtime
 tokio.workspace = true
@@ -74,6 +76,10 @@ path = "src/bin/security_tests.rs"
 [[bin]]
 name = "load-tests"
 path = "src/bin/load_tests.rs"
+
+[[bin]]
+name = "proof-tests"
+path = "src/bin/proof_tests.rs"
 
 [[bench]]
 name = "throughput"

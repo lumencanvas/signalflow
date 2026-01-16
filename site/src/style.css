@@ -435,3 +435,133 @@ footer {
 .hljs {
   background: transparent !important;
 }
+
+/* Benchmark section styles - matches site design language */
+.bench-intro {
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+.feature-table {
+  display: flex;
+  flex-direction: column;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+.feature-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.feature-row:last-child {
+  border-bottom: none;
+}
+
+.feature-row.header {
+  background: rgba(0,0,0,0.04);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.feature-row span.yes {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.bench-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.bench-card {
+  border: 1px solid rgba(0,0,0,0.15);
+  padding: 1rem 1.25rem;
+}
+
+.bench-title {
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  opacity: 0.6;
+}
+
+.bench-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.bench-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.bench-row.winner {
+  background: rgba(255, 95, 31, 0.08);
+  border-color: var(--accent);
+}
+
+.bench-row .proto {
+  font-weight: 500;
+}
+
+.bench-row .rate {
+  font-family: monospace;
+  opacity: 0.7;
+}
+
+.bench-row.winner .rate {
+  color: var(--accent);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.bench-note {
+  border: 1px solid rgba(0,0,0,0.15);
+  padding: 1rem 1.25rem;
+  margin-top: 1.5rem;
+  line-height: 1.6;
+}
+
+.bench-note b {
+  color: var(--accent);
+}
+
+.bench-run {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+
+.bench-run code {
+  background: rgba(0,0,0,0.06);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+  .bench-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-row {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+  }
+}

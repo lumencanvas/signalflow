@@ -19,7 +19,7 @@
 
 ---
 
-CLASP is a universal protocol bridge and signal router for creative applications. It unifies disparate protocols—OSC, MIDI, DMX, Art-Net, MQTT, WebSocket, HTTP—into a single, routable message system optimized for real-time performance.
+CLASP is a universal protocol bridge and signal router for creative applications. It unifies disparate protocols (OSC, MIDI, DMX, Art-Net, MQTT, WebSocket, HTTP) into a single, routable message system optimized for real-time performance.
 
 ## Why CLASP?
 
@@ -271,6 +271,40 @@ CLASP clients in different languages can seamlessly communicate:
 - **CLI Tool**: Start servers and bridges from the command line
 - **Embeddable**: Rust crates, WASM module, Python, JavaScript
 
+## Performance
+
+We believe in transparent benchmarking. Here's how CLASP compares to OSC and MQTT:
+
+### Encoding/Decoding Speed (messages/second)
+
+| Protocol | Encoding | Decoding | Message Size |
+|----------|----------|----------|--------------|
+| **MQTT** | 11.4M | 11.4M | 19 B |
+| **OSC** | 4.5M | 5.7M | 24 B |
+| **CLASP** | 1.8M | 1.5M | 64 B |
+
+### The Tradeoff
+
+**MQTT and OSC are faster for raw serialization.** CLASP trades speed for features:
+
+| Feature | CLASP | OSC | MQTT |
+|---------|-------|-----|------|
+| State synchronization | Yes | No | No |
+| Late-joiner support | Yes | No | Yes |
+| Typed signals (Param/Event/Stream) | Yes | No | No |
+| QoS levels | 3 | 0 | 3 |
+| JWT security with scopes | Yes | No | Yes |
+| Multi-protocol bridging | Yes | No | No |
+| Clock sync | Yes | Yes | No |
+| Wildcard subscriptions | Yes | No | Yes |
+
+**Bottom line**: MQTT is fastest, OSC is simpler, but CLASP provides state sync, typed signals, and multi-protocol bridging with sub-microsecond latencies (~900ns) that are still well under a 60fps frame (16.6ms).
+
+Run the benchmarks yourself:
+```bash
+cargo run -p clasp-test-suite --bin proof-tests --release
+```
+
 ## Supported Protocols
 
 | Protocol | Direction | Features |
@@ -284,6 +318,32 @@ CLASP clients in different languages can seamlessly communicate:
 | **WebSocket** | Bidirectional | Client/server, JSON/binary |
 | **Socket.IO** | Bidirectional | v4, rooms, namespaces |
 | **HTTP** | Bidirectional | REST API, CORS, client/server |
+
+## Transports
+
+CLASP supports multiple network transports for different use cases:
+
+| Transport | Use Case | Features |
+|-----------|----------|----------|
+| **WebSocket** | Web apps, cross-platform | Default transport, works everywhere, JSON or binary |
+| **QUIC** | Native apps, mobile | TLS 1.3, 0-RTT, connection migration, multiplexed streams |
+| **UDP** | Low-latency, local network | Minimal overhead, best for high-frequency data |
+| **TCP** | Reliable delivery | For environments where UDP is blocked |
+| **Serial** | Hardware integration | UART/RS-232 for embedded devices |
+| **BLE** | Wireless sensors | Bluetooth Low Energy for IoT devices |
+| **WebRTC** | P2P, browser-to-browser | NAT traversal, direct peer connections |
+
+Enable transports with feature flags:
+```bash
+# Default (WebSocket + UDP + QUIC)
+cargo add clasp-transport
+
+# All transports
+cargo add clasp-transport --features full
+
+# Specific transports
+cargo add clasp-transport --features "websocket,quic,serial"
+```
 
 ## Documentation
 

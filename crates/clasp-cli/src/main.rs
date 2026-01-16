@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
-use tracing::{info, warn, Level};
+use tracing::{info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 mod server;

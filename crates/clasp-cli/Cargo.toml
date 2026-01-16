@@ -17,7 +17,10 @@ path = "src/main.rs"
 [dependencies]
 clasp-core = { workspace = true }
 clasp-bridge = { workspace = true, features = ["osc", "midi", "artnet", "mqtt", "websocket", "http"] }
-clasp-transport = { workspace = true }
+clasp-transport = { workspace = true, features = ["websocket", "udp", "quic"] }
+
+# Certificate generation for QUIC dev mode
+rcgen = "0.12"
 
 # CLI
 clap = { version = "4.4", features = ["derive", "env"] }

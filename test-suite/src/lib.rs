@@ -42,10 +42,14 @@ impl TestSuite {
     }
 
     pub fn print_summary(&self) {
-        println!("\n{:=<60}", "");
-        println!("CLASP TEST SUITE RESULTS");
-        println!("{:=<60}\n", "");
+        self.print_results(false);
+    }
 
+    pub fn print_verbose(&self) {
+        self.print_results(true);
+    }
+
+    fn print_results(&self, verbose: bool) {
         for result in &self.results {
             let status = if result.passed { "PASS" } else { "FAIL" };
             let status_color = if result.passed {
@@ -62,20 +66,20 @@ impl TestSuite {
             );
 
             if let Some(msg) = &result.message {
-                if !result.passed {
-                    println!("       Error: {}", msg);
+                if verbose || !result.passed {
+                    println!("{}", msg);
                 }
             }
         }
 
-        println!("\n{:-<60}", "");
+        println!("\n{:=<75}", "");
         println!(
-            "Total: {} | Passed: {} | Failed: {}",
+            "SUMMARY: Total: {} | Passed: {} | Failed: {}",
             self.results.len(),
             self.passed(),
             self.failed()
         );
-        println!("{:-<60}\n", "");
+        println!("{:=<75}\n", "");
     }
 
     pub fn all_passed(&self) -> bool {

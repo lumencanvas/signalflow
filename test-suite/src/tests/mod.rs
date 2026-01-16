@@ -6,4 +6,5 @@ pub mod helpers;
 pub mod load;
 pub mod midi;
 pub mod osc;
+pub mod proof;
 pub mod security;
