@@ -73,3 +73,7 @@ clasp-bridge = { version = "0.1", default-features = false, features = ["osc", "
 ## License
 
 Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+
+---
+
+Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026

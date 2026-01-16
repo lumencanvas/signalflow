@@ -103,3 +103,7 @@ Visit **[clasp.to](https://clasp.to)** for full documentation.
 ## License
 
 MIT
+
+---
+
+Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026

@@ -43,3 +43,7 @@ Visit **[clasp.to](https://clasp.to)** for full documentation.
 ## License
 
 Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+
+---
+
+Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026

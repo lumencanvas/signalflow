@@ -213,3 +213,7 @@ CLASP builds on the shoulders of giants:
 - [rosc](https://github.com/klingtnet/rosc) - OSC codec
 - [midir](https://github.com/Boddlnagg/midir) - MIDI I/O
 - [rumqttc](https://github.com/bytebeamio/rumqtt) - MQTT client
+
+---
+
+Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026
