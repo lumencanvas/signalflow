@@ -1,0 +1,30 @@
+[package]
+name = "clasp-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLASP client library"
+
+[dependencies]
+clasp-core = { workspace = true }
+clasp-transport = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Utils
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

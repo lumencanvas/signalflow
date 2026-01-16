@@ -1,0 +1,80 @@
+[package]
+name = "clasp-test-suite"
+version.workspace = true
+edition.workspace = true
+description = "Comprehensive integration and load tests for CLASP protocol"
+
+[dependencies]
+# CLASP crates (workspace)
+clasp-core.workspace = true
+clasp-transport.workspace = true
+clasp-bridge.workspace = true
+clasp-router.workspace = true
+clasp-client.workspace = true
+clasp-discovery.workspace = true
+
+# Real protocol libraries for integration testing
+rosc.workspace = true
+midir.workspace = true
+artnet_protocol = "0.4"
+
+# Async runtime
+tokio.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+
+# Networking
+tokio-tungstenite.workspace = true
+socket2.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+rmp-serde = "1.1"
+
+# Testing utilities
+criterion.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Timing and stats
+hdrhistogram = "7.5"
+rand = "0.8"
+
+# JWT for security tests
+jsonwebtoken = "9.2"
+
+[dev-dependencies]
+tempfile = "3.10"
+
+[[bin]]
+name = "run-all-tests"
+path = "src/main.rs"
+
+[[bin]]
+name = "osc-integration"
+path = "src/bin/osc_integration.rs"
+
+[[bin]]
+name = "midi-integration"
+path = "src/bin/midi_integration.rs"
+
+[[bin]]
+name = "artnet-integration"
+path = "src/bin/artnet_integration.rs"
+
+[[bin]]
+name = "clasp-to-clasp"
+path = "src/bin/clasp_to_clasp.rs"
+
+[[bin]]
+name = "security-tests"
+path = "src/bin/security_tests.rs"
+
+[[bin]]
+name = "load-tests"
+path = "src/bin/load_tests.rs"
+
+[[bench]]
+name = "throughput"
+harness = false

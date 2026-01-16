@@ -1,19 +1,21 @@
-# SignalFlow Protocol Specification (SF/2)
+# CLASP Protocol Specification (CLASP/2)
 
-**Version**: 2.0-draft  
-**Status**: Working Specification  
-**Author**: Developed for LumenCanvas and the creative tools community  
+**Creative Low-Latency Application Streaming Protocol**
+
+**Version**: 2.0-draft
+**Status**: Working Specification
+**Author**: Developed for LumenCanvas and the creative tools community
 **License**: CC0 1.0 Universal (Public Domain)
 
 ---
 
 # Explain Like I'm 5
 
-**What is SignalFlow?**
+**What is CLASP?**
 
 Imagine you have a bunch of toys that can talk to each other - your keyboard, your lights, your tablet with cool visuals, and your computer. Right now, each toy speaks a different language. Your keyboard speaks "MIDI" (invented in 1983, before your parents were probably using computers!). Your lights might speak "DMX" or "Art-Net." Your tablet app probably speaks "WebSocket JSON" or something custom.
 
-SignalFlow is like giving all your toys a universal translator. But it's even better - it's a NEW language that's smarter than all the old ones. It remembers things (like "the brightness is currently 50%"), it's super fast (faster than you can blink), it works on WiFi, wired internet, or even Bluetooth, and it keeps secrets safe (so bad guys can't mess with your light show).
+CLASP is like giving all your toys a universal translator. But it's even better - it's a NEW language that's smarter than all the old ones. It remembers things (like "the brightness is currently 50%"), it's super fast (faster than you can blink), it works on WiFi, wired internet, or even Bluetooth, and it keeps secrets safe (so bad guys can't mess with your light show).
 
 **Why should I care?**
 
@@ -104,8 +106,8 @@ A protocol without a good API is just a spec document that collects dust. MIDI 2
 
 ## 1.1 Core Principles
 
-1. **Browser-Native, Everywhere-Compatible**  
-   WebSocket MUST work. WebRTC DataChannel SHOULD work. Everything else is optional.
+1. **Transport-Agnostic, Universally Compatible**
+   CLASP is transport-agnostic by design. The protocol works over any byte transport: WebSocket, WebRTC, QUIC, UDP, Bluetooth LE, Serial, or custom transports. For interoperability, WebSocket is the recommended baseline (browsers can use it, and it's universally available). WebRTC DataChannel offers lower latency for P2P. Constrained devices may use UDP or BLE exclusively.
 
 2. **Progressive Enhancement**  
    Simple things MUST be simple:

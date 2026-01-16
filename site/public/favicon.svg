@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Simplified favicon - no filter for clarity at small sizes -->
+  <!-- Left bracket -->
+  <path d="M 4 16 L 4 6 Q 4 2, 8 2 L 13 2 L 13 5 L 9 5 Q 7 5, 7 8 L 7 16 L 7 24 Q 7 27, 9 27 L 13 27 L 13 30 L 8 30 Q 4 30, 4 26 Z" fill="#1a1a1a"/>
+  <!-- Right bracket -->
+  <path d="M 28 16 L 28 6 Q 28 2, 24 2 L 19 2 L 19 5 L 23 5 Q 25 5, 25 8 L 25 16 L 25 24 Q 25 27, 23 27 L 19 27 L 19 30 L 24 30 Q 28 30, 28 26 Z" fill="#1a1a1a"/>
+  <!-- Connection lines -->
+  <line x1="7" y1="11" x2="25" y2="11" stroke="#1a1a1a" stroke-width="2"/>
+  <line x1="7" y1="16" x2="25" y2="16" stroke="#1a1a1a" stroke-width="2"/>
+  <line x1="7" y1="21" x2="25" y2="21" stroke="#1a1a1a" stroke-width="2"/>
+  <!-- Center node -->
+  <circle cx="16" cy="16" r="4" fill="#FFFFFF" stroke="#1a1a1a" stroke-width="2"/>
+  <circle cx="16" cy="16" r="1.5" fill="#FF5F1F"/>
+</svg>

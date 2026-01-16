@@ -1,0 +1,69 @@
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%">
+    <defs>
+      <!-- Rough edges filter -->
+      <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5"/>
+      </filter>
+    </defs>
+
+    <!-- Left bracket - bold, chunky -->
+    <g filter="url(#rough)">
+      <path d="M 35 150
+               L 35 60
+               Q 35 25, 70 25
+               L 120 25
+               L 120 55
+               L 85 55
+               Q 65 55, 65 75
+               L 65 150
+               L 65 225
+               Q 65 245, 85 245
+               L 120 245
+               L 120 275
+               L 70 275
+               Q 35 275, 35 240
+               Z"
+            fill="#1a1a1a"/>
+
+      <!-- Right bracket -->
+      <path d="M 265 150
+               L 265 60
+               Q 265 25, 230 25
+               L 180 25
+               L 180 55
+               L 215 55
+               Q 235 55, 235 75
+               L 235 150
+               L 235 225
+               Q 235 245, 215 245
+               L 180 245
+               L 180 275
+               L 230 275
+               Q 265 275, 265 240
+               Z"
+            fill="#1a1a1a"/>
+    </g>
+
+    <!-- Connection lines - hand-drawn style -->
+    <g stroke="#1a1a1a" stroke-width="6" stroke-linecap="round" filter="url(#rough)">
+      <line x1="65" y1="110" x2="235" y2="112"/>
+      <line x1="65" y1="150" x2="235" y2="148"/>
+      <line x1="65" y1="190" x2="235" y2="191"/>
+    </g>
+
+    <!-- Center node - bold circle -->
+    <g filter="url(#rough)">
+      <circle cx="150" cy="150" r="28" fill="#FFFFFF" stroke="#1a1a1a" stroke-width="8"/>
+      <circle cx="150" cy="150" r="10" fill="#1a1a1a"/>
+    </g>
+
+    <!-- Accent color - spot orange -->
+    <g opacity="0.9" filter="url(#rough)">
+      <circle cx="150" cy="150" r="10" fill="#FF5F1F"/>
+      <rect x="60" y="146" width="20" height="8" fill="#FF5F1F"/>
+      <rect x="220" y="146" width="20" height="8" fill="#FF5F1F"/>
+    </g>
+  </svg>
+</template>

@@ -2,13 +2,13 @@
 //!
 //! Tests bidirectional OSC <-> SignalFlow conversion
 
-use signalflow_bridge::{Bridge, BridgeEvent, OscBridge, OscBridgeConfig};
-use signalflow_core::{Message, SetMessage, Value};
+use clasp_bridge::{Bridge, BridgeEvent, OscBridge, OscBridgeConfig};
+use clasp_core::{Message, SetMessage, Value};
 use std::net::UdpSocket;
 use std::time::Duration;
 
 #[tokio::test]
-async fn test_osc_to_signalflow() {
+async fn test_osc_to_clasp() {
     // Create OSC bridge
     let config = OscBridgeConfig {
         listen_addr: "127.0.0.1:9001".to_string(),
@@ -54,7 +54,7 @@ async fn test_osc_to_signalflow() {
 }
 
 #[tokio::test]
-async fn test_signalflow_to_osc() {
+async fn test_clasp_to_osc() {
     // Create receiver socket first
     let receiver = UdpSocket::bind("127.0.0.1:9012").expect("Failed to bind receiver");
     receiver

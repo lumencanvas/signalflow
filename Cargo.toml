@@ -1,29 +1,30 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/signalflow-core",
-    "crates/signalflow-transport",
-    "crates/signalflow-discovery",
-    "crates/signalflow-bridge",
-    "crates/signalflow-router",
-    "crates/signalflow-client",
-    "crates/signalflow-embedded",
-    "crates/signalflow-wasm",
-    "tools/sf-bridge-service",
+    "crates/clasp-core",
+    "crates/clasp-transport",
+    "crates/clasp-discovery",
+    "crates/clasp-bridge",
+    "crates/clasp-router",
+    "crates/clasp-client",
+    "crates/clasp-embedded",
+    "crates/clasp-wasm",
+    "tools/clasp-service",
+    "test-suite",
     # Tools temporarily disabled - need API updates
-    # "tools/sf-cli",
-    # "tools/sf-router",
-    # "tools/sf-test",
+    # "tools/clasp-cli",
+    # "tools/clasp-router",
+    # "tools/clasp-test",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/lumencanvas/signalflow"
+repository = "https://github.com/lumencanvas/clasp"
 rust-version = "1.75"
 authors = ["LumenCanvas"]
-description = "Universal protocol for creative tools communication"
+description = "Creative Low-Latency Application Streaming Protocol"
 
 [workspace.dependencies]
 # Async runtime
@@ -73,12 +74,12 @@ web-sys = { version = "0.3", features = ["WebSocket", "MessageEvent", "BinaryTyp
 criterion = "0.5"
 
 # Internal crates
-signalflow-core = { path = "crates/signalflow-core" }
-signalflow-transport = { path = "crates/signalflow-transport" }
-signalflow-discovery = { path = "crates/signalflow-discovery" }
-signalflow-bridge = { path = "crates/signalflow-bridge" }
-signalflow-router = { path = "crates/signalflow-router" }
-signalflow-client = { path = "crates/signalflow-client" }
+clasp-core = { path = "crates/clasp-core" }
+clasp-transport = { path = "crates/clasp-transport" }
+clasp-discovery = { path = "crates/clasp-discovery" }
+clasp-bridge = { path = "crates/clasp-bridge" }
+clasp-router = { path = "crates/clasp-router" }
+clasp-client = { path = "crates/clasp-client" }
 
 [profile.release]
 lto = true

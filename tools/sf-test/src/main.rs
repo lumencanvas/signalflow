@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use signalflow_client::SignalFlow;
+use clasp_client::SignalFlow;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

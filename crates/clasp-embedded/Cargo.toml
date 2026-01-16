@@ -1,0 +1,13 @@
+[package]
+name = "clasp-embedded"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLASP embedded/no_std implementation"
+
+[features]
+default = []
+alloc = []
+
+[dependencies]
+# Minimal dependencies for no_std

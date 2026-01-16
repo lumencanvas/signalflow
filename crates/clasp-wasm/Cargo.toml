@@ -1,0 +1,29 @@
+[package]
+name = "clasp-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLASP WebAssembly bindings"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+
+[dependencies]
+clasp-core = { workspace = true }
+
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = "0.6"
+
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

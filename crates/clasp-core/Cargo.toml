@@ -1,0 +1,27 @@
+[package]
+name = "clasp-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core types and encoding for CLASP protocol"
+
+[features]
+default = ["std"]
+std = []
+alloc = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+rmp-serde = { workspace = true }
+thiserror = { workspace = true }
+bytes = { workspace = true }
+glob-match = { workspace = true }
+regex-lite = "0.1"
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "codec"
+harness = false

@@ -2,9 +2,9 @@
 //!
 //! Tests Art-Net and DMX <-> SignalFlow conversion
 
-use signalflow_bridge::{ArtNetBridge, ArtNetBridgeConfig, DmxBridge, DmxBridgeConfig, DmxInterfaceType};
-use signalflow_bridge::{Bridge, BridgeEvent};
-use signalflow_core::{Message, SetMessage, Value};
+use clasp_bridge::{ArtNetBridge, ArtNetBridgeConfig, DmxBridge, DmxBridgeConfig, DmxInterfaceType};
+use clasp_bridge::{Bridge, BridgeEvent};
+use clasp_core::{Message, SetMessage, Value};
 use std::time::Duration;
 
 #[tokio::test]
@@ -121,7 +121,7 @@ fn test_list_dmx_ports() {
 }
 
 #[tokio::test]
-async fn test_artnet_signalflow_conversion() {
+async fn test_artnet_clasp_conversion() {
     // Test SignalFlow -> Art-Net conversion
     let config = ArtNetBridgeConfig {
         bind_addr: "127.0.0.1:6457".to_string(),

@@ -1,0 +1,39 @@
+[package]
+name = "clasp-discovery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Device discovery for CLASP (mDNS, UDP broadcast)"
+
+[features]
+default = ["mdns", "broadcast"]
+mdns = ["mdns-sd"]
+broadcast = []
+
+[dependencies]
+clasp-core = { workspace = true }
+clasp-transport = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Discovery
+mdns-sd = { workspace = true, optional = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Utils
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+hostname = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -3,8 +3,8 @@
 //! Tests MIDI <-> SignalFlow conversion
 //! Note: These tests require a MIDI loopback device or virtual MIDI port
 
-use signalflow_bridge::{MidiBridge, MidiBridgeConfig};
-use signalflow_core::{Message, Value};
+use clasp_bridge::{MidiBridge, MidiBridgeConfig};
+use clasp_core::{Message, Value};
 
 #[test]
 fn test_midi_message_parsing() {
@@ -105,7 +105,7 @@ async fn test_midi_bridge_lifecycle() {
 }
 
 #[test]
-fn test_signalflow_to_midi_conversion() {
+fn test_clasp_to_midi_conversion() {
     // Test converting SignalFlow messages to MIDI bytes
 
     // CC message

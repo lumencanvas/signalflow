@@ -1,0 +1,31 @@
+[package]
+name = "clasp-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLASP message router and server"
+
+[dependencies]
+clasp-core = { workspace = true }
+clasp-transport = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Utils
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

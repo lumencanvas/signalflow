@@ -5,8 +5,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use signalflow_discovery::Discovery;
-use signalflow_router::Router;
+use clasp_discovery::Discovery;
+use clasp_router::Router;
 use std::net::SocketAddr;
 use tracing_subscriber::EnvFilter;
 

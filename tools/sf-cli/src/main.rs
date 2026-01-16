@@ -5,8 +5,8 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use signalflow_client::SignalFlow;
-use signalflow_discovery::Discovery;
+use clasp_client::SignalFlow;
+use clasp_discovery::Discovery;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 

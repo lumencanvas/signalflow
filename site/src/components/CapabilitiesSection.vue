@@ -1,0 +1,40 @@
+<script setup>
+const capabilities = [
+  {
+    title: 'DISCOVERY',
+    desc: 'mDNS auto-discovery, UDP broadcast fallback, WAN rendezvous for public endpoints.'
+  },
+  {
+    title: 'STATE',
+    desc: 'Authoritative params with revisioning, conflict strategies (LWW, max, min, lock, merge).'
+  },
+  {
+    title: 'TIME',
+    desc: 'NTP-style clock sync, jitter buffers, scheduled bundle execution within ±1ms.'
+  },
+  {
+    title: 'BRIDGES',
+    desc: 'Bidirectional: MIDI, OSC, DMX-512, Art-Net, sACN. Planned: MQTT, WebSocket, REST.'
+  },
+  {
+    title: 'P2P',
+    desc: 'WebRTC DataChannels with ICE/NAT traversal for direct peer-to-peer connections.'
+  },
+  {
+    title: 'EMBEDDED',
+    desc: 'no_std Lite profile: 2-byte addresses, fixed-size messages, UDP transport.'
+  }
+]
+</script>
+
+<template>
+  <section class="section">
+    <h2>CAPABILITIES</h2>
+    <div class="grid">
+      <div class="card" v-for="cap in capabilities" :key="cap.title">
+        <h3>{{ cap.title }}</h3>
+        <p>{{ cap.desc }}</p>
+      </div>
+    </div>
+  </section>
+</template>
