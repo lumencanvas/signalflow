@@ -14,6 +14,7 @@
     "@clasp-to/core": "file:../../bindings/js/packages/clasp-core"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "@types/node": "^20.10.0",
     "concurrently": "^8.2.0",
     "electron": "^28.0.0",
@@ -36,16 +37,36 @@
     "extraMetadata": {
       "main": "electron/main.js"
     },
+    "afterSign": "scripts/notarize.js",
     "mac": {
       "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "artifactName": "CLASP.Bridge-${arch}.${ext}"
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "artifactName": "CLASP.Bridge-Setup.${ext}"
     },
     "nsis": {
@@ -55,7 +76,10 @@
       "artifactName": "CLASP.Bridge-portable.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "artifactName": "CLASP.Bridge.${ext}"
     },
     "deb": {

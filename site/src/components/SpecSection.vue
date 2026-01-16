@@ -355,9 +355,9 @@ const signalTypes = [
         >
           <h3 @click="toggleSection(specSections[1])">1. What is CLASP?</h3>
           <div class="spec-content">
-            <p>CLASP is a <b>universal protocol bridge</b> for creative applications. It connects everything—MIDI controllers, OSC apps, DMX lights, Art-Net fixtures, MQTT sensors, WebSocket interfaces—through a single unified address space.</p>
+            <p>CLASP is a <b>universal protocol bridge</b> for creative applications. It connects everything: MIDI controllers, OSC apps, DMX lights, Art-Net fixtures, MQTT sensors, and WebSocket interfaces through a single unified address space.</p>
 
-            <p style="margin-top: 1rem;">Under the hood, it's a <b>pub/sub protocol</b> (like MQTT) optimized for real-time media. But the killer feature is that it <b>bridges all your existing gear</b>: your TouchOSC tablet can control your DMX lights while your MIDI controller adjusts your VJ software—all through CLASP.</p>
+            <p style="margin-top: 1rem;">Under the hood, it's a <b>pub/sub protocol</b> (like MQTT) optimized for real-time media. But the killer feature is that it <b>bridges all your existing gear</b>: your TouchOSC tablet can control your DMX lights while your MIDI controller adjusts your VJ software, all through CLASP.</p>
 
             <p style="margin-top: 1rem;"><b>Core concepts:</b></p>
             <ul>
@@ -374,7 +374,7 @@ const signalTypes = [
               <li><b>vs MQTT:</b> CLASP has typed signals (param vs event), built-in clock sync, and sub-ms latency.</li>
             </ul>
 
-            <p style="margin-top: 1rem;">You don't have to choose—CLASP bridges them all. Keep using your existing gear and software.</p>
+            <p style="margin-top: 1rem;">You don't have to choose. CLASP bridges them all. Keep using your existing gear and software.</p>
           </div>
         </section>
 
