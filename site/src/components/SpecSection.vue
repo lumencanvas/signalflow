@@ -224,7 +224,6 @@ Each bridge is a CLASP client that speaks both languages.
 │ OSC        │ Preserves OSC path as CLASP address              │
 │ Art-Net    │ /artnet/{universe}/{channel}          (Param)    │
 │ DMX        │ /dmx/{universe}/{channel}             (Param)    │
-│ sACN       │ /sacn/{universe}/{channel}            (Param)    │
 │ MQTT       │ /mqtt/{topic}                         (varies)   │
 │ HTTP       │ REST API at /api/v1/...                          │
 └────────────┴───────────────────────────────────────────────────┘
@@ -556,7 +555,6 @@ const signalTypes = [
               <li><b>MIDI:</b> CC, notes, program change, pitchbend (via midir)</li>
               <li><b>Art-Net:</b> Multiple universes, polling, delta detection</li>
               <li><b>DMX:</b> ENTTEC Pro/Open, FTDI adapters</li>
-              <li><b>sACN (E1.31):</b> Multicast and unicast</li>
               <li><b>MQTT:</b> v3.1.1 and v5, TLS support</li>
               <li><b>WebSocket:</b> Generic JSON bridge</li>
               <li><b>HTTP:</b> REST API for request/response patterns</li>

@@ -2,7 +2,7 @@
 const capabilities = [
   {
     title: 'DISCOVERY',
-    desc: 'mDNS auto-discovery, UDP broadcast fallback, WAN rendezvous for public endpoints.'
+    desc: 'mDNS auto-discovery with UDP broadcast fallback for local networks.'
   },
   {
     title: 'STATE',
@@ -10,11 +10,11 @@ const capabilities = [
   },
   {
     title: 'TIME',
-    desc: 'NTP-style clock sync, jitter buffers, scheduled bundle execution within ±1ms.'
+    desc: 'NTP-style clock sync, jitter buffers, scheduled bundle execution.'
   },
   {
     title: 'BRIDGES',
-    desc: 'Bidirectional: MIDI, OSC, DMX-512, Art-Net, sACN, MQTT, WebSocket, HTTP REST, Socket.IO.'
+    desc: 'Bidirectional: MIDI, OSC, DMX-512, Art-Net, MQTT, WebSocket, HTTP REST, Socket.IO.'
   },
   {
     title: 'P2P',

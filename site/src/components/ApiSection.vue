@@ -7,8 +7,7 @@ const activeTab = ref('js')
 const tabs = [
   { id: 'js', label: 'JavaScript' },
   { id: 'py', label: 'Python' },
-  { id: 'rs', label: 'Rust' },
-  { id: 'c', label: 'C (Embedded)' }
+  { id: 'rs', label: 'Rust' }
 ]
 
 // SDK examples matching actual implementation
@@ -21,7 +20,7 @@ const clasp = new Clasp('ws://localhost:7330');
 await clasp.connect();
 
 // Subscribe to addresses (wildcards supported)
-const unsubscribe = clasp.on('/lights/*/brightness', (value, address, meta) => {
+const unsubscribe = clasp.on('/lights/*/brightness', (value, address) => {
   console.log(\`\${address} = \${value}\`);
 });
 
@@ -102,8 +101,8 @@ async fn main() -> anyhow::Result<()> {
     // Set a Param
     client.set("/lights/kitchen/brightness", Value::Float(0.75)).await?;
 
-    // Publish an Event
-    client.publish("/cue/fire", Value::Map(
+    // Emit an Event
+    client.emit("/cue/fire", Value::Map(
         [("cueId".into(), Value::String("intro".into()))].into()
     )).await?;
 
@@ -123,48 +122,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }`
 
-const cCode = `// CLASP Embedded SDK (no_std compatible)
-// Uses UDP Lite profile with fixed 2-byte addresses
-#include "clasp.h"
-
-int main() {
-    // Initialize UDP transport
-    clasp_ctx_t* ctx = clasp_init_udp("192.168.1.42", 7331);
-
-    // Set a Param (float32)
-    clasp_set_f32(ctx, 0x0001, 0.75f);  // /controller/fader/1
-
-    // Set a Param (integer)
-    clasp_set_i32(ctx, 0x0100, 255);    // /dmx/0/1
-
-    // Emit an Event
-    uint8_t payload[] = {0x01, 0x00};
-    clasp_emit(ctx, 0x1000, payload, sizeof(payload));
-
-    // Poll for incoming messages
-    clasp_msg_t msg;
-    while (1) {
-        if (clasp_recv(ctx, &msg, 100)) {  // 100ms timeout
-            switch (msg.type) {
-                case CLASP_MSG_SET:
-                    printf("SET %04x = %f\\n", msg.address, msg.value.f32);
-                    break;
-                case CLASP_MSG_EVENT:
-                    printf("EVENT %04x\\n", msg.address);
-                    break;
-            }
-        }
-    }
-
-    clasp_free(ctx);
-    return 0;
-}`
-
 const codeExamples = {
   js: { code: jsCode, lang: 'javascript' },
   py: { code: pyCode, lang: 'python' },
-  rs: { code: rsCode, lang: 'rust' },
-  c: { code: cCode, lang: 'c' }
+  rs: { code: rsCode, lang: 'rust' }
 }
 </script>
 
