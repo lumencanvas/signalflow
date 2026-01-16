@@ -1,6 +1,6 @@
 {
   "name": "@clasp-to/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLASP protocol client for JavaScript/TypeScript - Creative Low-Latency Application Streaming Protocol",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -34,7 +34,7 @@
   "homepage": "https://clasp.to",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lumencanvas/clasp"
+    "url": "git+https://github.com/lumencanvas/clasp.git"
   },
   "bugs": {
     "url": "https://github.com/lumencanvas/clasp/issues"
