@@ -38,7 +38,21 @@
       <aside class="sidebar">
         <section class="sidebar-section">
           <div class="section-header">
-            <h2 class="section-title">DEVICES</h2>
+            <h2 class="section-title">MY SERVERS</h2>
+            <span class="section-badge" id="server-badge">0</span>
+          </div>
+          <div id="server-list" class="device-list"></div>
+          <div class="sidebar-buttons">
+            <button class="btn btn-sm btn-primary" id="add-server-btn">
+              <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              ADD SERVER
+            </button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-header">
+            <h2 class="section-title">DISCOVERED</h2>
             <span class="section-badge" id="device-badge">0</span>
           </div>
           <div id="device-list" class="device-list"></div>
@@ -46,10 +60,6 @@
             <button class="btn btn-sm btn-secondary" id="scan-btn">
               <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
               SCAN
-            </button>
-            <button class="btn btn-sm btn-secondary" id="add-server-btn">
-              <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              ADD
             </button>
           </div>
         </section>
@@ -164,10 +174,14 @@
               <div class="form-group">
                 <label class="form-label">Protocol</label>
                 <select name="source" class="select" id="bridge-source">
+                  <option value="clasp">CLASP</option>
                   <option value="osc">OSC</option>
                   <option value="midi">MIDI</option>
                   <option value="artnet">Art-Net</option>
                   <option value="dmx">DMX</option>
+                  <option value="mqtt">MQTT</option>
+                  <option value="websocket">WebSocket</option>
+                  <option value="http">HTTP</option>
                 </select>
               </div>
               <div class="form-group" id="source-addr-group">
@@ -188,6 +202,9 @@
                   <option value="midi">MIDI</option>
                   <option value="artnet">Art-Net</option>
                   <option value="dmx">DMX</option>
+                  <option value="mqtt">MQTT</option>
+                  <option value="websocket">WebSocket</option>
+                  <option value="http">HTTP</option>
                 </select>
               </div>
               <div class="form-group" id="target-addr-group">
@@ -205,7 +222,7 @@
     </dialog>
 
     <!-- Mapping Modal -->
-    <dialog id="mapping-modal" class="modal modal-lg">
+    <dialog id="mapping-modal" class="modal modal-xl">
       <div class="modal-content">
         <div class="modal-header">
           <h2 class="modal-title">CREATE MAPPING</h2>
@@ -214,156 +231,331 @@
           </button>
         </div>
         <form id="mapping-form">
-          <div class="mapping-editor">
-            <!-- Source -->
-            <div class="mapping-side">
-              <h3 class="mapping-side-title">SOURCE</h3>
-              <div class="form-group">
-                <label class="form-label">Protocol</label>
-                <select name="sourceProtocol" class="select" id="mapping-source-protocol">
-                  <option value="osc">OSC</option>
-                  <option value="midi">MIDI</option>
-                  <option value="artnet">Art-Net</option>
-                  <option value="dmx">DMX</option>
-                </select>
+          <!-- How It Works Banner -->
+          <div class="mapping-help">
+            <svg class="mapping-help-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>Signal mappings route values from a <strong>source</strong> protocol/address, apply a <strong>transform</strong>, then send to a <strong>target</strong>.</span>
+          </div>
+
+          <div class="mapping-editor-v2">
+            <!-- Source Panel -->
+            <div class="mapping-panel">
+              <div class="mapping-panel-header">
+                <span class="mapping-panel-badge">1</span>
+                <h3 class="mapping-panel-title">SOURCE</h3>
               </div>
-              <div class="form-group" id="source-osc-fields">
-                <label class="form-label">Address Pattern</label>
-                <div class="input-with-btn">
-                  <input type="text" name="sourceAddress" class="input" placeholder="/my/address/*">
-                  <button type="button" class="btn btn-sm btn-secondary" id="learn-source-btn" title="Learn from incoming">
-                    <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
-                  </button>
+              <div class="mapping-panel-body">
+                <div class="form-group">
+                  <label class="form-label">Protocol</label>
+                  <select name="sourceProtocol" class="select" id="mapping-source-protocol">
+                    <option value="clasp">CLASP</option>
+                    <option value="osc">OSC</option>
+                    <option value="midi">MIDI</option>
+                    <option value="artnet">Art-Net</option>
+                    <option value="dmx">DMX</option>
+                    <option value="mqtt">MQTT</option>
+                    <option value="websocket">WebSocket</option>
+                    <option value="http">HTTP</option>
+                  </select>
                 </div>
-              </div>
-              <div class="form-group hidden" id="source-midi-fields">
-                <label class="form-label">MIDI Input</label>
-                <select name="sourceMidiType" class="select">
-                  <option value="note">Note On/Off</option>
-                  <option value="cc">Control Change</option>
-                  <option value="pc">Program Change</option>
-                  <option value="pb">Pitch Bend</option>
-                  <option value="at">Aftertouch</option>
-                </select>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label class="form-label">Channel</label>
-                    <input type="number" name="sourceMidiChannel" class="input" min="1" max="16" value="1">
+
+                <!-- CLASP fields -->
+                <div class="form-group" id="source-clasp-fields">
+                  <label class="form-label">Address Pattern</label>
+                  <div class="input-with-btn">
+                    <input type="text" name="sourceClaspAddress" class="input" placeholder="/lumen/scene/*/opacity">
+                    <button type="button" class="btn btn-sm btn-secondary" id="learn-source-btn" title="Learn from incoming">
+                      <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+                    </button>
                   </div>
-                  <div class="form-group" id="source-midi-note-group">
-                    <label class="form-label">Note/CC #</label>
-                    <input type="number" name="sourceMidiNumber" class="input" min="0" max="127" placeholder="Any">
+                  <span class="form-hint">Use * for single segment, ** for multiple</span>
+                </div>
+
+                <!-- OSC fields -->
+                <div class="form-group hidden" id="source-osc-fields">
+                  <label class="form-label">Address Pattern</label>
+                  <div class="input-with-btn">
+                    <input type="text" name="sourceAddress" class="input" placeholder="/my/address/*">
+                    <button type="button" class="btn btn-sm btn-secondary" id="learn-source-osc-btn" title="Learn from incoming">
+                      <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div class="form-group hidden" id="source-dmx-fields">
-                <label class="form-label">DMX Channel</label>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label class="form-label">Universe</label>
-                    <input type="number" name="sourceDmxUniverse" class="input" min="0" value="0">
+
+                <!-- MIDI fields -->
+                <div class="form-group hidden" id="source-midi-fields">
+                  <label class="form-label">MIDI Input</label>
+                  <select name="sourceMidiType" class="select">
+                    <option value="note">Note On/Off</option>
+                    <option value="cc">Control Change</option>
+                    <option value="pc">Program Change</option>
+                    <option value="pb">Pitch Bend</option>
+                    <option value="at">Aftertouch</option>
+                  </select>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Channel</label>
+                      <input type="number" name="sourceMidiChannel" class="input" min="1" max="16" value="1">
+                    </div>
+                    <div class="form-group" id="source-midi-note-group">
+                      <label class="form-label">Note/CC #</label>
+                      <input type="number" name="sourceMidiNumber" class="input" min="0" max="127" placeholder="Any">
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Channel</label>
-                    <input type="number" name="sourceDmxChannel" class="input" min="1" max="512" value="1">
+                </div>
+
+                <!-- DMX/Art-Net fields -->
+                <div class="form-group hidden" id="source-dmx-fields">
+                  <label class="form-label">DMX Channel</label>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Universe</label>
+                      <input type="number" name="sourceDmxUniverse" class="input" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Channel</label>
+                      <input type="number" name="sourceDmxChannel" class="input" min="1" max="512" value="1">
+                    </div>
                   </div>
+                </div>
+
+                <!-- Value Type -->
+                <div class="form-group">
+                  <label class="form-label">Value Type</label>
+                  <select name="sourceValueType" class="select" id="source-value-type">
+                    <option value="auto">Auto-detect</option>
+                    <option value="number">Number</option>
+                    <option value="boolean">Boolean</option>
+                    <option value="string">String</option>
+                    <option value="json">JSON Object</option>
+                    <option value="array">Array</option>
+                  </select>
+                </div>
+
+                <!-- JSON Path (for complex types) -->
+                <div class="form-group hidden" id="source-json-path-group">
+                  <label class="form-label">JSON Path (optional)</label>
+                  <input type="text" name="sourceJsonPath" class="input" placeholder="$.data.value">
+                  <span class="form-hint">Extract nested value, e.g., $.items[0].name</span>
                 </div>
               </div>
             </div>
 
-            <!-- Transform -->
-            <div class="mapping-transform">
-              <svg class="transform-arrow" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-              <div class="transform-options">
-                <label class="form-label">TRANSFORM</label>
-                <select name="transform" class="select" id="mapping-transform">
-                  <option value="direct">Direct (no change)</option>
-                  <option value="scale">Scale Range</option>
-                  <option value="invert">Invert</option>
-                  <option value="toggle">Toggle (on/off)</option>
-                  <option value="threshold">Threshold</option>
-                </select>
+            <!-- Transform Panel -->
+            <div class="mapping-panel mapping-panel-transform">
+              <div class="mapping-panel-header">
+                <span class="mapping-panel-badge">2</span>
+                <h3 class="mapping-panel-title">TRANSFORM</h3>
+              </div>
+              <div class="mapping-panel-body">
+                <div class="form-group">
+                  <label class="form-label">Transform Type</label>
+                  <select name="transform" class="select select-lg" id="mapping-transform">
+                    <option value="direct">Direct Pass-through</option>
+                    <optgroup label="Numeric">
+                      <option value="scale">Scale Range</option>
+                      <option value="invert">Invert (1 - value)</option>
+                      <option value="clamp">Clamp to Range</option>
+                      <option value="round">Round to Integer</option>
+                      <option value="threshold">Threshold (→ 0/1)</option>
+                    </optgroup>
+                    <optgroup label="Logic">
+                      <option value="toggle">Toggle State</option>
+                      <option value="gate">Gate (high when > 0)</option>
+                      <option value="trigger">Trigger (pulse on change)</option>
+                    </optgroup>
+                    <optgroup label="Advanced">
+                      <option value="expression">Expression</option>
+                      <option value="javascript">JavaScript Function</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <!-- Transform parameter panels -->
                 <div class="transform-params hidden" id="scale-params">
-                  <div class="form-row">
+                  <div class="transform-params-header">Input Range → Output Range</div>
+                  <div class="form-row-4">
                     <div class="form-group">
                       <label class="form-label">In Min</label>
-                      <input type="number" name="scaleInMin" class="input" step="0.01" value="0">
+                      <input type="number" name="scaleInMin" class="input" step="any" value="0">
                     </div>
                     <div class="form-group">
                       <label class="form-label">In Max</label>
-                      <input type="number" name="scaleInMax" class="input" step="0.01" value="1">
+                      <input type="number" name="scaleInMax" class="input" step="any" value="1">
                     </div>
-                  </div>
-                  <div class="form-row">
                     <div class="form-group">
                       <label class="form-label">Out Min</label>
-                      <input type="number" name="scaleOutMin" class="input" step="0.01" value="0">
+                      <input type="number" name="scaleOutMin" class="input" step="any" value="0">
                     </div>
                     <div class="form-group">
                       <label class="form-label">Out Max</label>
-                      <input type="number" name="scaleOutMax" class="input" step="0.01" value="127">
+                      <input type="number" name="scaleOutMax" class="input" step="any" value="127">
                     </div>
                   </div>
                 </div>
+
+                <div class="transform-params hidden" id="clamp-params">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Min</label>
+                      <input type="number" name="clampMin" class="input" step="any" value="0">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Max</label>
+                      <input type="number" name="clampMax" class="input" step="any" value="1">
+                    </div>
+                  </div>
+                </div>
+
                 <div class="transform-params hidden" id="threshold-params">
                   <div class="form-group">
-                    <label class="form-label">Threshold</label>
-                    <input type="number" name="threshold" class="input" step="0.01" value="0.5">
+                    <label class="form-label">Threshold Value</label>
+                    <input type="number" name="threshold" class="input" step="any" value="0.5">
+                  </div>
+                  <span class="form-hint">Output 1 if input ≥ threshold, else 0</span>
+                </div>
+
+                <div class="transform-params hidden" id="expression-params">
+                  <div class="form-group">
+                    <label class="form-label">Expression</label>
+                    <input type="text" name="expression" class="input" placeholder="value * 2 + 10">
+                  </div>
+                  <span class="form-hint">Use 'value' as input. Supports: + - * / % ^ sin cos tan abs min max</span>
+                </div>
+
+                <div class="transform-params hidden" id="javascript-params">
+                  <div class="form-group">
+                    <label class="form-label">JavaScript Function</label>
+                    <textarea name="javascriptCode" class="input code-editor" rows="8" spellcheck="false">// Transform function
+// 'input' contains the incoming value
+// Return the transformed value
+
+function transform(input) {
+  // Example: scale MIDI velocity to 0-1 range
+  if (typeof input === 'number') {
+    return input / 127;
+  }
+
+  // Example: extract from JSON
+  if (typeof input === 'object') {
+    return input.value ?? input;
+  }
+
+  return input;
+}</textarea>
+                  </div>
+                  <div class="js-editor-toolbar">
+                    <button type="button" class="btn btn-sm btn-secondary" id="test-js-btn">
+                      <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      TEST
+                    </button>
+                    <span class="js-test-result" id="js-test-result"></span>
+                  </div>
+                </div>
+
+                <!-- Preview -->
+                <div class="transform-preview">
+                  <div class="transform-preview-label">PREVIEW</div>
+                  <div class="transform-preview-flow">
+                    <span class="preview-value" id="preview-input">0.5</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    <span class="preview-value preview-output" id="preview-output">0.5</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Target -->
-            <div class="mapping-side">
-              <h3 class="mapping-side-title">TARGET</h3>
-              <div class="form-group">
-                <label class="form-label">Protocol</label>
-                <select name="targetProtocol" class="select" id="mapping-target-protocol">
-                  <option value="midi">MIDI</option>
-                  <option value="osc">OSC</option>
-                  <option value="artnet">Art-Net</option>
-                  <option value="dmx">DMX</option>
-                </select>
+            <!-- Target Panel -->
+            <div class="mapping-panel">
+              <div class="mapping-panel-header">
+                <span class="mapping-panel-badge">3</span>
+                <h3 class="mapping-panel-title">TARGET</h3>
               </div>
-              <div class="form-group hidden" id="target-osc-fields">
-                <label class="form-label">Address</label>
-                <input type="text" name="targetAddress" class="input" placeholder="/target/address">
-              </div>
-              <div class="form-group" id="target-midi-fields">
-                <label class="form-label">MIDI Output</label>
-                <select name="targetMidiType" class="select">
-                  <option value="note">Note On/Off</option>
-                  <option value="cc">Control Change</option>
-                  <option value="pc">Program Change</option>
-                  <option value="pb">Pitch Bend</option>
-                </select>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label class="form-label">Channel</label>
-                    <input type="number" name="targetMidiChannel" class="input" min="1" max="16" value="1">
-                  </div>
-                  <div class="form-group" id="target-midi-note-group">
-                    <label class="form-label">Note/CC #</label>
-                    <input type="number" name="targetMidiNumber" class="input" min="0" max="127" value="60">
+              <div class="mapping-panel-body">
+                <div class="form-group">
+                  <label class="form-label">Protocol</label>
+                  <select name="targetProtocol" class="select" id="mapping-target-protocol">
+                    <option value="clasp">CLASP</option>
+                    <option value="osc">OSC</option>
+                    <option value="midi">MIDI</option>
+                    <option value="artnet">Art-Net</option>
+                    <option value="dmx">DMX</option>
+                    <option value="mqtt">MQTT</option>
+                    <option value="websocket">WebSocket</option>
+                    <option value="http">HTTP</option>
+                  </select>
+                </div>
+
+                <!-- CLASP fields -->
+                <div class="form-group" id="target-clasp-fields">
+                  <label class="form-label">Address</label>
+                  <input type="text" name="targetClaspAddress" class="input" placeholder="/lumen/scene/0/opacity">
+                </div>
+
+                <!-- OSC fields -->
+                <div class="form-group hidden" id="target-osc-fields">
+                  <label class="form-label">Address</label>
+                  <input type="text" name="targetAddress" class="input" placeholder="/target/address">
+                </div>
+
+                <!-- MIDI fields -->
+                <div class="form-group hidden" id="target-midi-fields">
+                  <label class="form-label">MIDI Output</label>
+                  <select name="targetMidiType" class="select">
+                    <option value="note">Note On/Off</option>
+                    <option value="cc">Control Change</option>
+                    <option value="pc">Program Change</option>
+                    <option value="pb">Pitch Bend</option>
+                  </select>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Channel</label>
+                      <input type="number" name="targetMidiChannel" class="input" min="1" max="16" value="1">
+                    </div>
+                    <div class="form-group" id="target-midi-note-group">
+                      <label class="form-label">Note/CC #</label>
+                      <input type="number" name="targetMidiNumber" class="input" min="0" max="127" value="60">
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="form-group hidden" id="target-dmx-fields">
-                <label class="form-label">DMX Channel</label>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label class="form-label">Universe</label>
-                    <input type="number" name="targetDmxUniverse" class="input" min="0" value="0">
+
+                <!-- DMX fields -->
+                <div class="form-group hidden" id="target-dmx-fields">
+                  <label class="form-label">DMX Channel</label>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Universe</label>
+                      <input type="number" name="targetDmxUniverse" class="input" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Channel</label>
+                      <input type="number" name="targetDmxChannel" class="input" min="1" max="512" value="1">
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">Channel</label>
-                    <input type="number" name="targetDmxChannel" class="input" min="1" max="512" value="1">
-                  </div>
+                </div>
+
+                <!-- Output Value Type -->
+                <div class="form-group">
+                  <label class="form-label">Output Format</label>
+                  <select name="targetValueType" class="select" id="target-value-type">
+                    <option value="auto">Same as input</option>
+                    <option value="number">Number</option>
+                    <option value="boolean">Boolean</option>
+                    <option value="string">String</option>
+                    <option value="json">JSON Object</option>
+                  </select>
+                </div>
+
+                <!-- JSON template (for complex output) -->
+                <div class="form-group hidden" id="target-json-template-group">
+                  <label class="form-label">JSON Template</label>
+                  <textarea name="targetJsonTemplate" class="input" rows="3" placeholder='{"value": $value, "timestamp": $now}'></textarea>
+                  <span class="form-hint">Use $value for the transformed value, $now for timestamp</span>
                 </div>
               </div>
             </div>
           </div>
+
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" data-close-modal>CANCEL</button>
             <button type="submit" class="btn btn-primary">CREATE MAPPING</button>
@@ -374,7 +566,7 @@
 
     <!-- Server Modal -->
     <dialog id="server-modal" class="modal">
-      <div class="modal-content modal-sm">
+      <div class="modal-content">
         <div class="modal-header">
           <h2 class="modal-title">ADD SERVER</h2>
           <button type="button" class="modal-close" data-close-modal>
@@ -383,12 +575,118 @@
         </div>
         <form id="server-form">
           <div class="form-group">
-            <label class="form-label">Server Address</label>
-            <input type="text" name="address" class="input" placeholder="localhost:7330" value="localhost:7330" required>
+            <label class="form-label">Server Type</label>
+            <select name="serverType" class="select" id="server-type">
+              <option value="clasp">CLASP (Native Protocol)</option>
+              <option value="osc">OSC Server</option>
+              <option value="mqtt">MQTT Broker</option>
+              <option value="websocket">WebSocket Server</option>
+              <option value="http">HTTP REST API</option>
+              <option value="artnet">Art-Net (DMX over Ethernet)</option>
+              <option value="dmx">DMX (USB Serial)</option>
+            </select>
           </div>
+
+          <!-- CLASP Server Fields -->
+          <div id="server-clasp-fields" class="server-fields">
+            <div class="form-group">
+              <label class="form-label">Address</label>
+              <input type="text" name="claspAddress" class="input" placeholder="localhost:7331" value="localhost:7331">
+            </div>
+          </div>
+
+          <!-- OSC Server Fields -->
+          <div id="server-osc-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Bind Address</label>
+              <input type="text" name="oscBind" class="input" placeholder="0.0.0.0" value="0.0.0.0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Port</label>
+              <input type="number" name="oscPort" class="input" placeholder="9000" value="9000" min="1" max="65535">
+            </div>
+          </div>
+
+          <!-- MQTT Broker Fields -->
+          <div id="server-mqtt-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Broker Host</label>
+              <input type="text" name="mqttHost" class="input" placeholder="localhost" value="localhost">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Port</label>
+              <input type="number" name="mqttPort" class="input" placeholder="1883" value="1883" min="1" max="65535">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subscribe Topics (comma separated)</label>
+              <input type="text" name="mqttTopics" class="input" placeholder="#" value="#">
+            </div>
+          </div>
+
+          <!-- WebSocket Server Fields -->
+          <div id="server-websocket-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Mode</label>
+              <select name="wsMode" class="select">
+                <option value="server">Server (accept connections)</option>
+                <option value="client">Client (connect to server)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Address/URL</label>
+              <input type="text" name="wsAddress" class="input" placeholder="0.0.0.0:8080" value="0.0.0.0:8080">
+            </div>
+          </div>
+
+          <!-- HTTP Server Fields -->
+          <div id="server-http-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Bind Address</label>
+              <input type="text" name="httpBind" class="input" placeholder="0.0.0.0:3000" value="0.0.0.0:3000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Base Path</label>
+              <input type="text" name="httpBasePath" class="input" placeholder="/api" value="/api">
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" name="httpCors" checked> Enable CORS
+              </label>
+            </div>
+          </div>
+
+          <!-- Art-Net Server Fields -->
+          <div id="server-artnet-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Bind Address</label>
+              <input type="text" name="artnetBind" class="input" placeholder="0.0.0.0:6454" value="0.0.0.0:6454">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subnet</label>
+              <input type="number" name="artnetSubnet" class="input" placeholder="0" value="0" min="0" max="15">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Universe</label>
+              <input type="number" name="artnetUniverse" class="input" placeholder="0" value="0" min="0" max="15">
+            </div>
+          </div>
+
+          <!-- DMX Serial Fields -->
+          <div id="server-dmx-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Serial Port</label>
+              <input type="text" name="dmxPort" class="input" placeholder="/dev/ttyUSB0" value="/dev/ttyUSB0">
+              <span class="form-hint">macOS: /dev/cu.usbserial-*, Windows: COM3</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Universe</label>
+              <input type="number" name="dmxUniverse" class="input" placeholder="0" value="0" min="0" max="15">
+            </div>
+          </div>
+
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" data-close-modal>CANCEL</button>
-            <button type="submit" class="btn btn-primary">CONNECT</button>
+            <button type="submit" class="btn btn-primary">START SERVER</button>
           </div>
         </form>
       </div>

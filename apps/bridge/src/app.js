@@ -5,7 +5,8 @@
 
 // State
 const state = {
-  devices: [],
+  servers: [],      // User-created servers
+  devices: [],      // Discovered devices
   bridges: [],
   mappings: [],
   signals: [],
@@ -44,25 +45,35 @@ const protocolNames = {
   artnet: 'Art-Net',
   dmx: 'DMX',
   clasp: 'CLASP',
+  mqtt: 'MQTT',
+  websocket: 'WS',
+  http: 'HTTP',
 };
 
 // Default addresses for protocols
 const defaultAddresses = {
-  osc: '0.0.0.0:8000',
+  osc: '0.0.0.0:9000',
   midi: 'default',
   artnet: '0.0.0.0:6454',
   dmx: '/dev/ttyUSB0',
-  clasp: 'localhost:7330',
+  clasp: 'localhost:7331',
+  mqtt: 'localhost:1883',
+  websocket: '0.0.0.0:8080',
+  http: '0.0.0.0:3000',
 };
 
 // Initialize application
 async function init() {
   console.log('CLASP Bridge v2 initializing...');
 
-  // Load saved data
+  // Load saved data from localStorage
   loadMappingsFromStorage();
 
-  // Load data from backend
+  // Restore saved servers and bridges (reconnect them)
+  await restoreServersOnStartup();
+  await restoreBridgesOnStartup();
+
+  // Also try to load any discovered devices from backend
   await Promise.all([loadDevices(), loadBridges()]);
 
   // Set up UI
@@ -70,15 +81,18 @@ async function init() {
   setupModals();
   setupEventListeners();
   setupProtocolFieldSwitching();
+  setupServerTypeFieldSwitching();
   setupTransformParams();
   setupLearnMode();
 
   // Initial render
+  renderServers();
   renderDevices();
   renderBridges();
   renderMappings();
   renderSignalMonitor();
   updateStatus();
+  updateMappingCount();
 
   // Start rate counter
   setInterval(updateSignalRate, 1000);
@@ -126,6 +140,111 @@ function saveMappingsToStorage() {
     localStorage.setItem('clasp-mappings', JSON.stringify(state.mappings));
   } catch (e) {
     console.error('Failed to save mappings:', e);
+  }
+}
+
+function loadServersFromStorage() {
+  try {
+    const saved = localStorage.getItem('clasp-servers');
+    if (saved) {
+      const servers = JSON.parse(saved);
+      // Mark all as disconnected initially (will be reconnected)
+      return servers.map(s => ({ ...s, status: 'disconnected' }));
+    }
+  } catch (e) {
+    console.error('Failed to load servers from storage:', e);
+  }
+  return [];
+}
+
+function saveServersToStorage() {
+  try {
+    // Save server configs (not runtime status)
+    const serversToSave = state.servers.map(s => ({
+      id: s.id,
+      type: s.type,
+      protocol: s.protocol,
+      name: s.name,
+      address: s.address,
+      // Protocol-specific configs
+      bind: s.bind,
+      port: s.port,
+      host: s.host,
+      topics: s.topics,
+      mode: s.mode,
+      basePath: s.basePath,
+      cors: s.cors,
+      subnet: s.subnet,
+      universe: s.universe,
+      // DMX specific
+      serialPort: s.serialPort,
+    }));
+    localStorage.setItem('clasp-servers', JSON.stringify(serversToSave));
+  } catch (e) {
+    console.error('Failed to save servers:', e);
+  }
+}
+
+function loadBridgesFromStorage() {
+  try {
+    const saved = localStorage.getItem('clasp-bridges');
+    if (saved) {
+      const bridges = JSON.parse(saved);
+      return bridges.map(b => ({ ...b, active: false }));
+    }
+  } catch (e) {
+    console.error('Failed to load bridges from storage:', e);
+  }
+  return [];
+}
+
+function saveBridgesToStorage() {
+  try {
+    localStorage.setItem('clasp-bridges', JSON.stringify(state.bridges));
+  } catch (e) {
+    console.error('Failed to save bridges:', e);
+  }
+}
+
+async function restoreServersOnStartup() {
+  const savedServers = loadServersFromStorage();
+  for (const serverConfig of savedServers) {
+    try {
+      if (window.clasp) {
+        // Try to restart the server
+        const result = await window.clasp.startServer(serverConfig);
+        serverConfig.id = result?.id || serverConfig.id;
+        serverConfig.status = 'connected';
+      } else {
+        serverConfig.status = 'connected'; // Mock mode
+      }
+      state.servers.push(serverConfig);
+    } catch (err) {
+      console.warn(`Failed to restore server ${serverConfig.name}:`, err);
+      serverConfig.status = 'error';
+      serverConfig.error = err.message;
+      state.servers.push(serverConfig);
+    }
+  }
+}
+
+async function restoreBridgesOnStartup() {
+  const savedBridges = loadBridgesFromStorage();
+  for (const bridgeConfig of savedBridges) {
+    try {
+      if (window.clasp) {
+        const bridge = await window.clasp.createBridge(bridgeConfig);
+        bridgeConfig.id = bridge?.id || bridgeConfig.id;
+        bridgeConfig.active = true;
+      } else {
+        bridgeConfig.active = true; // Mock mode
+      }
+      state.bridges.push(bridgeConfig);
+    } catch (err) {
+      console.warn(`Failed to restore bridge:`, err);
+      bridgeConfig.active = false;
+      state.bridges.push(bridgeConfig);
+    }
   }
 }
 
@@ -210,16 +329,21 @@ function setupProtocolFieldSwitching() {
 
 function updateProtocolFields(side, protocol) {
   // Hide all protocol-specific fields for this side
+  const claspFields = $(`${side}-clasp-fields`);
   const oscFields = $(`${side}-osc-fields`);
   const midiFields = $(`${side}-midi-fields`);
   const dmxFields = $(`${side}-dmx-fields`);
 
+  claspFields?.classList.add('hidden');
   oscFields?.classList.add('hidden');
   midiFields?.classList.add('hidden');
   dmxFields?.classList.add('hidden');
 
   // Show appropriate fields
   switch (protocol) {
+    case 'clasp':
+      claspFields?.classList.remove('hidden');
+      break;
     case 'osc':
       oscFields?.classList.remove('hidden');
       break;
@@ -241,27 +365,204 @@ function updateBridgeAddressPlaceholder(side, protocol) {
 }
 
 // ============================================
+// Server Type Field Switching
+// ============================================
+
+function setupServerTypeFieldSwitching() {
+  $('server-type')?.addEventListener('change', (e) => {
+    updateServerTypeFields(e.target.value);
+  });
+}
+
+function updateServerTypeFields(serverType) {
+  // Hide all server fields
+  const allFields = ['clasp', 'osc', 'mqtt', 'websocket', 'http', 'artnet', 'dmx'];
+  allFields.forEach(type => {
+    const fields = $(`server-${type}-fields`);
+    if (fields) {
+      fields.classList.add('hidden');
+    }
+  });
+
+  // Show appropriate fields
+  const targetFields = $(`server-${serverType}-fields`);
+  if (targetFields) {
+    targetFields.classList.remove('hidden');
+  }
+}
+
+// ============================================
 // Transform Parameters
 // ============================================
 
 function setupTransformParams() {
   $('mapping-transform')?.addEventListener('change', (e) => {
-    const transform = e.target.value;
+    updateTransformParams(e.target.value);
+    updateTransformPreview();
+  });
 
-    // Hide all transform params
-    $('scale-params')?.classList.add('hidden');
-    $('threshold-params')?.classList.add('hidden');
-
-    // Show appropriate params
-    switch (transform) {
-      case 'scale':
-        $('scale-params')?.classList.remove('hidden');
-        break;
-      case 'threshold':
-        $('threshold-params')?.classList.remove('hidden');
-        break;
+  // Value type changes
+  $('source-value-type')?.addEventListener('change', (e) => {
+    const valueType = e.target.value;
+    const jsonPathGroup = $('source-json-path-group');
+    if (jsonPathGroup) {
+      jsonPathGroup.classList.toggle('hidden', valueType !== 'json' && valueType !== 'array');
     }
   });
+
+  $('target-value-type')?.addEventListener('change', (e) => {
+    const valueType = e.target.value;
+    const jsonTemplateGroup = $('target-json-template-group');
+    if (jsonTemplateGroup) {
+      jsonTemplateGroup.classList.toggle('hidden', valueType !== 'json');
+    }
+  });
+
+  // Transform input changes for preview
+  const transformInputs = document.querySelectorAll('#scale-params input, #clamp-params input, #threshold-params input, [name="expression"]');
+  transformInputs.forEach(input => {
+    input.addEventListener('input', () => updateTransformPreview());
+  });
+
+  // JS test button
+  $('test-js-btn')?.addEventListener('click', testJavaScriptTransform);
+}
+
+function updateTransformParams(transform) {
+  // Hide all transform params
+  $('scale-params')?.classList.add('hidden');
+  $('clamp-params')?.classList.add('hidden');
+  $('threshold-params')?.classList.add('hidden');
+  $('expression-params')?.classList.add('hidden');
+  $('javascript-params')?.classList.add('hidden');
+
+  // Show appropriate params
+  switch (transform) {
+    case 'scale':
+      $('scale-params')?.classList.remove('hidden');
+      break;
+    case 'clamp':
+      $('clamp-params')?.classList.remove('hidden');
+      break;
+    case 'threshold':
+      $('threshold-params')?.classList.remove('hidden');
+      break;
+    case 'expression':
+      $('expression-params')?.classList.remove('hidden');
+      break;
+    case 'javascript':
+      $('javascript-params')?.classList.remove('hidden');
+      break;
+  }
+}
+
+function updateTransformPreview() {
+  const previewInput = $('preview-input');
+  const previewOutput = $('preview-output');
+  if (!previewInput || !previewOutput) return;
+
+  const testValue = 0.5;
+  const transformType = $('mapping-transform')?.value || 'direct';
+
+  let output;
+  try {
+    output = applyTransformForPreview(testValue, transformType);
+    previewOutput.textContent = typeof output === 'number' ? output.toFixed(3) : String(output);
+    previewOutput.classList.remove('error');
+  } catch (e) {
+    previewOutput.textContent = 'ERR';
+    previewOutput.classList.add('error');
+  }
+}
+
+function applyTransformForPreview(value, transformType) {
+  switch (transformType) {
+    case 'direct':
+      return value;
+    case 'scale': {
+      const inMin = parseFloat(document.querySelector('[name="scaleInMin"]')?.value) || 0;
+      const inMax = parseFloat(document.querySelector('[name="scaleInMax"]')?.value) || 1;
+      const outMin = parseFloat(document.querySelector('[name="scaleOutMin"]')?.value) || 0;
+      const outMax = parseFloat(document.querySelector('[name="scaleOutMax"]')?.value) || 127;
+      const normalized = (value - inMin) / (inMax - inMin);
+      return outMin + normalized * (outMax - outMin);
+    }
+    case 'invert':
+      return 1 - value;
+    case 'clamp': {
+      const min = parseFloat(document.querySelector('[name="clampMin"]')?.value) || 0;
+      const max = parseFloat(document.querySelector('[name="clampMax"]')?.value) || 1;
+      return Math.min(max, Math.max(min, value));
+    }
+    case 'round':
+      return Math.round(value);
+    case 'threshold': {
+      const threshold = parseFloat(document.querySelector('[name="threshold"]')?.value) || 0.5;
+      return value >= threshold ? 1 : 0;
+    }
+    case 'toggle':
+      return value > 0.5 ? 1 : 0;
+    case 'gate':
+      return value > 0 ? 1 : 0;
+    case 'trigger':
+      return 1; // Simplified for preview
+    case 'expression': {
+      const expr = document.querySelector('[name="expression"]')?.value || 'value';
+      return evaluateExpression(expr, value);
+    }
+    case 'javascript':
+      return value; // Can't preview JS without running it
+    default:
+      return value;
+  }
+}
+
+function evaluateExpression(expr, value) {
+  // Simple expression evaluator (safe subset)
+  const safeExpr = expr
+    .replace(/\bvalue\b/g, String(value))
+    .replace(/\bsin\b/g, 'Math.sin')
+    .replace(/\bcos\b/g, 'Math.cos')
+    .replace(/\btan\b/g, 'Math.tan')
+    .replace(/\babs\b/g, 'Math.abs')
+    .replace(/\bmin\b/g, 'Math.min')
+    .replace(/\bmax\b/g, 'Math.max')
+    .replace(/\bpow\b/g, 'Math.pow')
+    .replace(/\bsqrt\b/g, 'Math.sqrt')
+    .replace(/\bfloor\b/g, 'Math.floor')
+    .replace(/\bceil\b/g, 'Math.ceil')
+    .replace(/\bround\b/g, 'Math.round')
+    .replace(/\bPI\b/g, 'Math.PI');
+
+  // Basic validation - only allow safe characters
+  if (!/^[0-9+\-*/%().Math\s,]+$/.test(safeExpr)) {
+    throw new Error('Invalid expression');
+  }
+
+  return Function(`"use strict"; return (${safeExpr})`)();
+}
+
+function testJavaScriptTransform() {
+  const resultEl = $('js-test-result');
+  if (!resultEl) return;
+
+  const code = document.querySelector('[name="javascriptCode"]')?.value || '';
+  const testInput = 0.5;
+
+  try {
+    // Create a sandboxed function
+    const fn = new Function('input', `
+      ${code}
+      return transform(input);
+    `);
+
+    const result = fn(testInput);
+    resultEl.textContent = `Input: ${testInput} → Output: ${JSON.stringify(result)}`;
+    resultEl.className = 'js-test-result success';
+  } catch (e) {
+    resultEl.textContent = `Error: ${e.message}`;
+    resultEl.className = 'js-test-result error';
+  }
 }
 
 // ============================================
@@ -269,13 +570,23 @@ function setupTransformParams() {
 // ============================================
 
 function setupLearnMode() {
-  // Global learn button
+  // Global learn button (in the mappings toolbar)
   $('learn-btn')?.addEventListener('click', () => {
+    // First open the mapping modal if not open
+    const modal = $('mapping-modal');
+    if (!modal?.open) {
+      openMappingModal();
+    }
     toggleLearnMode('source');
   });
 
-  // Source learn button in modal
+  // Source learn button in modal (CLASP fields)
   $('learn-source-btn')?.addEventListener('click', () => {
+    toggleLearnMode('source');
+  });
+
+  // OSC learn button in modal
+  $('learn-source-osc-btn')?.addEventListener('click', () => {
     toggleLearnMode('source');
   });
 }
@@ -289,17 +600,41 @@ function toggleLearnMode(target) {
     state.learnMode = true;
     state.learnTarget = target;
 
-    // Visual feedback
-    $('learn-btn')?.classList.add('learn-active');
-    $('learn-source-btn')?.classList.add('learn-active');
+    // Visual feedback - add pulsing animation to all learn buttons
+    const learnButtons = [$('learn-btn'), $('learn-source-btn'), $('learn-source-osc-btn')];
+    learnButtons.forEach(btn => btn?.classList.add('learn-active'));
+
+    // Show notification that we're waiting for a signal
+    showLearnNotification('Waiting for incoming signal...');
   }
 }
 
 function resetLearnMode() {
   state.learnMode = false;
   state.learnTarget = null;
-  $('learn-btn')?.classList.remove('learn-active');
-  $('learn-source-btn')?.classList.remove('learn-active');
+  const learnButtons = [$('learn-btn'), $('learn-source-btn'), $('learn-source-osc-btn')];
+  learnButtons.forEach(btn => btn?.classList.remove('learn-active'));
+  hideLearnNotification();
+}
+
+function showLearnNotification(message) {
+  // Create or update notification element
+  let notification = $('learn-notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'learn-notification';
+    notification.className = 'learn-notification';
+    document.body.appendChild(notification);
+  }
+  notification.textContent = message;
+  notification.classList.add('visible');
+}
+
+function hideLearnNotification() {
+  const notification = $('learn-notification');
+  if (notification) {
+    notification.classList.remove('visible');
+  }
 }
 
 function handleLearnedSignal(signal) {
@@ -321,18 +656,51 @@ function handleLearnedSignal(signal) {
       updateProtocolFields('source', protocol);
     }
 
-    // Fill in address
-    if (protocol === 'osc') {
-      const addressInput = document.querySelector('[name="sourceAddress"]');
-      if (addressInput) addressInput.value = signal.address;
+    // Fill in address based on protocol
+    if (protocol === 'clasp' || protocol === 'osc') {
+      // For CLASP/OSC, fill in the address
+      if (protocol === 'clasp') {
+        const claspAddressInput = document.querySelector('[name="sourceClaspAddress"]');
+        if (claspAddressInput && signal.address) {
+          claspAddressInput.value = signal.address;
+        }
+      } else {
+        const oscAddressInput = document.querySelector('[name="sourceAddress"]');
+        if (oscAddressInput && signal.address) {
+          oscAddressInput.value = signal.address;
+        }
+      }
     } else if (protocol === 'midi') {
       // Parse MIDI info from signal
       const channelInput = document.querySelector('[name="sourceMidiChannel"]');
       const numberInput = document.querySelector('[name="sourceMidiNumber"]');
+      const typeSelect = document.querySelector('[name="sourceMidiType"]');
+
       if (channelInput && signal.channel) channelInput.value = signal.channel;
-      if (numberInput && signal.note !== undefined) numberInput.value = signal.note;
-      if (numberInput && signal.cc !== undefined) numberInput.value = signal.cc;
+
+      if (signal.note !== undefined) {
+        if (typeSelect) typeSelect.value = 'note';
+        if (numberInput) numberInput.value = signal.note;
+      } else if (signal.cc !== undefined) {
+        if (typeSelect) typeSelect.value = 'cc';
+        if (numberInput) numberInput.value = signal.cc;
+      }
+    } else if (protocol === 'dmx' || protocol === 'artnet') {
+      const universeInput = document.querySelector('[name="sourceDmxUniverse"]');
+      const channelInput = document.querySelector('[name="sourceDmxChannel"]');
+      if (universeInput && signal.universe !== undefined) universeInput.value = signal.universe;
+      if (channelInput && signal.channel !== undefined) channelInput.value = signal.channel;
+    } else if (protocol === 'mqtt') {
+      // MQTT uses topic as address
+      const claspAddressInput = document.querySelector('[name="sourceClaspAddress"]');
+      if (claspAddressInput && signal.topic) {
+        claspAddressInput.value = `/mqtt/${signal.topic}`;
+      }
     }
+
+    // Show success notification
+    showLearnNotification(`Learned: ${signal.address || signal.topic || 'Signal'}`);
+    setTimeout(hideLearnNotification, 2000);
   }
 
   resetLearnMode();
@@ -340,10 +708,14 @@ function handleLearnedSignal(signal) {
 }
 
 function detectProtocol(signal) {
-  if (signal.address?.startsWith('/')) return 'osc';
-  if (signal.channel !== undefined) return 'midi';
-  if (signal.universe !== undefined) return 'dmx';
-  return 'osc'; // default
+  // Check for CLASP namespace prefixes first
+  if (signal.address?.startsWith('/mqtt/')) return 'mqtt';
+  if (signal.address?.startsWith('/osc/')) return 'osc';
+  if (signal.address?.startsWith('/')) return 'clasp'; // Default for OSC-like addresses
+  if (signal.topic !== undefined) return 'mqtt';
+  if (signal.channel !== undefined && (signal.note !== undefined || signal.cc !== undefined)) return 'midi';
+  if (signal.universe !== undefined) return 'artnet';
+  return 'clasp'; // default
 }
 
 // ============================================
@@ -351,6 +723,27 @@ function detectProtocol(signal) {
 // ============================================
 
 function setupEventListeners() {
+  // Event delegation for delete actions (CSP-compliant)
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+
+    const action = target.dataset.action;
+    const id = target.dataset.id;
+
+    switch (action) {
+      case 'delete-server':
+        deleteServer(id);
+        break;
+      case 'delete-bridge':
+        deleteBridge(id);
+        break;
+      case 'delete-mapping':
+        deleteMapping(id);
+        break;
+    }
+  });
+
   // Scan button
   $('scan-btn')?.addEventListener('click', handleScan);
 
@@ -480,28 +873,111 @@ function updateScanButton() {
 async function handleAddServer(e) {
   e.preventDefault();
   const form = e.target;
-  const addr = new FormData(form).get('address');
+  const data = new FormData(form);
+  const serverType = data.get('serverType') || 'clasp';
 
-  if (!addr) return;
+  let serverConfig = {
+    id: Date.now().toString(),
+    type: serverType,
+    protocol: serverType,
+    status: 'starting',
+  };
+
+  // Build config based on server type
+  switch (serverType) {
+    case 'clasp':
+      serverConfig.address = data.get('claspAddress') || 'localhost:7331';
+      serverConfig.name = `CLASP Server @ ${serverConfig.address}`;
+      break;
+
+    case 'osc':
+      serverConfig.bind = data.get('oscBind') || '0.0.0.0';
+      serverConfig.port = parseInt(data.get('oscPort')) || 9000;
+      serverConfig.address = `${serverConfig.bind}:${serverConfig.port}`;
+      serverConfig.name = `OSC Server @ ${serverConfig.address}`;
+      break;
+
+    case 'mqtt':
+      serverConfig.host = data.get('mqttHost') || 'localhost';
+      serverConfig.port = parseInt(data.get('mqttPort')) || 1883;
+      serverConfig.topics = (data.get('mqttTopics') || '#').split(',').map(t => t.trim());
+      serverConfig.address = `${serverConfig.host}:${serverConfig.port}`;
+      serverConfig.name = `MQTT Broker @ ${serverConfig.address}`;
+      break;
+
+    case 'websocket':
+      serverConfig.mode = data.get('wsMode') || 'server';
+      serverConfig.address = data.get('wsAddress') || '0.0.0.0:8080';
+      serverConfig.name = `WebSocket ${serverConfig.mode === 'server' ? 'Server' : 'Client'} @ ${serverConfig.address}`;
+      break;
+
+    case 'http':
+      serverConfig.bind = data.get('httpBind') || '0.0.0.0:3000';
+      serverConfig.basePath = data.get('httpBasePath') || '/api';
+      serverConfig.cors = data.get('httpCors') === 'on';
+      serverConfig.address = serverConfig.bind;
+      serverConfig.name = `HTTP REST API @ ${serverConfig.address}`;
+      break;
+
+    case 'artnet':
+      serverConfig.bind = data.get('artnetBind') || '0.0.0.0:6454';
+      serverConfig.subnet = parseInt(data.get('artnetSubnet')) || 0;
+      serverConfig.universe = parseInt(data.get('artnetUniverse')) || 0;
+      serverConfig.address = serverConfig.bind;
+      serverConfig.name = `Art-Net @ ${serverConfig.address} (${serverConfig.subnet}:${serverConfig.universe})`;
+      break;
+
+    case 'dmx':
+      serverConfig.serialPort = data.get('dmxPort') || '/dev/ttyUSB0';
+      serverConfig.universe = parseInt(data.get('dmxUniverse')) || 0;
+      serverConfig.address = serverConfig.serialPort;
+      serverConfig.name = `DMX @ ${serverConfig.serialPort} (U${serverConfig.universe})`;
+      break;
+
+    default:
+      console.error('Unknown server type:', serverType);
+      return;
+  }
 
   try {
     if (window.clasp) {
-      await window.clasp.addServer(addr);
+      // Call backend to start the server
+      const result = await window.clasp.startServer(serverConfig);
+      serverConfig.id = result?.id || serverConfig.id;
+      serverConfig.status = 'connected';
     } else {
-      state.devices.push({
-        id: Date.now().toString(),
-        name: `Server @ ${addr}`,
-        address: addr,
-        protocol: 'clasp',
-        status: 'connected'
-      });
+      // Mock mode
+      serverConfig.status = 'connected';
     }
-    renderDevices();
+
+    state.servers.push(serverConfig);
+    saveServersToStorage();
+    renderServers();
     updateStatus();
     $('server-modal')?.close();
     form.reset();
+    updateServerTypeFields('clasp'); // Reset to default fields
   } catch (err) {
-    console.error('Failed to add server:', err);
+    console.error('Failed to start server:', err);
+    serverConfig.status = 'error';
+    serverConfig.error = err.message;
+    state.servers.push(serverConfig);
+    saveServersToStorage();
+    renderServers();
+  }
+}
+
+async function deleteServer(id) {
+  try {
+    if (window.clasp) {
+      await window.clasp.stopServer(id);
+    }
+    state.servers = state.servers.filter(s => s.id !== id);
+    saveServersToStorage();
+    renderServers();
+    updateStatus();
+  } catch (err) {
+    console.error('Failed to delete server:', err);
   }
 }
 
@@ -525,6 +1001,7 @@ async function handleCreateBridge(e) {
       bridge = { id: Date.now().toString(), ...config, active: true };
     }
     state.bridges.push(bridge);
+    saveBridgesToStorage();
     renderBridges();
     $('bridge-modal')?.close();
     form.reset();
@@ -540,13 +1017,19 @@ function openMappingModal() {
   // Reset form
   $('mapping-form')?.reset();
 
-  // Reset field visibility to defaults
-  updateProtocolFields('source', 'osc');
-  updateProtocolFields('target', 'midi');
+  // Reset field visibility to defaults (CLASP is now first/default)
+  updateProtocolFields('source', 'clasp');
+  updateProtocolFields('target', 'clasp');
 
   // Reset transform params
-  $('scale-params')?.classList.add('hidden');
-  $('threshold-params')?.classList.add('hidden');
+  updateTransformParams('direct');
+
+  // Reset value type visibility
+  $('source-json-path-group')?.classList.add('hidden');
+  $('target-json-template-group')?.classList.add('hidden');
+
+  // Update preview
+  updateTransformPreview();
 
   modal.showModal();
 }
@@ -556,34 +1039,58 @@ function handleCreateMapping(e) {
   const form = e.target;
   const data = new FormData(form);
 
+  const sourceProtocol = data.get('sourceProtocol');
+  const targetProtocol = data.get('targetProtocol');
+
   const mapping = {
     id: state.editingMapping || Date.now().toString(),
     enabled: true,
     source: {
-      protocol: data.get('sourceProtocol'),
-      address: data.get('sourceAddress') || null,
+      protocol: sourceProtocol,
+      // CLASP or OSC address
+      address: sourceProtocol === 'clasp' ? data.get('sourceClaspAddress') : data.get('sourceAddress') || null,
+      // MIDI fields
       midiType: data.get('sourceMidiType') || null,
       midiChannel: parseInt(data.get('sourceMidiChannel')) || null,
       midiNumber: data.get('sourceMidiNumber') ? parseInt(data.get('sourceMidiNumber')) : null,
+      // DMX fields
       dmxUniverse: parseInt(data.get('sourceDmxUniverse')) || null,
       dmxChannel: parseInt(data.get('sourceDmxChannel')) || null,
+      // Value type
+      valueType: data.get('sourceValueType') || 'auto',
+      jsonPath: data.get('sourceJsonPath') || null,
     },
     target: {
-      protocol: data.get('targetProtocol'),
-      address: data.get('targetAddress') || null,
+      protocol: targetProtocol,
+      // CLASP or OSC address
+      address: targetProtocol === 'clasp' ? data.get('targetClaspAddress') : data.get('targetAddress') || null,
+      // MIDI fields
       midiType: data.get('targetMidiType') || null,
       midiChannel: parseInt(data.get('targetMidiChannel')) || null,
       midiNumber: parseInt(data.get('targetMidiNumber')) || null,
+      // DMX fields
       dmxUniverse: parseInt(data.get('targetDmxUniverse')) || null,
       dmxChannel: parseInt(data.get('targetDmxChannel')) || null,
+      // Value type
+      valueType: data.get('targetValueType') || 'auto',
+      jsonTemplate: data.get('targetJsonTemplate') || null,
     },
     transform: {
       type: data.get('transform'),
+      // Scale params
       scaleInMin: parseFloat(data.get('scaleInMin')) || 0,
       scaleInMax: parseFloat(data.get('scaleInMax')) || 1,
       scaleOutMin: parseFloat(data.get('scaleOutMin')) || 0,
       scaleOutMax: parseFloat(data.get('scaleOutMax')) || 127,
+      // Clamp params
+      clampMin: parseFloat(data.get('clampMin')) || 0,
+      clampMax: parseFloat(data.get('clampMax')) || 1,
+      // Threshold
       threshold: parseFloat(data.get('threshold')) || 0.5,
+      // Expression
+      expression: data.get('expression') || null,
+      // JavaScript
+      javascriptCode: data.get('javascriptCode') || null,
     },
   };
 
@@ -615,6 +1122,7 @@ async function deleteBridge(id) {
       await window.clasp.deleteBridge(id);
     }
     state.bridges = state.bridges.filter(b => b.id !== id);
+    saveBridgesToStorage();
     renderBridges();
   } catch (err) {
     console.error('Failed to delete bridge:', err);
@@ -673,11 +1181,15 @@ function applyMappings(signal) {
 
 function matchesSource(signal, source) {
   switch (source.protocol) {
+    case 'clasp':
     case 'osc':
       if (!signal.address) return false;
       if (source.address) {
-        // Support wildcards
-        const pattern = source.address.replace(/\*/g, '.*');
+        // Support CLASP wildcards: * for single segment, ** for multiple
+        let pattern = source.address
+          .replace(/\*\*/g, '§§')  // Temp placeholder
+          .replace(/\*/g, '[^/]+')  // Single wildcard
+          .replace(/§§/g, '.*');    // Multi wildcard
         return new RegExp(`^${pattern}$`).test(signal.address);
       }
       return true;
@@ -699,10 +1211,40 @@ function matchesSource(signal, source) {
 }
 
 function extractValue(signal, source) {
-  if (typeof signal.value === 'number') return signal.value;
-  if (signal.velocity !== undefined) return signal.velocity / 127;
-  if (signal.value !== undefined) return signal.value;
-  return 0;
+  let value;
+
+  // Get raw value
+  if (typeof signal.value === 'number') {
+    value = signal.value;
+  } else if (signal.velocity !== undefined) {
+    value = signal.velocity / 127;
+  } else if (signal.value !== undefined) {
+    value = signal.value;
+  } else {
+    value = 0;
+  }
+
+  // Apply JSON path extraction if specified
+  if (source.jsonPath && typeof value === 'object') {
+    try {
+      value = extractJsonPath(value, source.jsonPath);
+    } catch (e) {
+      console.warn('JSON path extraction failed:', e);
+    }
+  }
+
+  return value;
+}
+
+function extractJsonPath(obj, path) {
+  // Simple JSON path implementation (supports $.foo.bar[0] style)
+  const parts = path.replace(/^\$\.?/, '').split(/\.|\[|\]/).filter(p => p);
+  let result = obj;
+  for (const part of parts) {
+    if (result === null || result === undefined) return undefined;
+    result = result[part];
+  }
+  return result;
 }
 
 function applyTransform(value, transform) {
@@ -710,19 +1252,49 @@ function applyTransform(value, transform) {
     case 'direct':
       return value;
 
-    case 'scale':
+    case 'scale': {
       // Map from input range to output range
       const normalized = (value - transform.scaleInMin) / (transform.scaleInMax - transform.scaleInMin);
       return transform.scaleOutMin + normalized * (transform.scaleOutMax - transform.scaleOutMin);
+    }
 
     case 'invert':
       return 1 - value;
 
+    case 'clamp':
+      return Math.min(transform.clampMax, Math.max(transform.clampMin, value));
+
+    case 'round':
+      return Math.round(value);
+
     case 'toggle':
       return value > 0.5 ? 1 : 0;
 
+    case 'gate':
+      return value > 0 ? 1 : 0;
+
     case 'threshold':
       return value >= transform.threshold ? 1 : 0;
+
+    case 'expression':
+      try {
+        return evaluateExpression(transform.expression, value);
+      } catch (e) {
+        console.error('Expression evaluation failed:', e);
+        return value;
+      }
+
+    case 'javascript':
+      try {
+        const fn = new Function('input', `
+          ${transform.javascriptCode}
+          return transform(input);
+        `);
+        return fn(value);
+      } catch (e) {
+        console.error('JavaScript transform failed:', e);
+        return value;
+      }
 
     default:
       return value;
@@ -732,6 +1304,34 @@ function applyTransform(value, transform) {
 // ============================================
 // Rendering
 // ============================================
+
+function renderServers() {
+  const list = $('server-list');
+  if (!list) return;
+
+  if (state.servers.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state-small">
+        <span class="empty-state-text">No servers running</span>
+      </div>
+    `;
+  } else {
+    list.innerHTML = state.servers.map(server => `
+      <div class="device-item" data-id="${server.id}">
+        <span class="status-dot ${server.status || 'available'}"></span>
+        <span class="device-protocol-badge ${server.protocol || 'clasp'}">${protocolNames[server.protocol] || server.protocol || 'CLASP'}</span>
+        <span class="device-name">${server.name}</span>
+        <button class="btn-device-delete" data-action="delete-server" data-id="${server.id}" title="Stop server">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  // Update badge
+  const badge = $('server-badge');
+  if (badge) badge.textContent = state.servers.length;
+}
 
 function renderDevices() {
   const list = $('device-list');
@@ -749,6 +1349,7 @@ function renderDevices() {
   list.innerHTML = state.devices.map(device => `
     <div class="device-item" data-id="${device.id}">
       <span class="status-dot ${device.status || 'available'}"></span>
+      <span class="device-protocol-badge ${device.protocol || 'clasp'}">${protocolNames[device.protocol] || device.protocol || 'CLASP'}</span>
       <span class="device-name">${device.name}</span>
     </div>
   `).join('');
@@ -785,7 +1386,7 @@ function renderBridges() {
         <span class="bridge-endpoint-value">${bridge.targetAddr || '--'}</span>
       </div>
       <div class="bridge-actions">
-        <button class="btn btn-sm btn-delete" onclick="deleteBridge('${bridge.id}')" title="Delete">
+        <button class="btn btn-sm btn-delete" data-action="delete-bridge" data-id="${bridge.id}" title="Delete">
           ${icons.delete}
         </button>
       </div>
@@ -820,7 +1421,7 @@ function renderMappings() {
         <span class="mapping-address">${formatMappingEndpoint(mapping.target)}</span>
       </div>
       <div class="bridge-actions">
-        <button class="btn btn-sm btn-delete" onclick="deleteMapping('${mapping.id}')" title="Delete">
+        <button class="btn btn-sm btn-delete" data-action="delete-mapping" data-id="${mapping.id}" title="Delete">
           ${icons.delete}
         </button>
       </div>
@@ -830,6 +1431,8 @@ function renderMappings() {
 
 function formatMappingEndpoint(endpoint) {
   switch (endpoint.protocol) {
+    case 'clasp':
+      return endpoint.address || '/clasp/*';
     case 'osc':
       return endpoint.address || '/*';
     case 'midi':
@@ -854,6 +1457,12 @@ function formatTransform(transform) {
     case 'invert': return '↔ INV';
     case 'toggle': return '⊡ TOG';
     case 'threshold': return `≥${transform.threshold}`;
+    case 'clamp': return `[${transform.clampMin}..${transform.clampMax}]`;
+    case 'round': return '⌊x⌋';
+    case 'gate': return '⊐ GATE';
+    case 'trigger': return '⌁ TRIG';
+    case 'expression': return `f(x)`;
+    case 'javascript': return 'JS( )';
     default: return '→';
   }
 }
@@ -946,8 +1555,10 @@ function updateSignalRate() {
 // Global Functions (for onclick handlers)
 // ============================================
 
-window.deleteBridge = deleteBridge;
-window.deleteMapping = deleteMapping;
+// No longer needed - using event delegation instead
+// window.deleteBridge = deleteBridge;
+// window.deleteMapping = deleteMapping;
+// window.deleteServer = deleteServer;
 
 // ============================================
 // Initialize

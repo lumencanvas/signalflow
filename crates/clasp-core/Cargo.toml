@@ -3,7 +3,12 @@ name = "clasp-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Core types and encoding for CLASP protocol"
+readme = "README.md"
 
 [features]
 default = ["std"]

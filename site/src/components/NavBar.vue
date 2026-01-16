@@ -11,6 +11,8 @@ function scrollTo(id) {
       <a @click="scrollTo('layers')">Layers</a>
       <a @click="scrollTo('spec')">Full Spec</a>
       <a @click="scrollTo('api')">API &amp; SDKs</a>
+      <a @click="scrollTo('downloads')">Downloads</a>
+      <a href="https://github.com/lumencanvas/clasp" target="_blank" class="github-link">GitHub</a>
     </div>
   </nav>
 </template>

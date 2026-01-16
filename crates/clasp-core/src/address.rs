@@ -171,10 +171,12 @@ impl Pattern {
 
         // Build regex for efficient matching
         let regex = if address.is_pattern() {
+            // ** matches zero or more path segments (including slashes)
+            // * matches exactly one path segment (no slashes)
             let regex_str = s
-                .replace("**", "§§") // Temp placeholder
+                .replace("/**", "§§") // Temp placeholder for /**/
                 .replace('*', "[^/]+")
-                .replace("§§", ".*");
+                .replace("§§", "(/[^/]+)*"); // Match zero or more /segment
             let regex_str = format!("^{}$", regex_str);
             Some(
                 regex_lite::Regex::new(&regex_str)

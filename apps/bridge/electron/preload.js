@@ -1,10 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('signalflow', {
-  // Device discovery
+// Expose as both 'clasp' and 'signalflow' for compatibility
+const api = {
+  // Device/Server management
   getDevices: () => ipcRenderer.invoke('get-devices'),
   scanNetwork: () => ipcRenderer.invoke('scan-network'),
   addServer: (address) => ipcRenderer.invoke('add-server', address),
+  startServer: (config) => ipcRenderer.invoke('start-server', config),
+  stopServer: (id) => ipcRenderer.invoke('stop-server', id),
 
   // Bridge management
   getBridges: () => ipcRenderer.invoke('get-bridges'),
@@ -30,4 +33,6 @@ contextBridge.exposeInMainWorld('signalflow', {
   onScanComplete: (callback) => {
     ipcRenderer.on('scan-complete', () => callback());
   },
-});
+};
+
+contextBridge.exposeInMainWorld('clasp', api);

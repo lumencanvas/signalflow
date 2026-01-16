@@ -131,6 +131,8 @@ pub enum GesturePhase {
 }
 
 /// Value type that can be sent in messages
+/// NOTE: Variant order matters for serde(untagged) - Array must come before Bytes
+/// because MessagePack arrays of small integers can be misinterpreted as binary data
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Value {
@@ -139,9 +141,9 @@ pub enum Value {
     Int(i64),
     Float(f64),
     String(String),
-    Bytes(Vec<u8>),
     Array(Vec<Value>),
     Map(HashMap<String, Value>),
+    Bytes(Vec<u8>),
 }
 
 impl Value {

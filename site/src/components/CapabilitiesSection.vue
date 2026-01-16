@@ -14,7 +14,7 @@ const capabilities = [
   },
   {
     title: 'BRIDGES',
-    desc: 'Bidirectional: MIDI, OSC, DMX-512, Art-Net, sACN. Planned: MQTT, WebSocket, REST.'
+    desc: 'Bidirectional: MIDI, OSC, DMX-512, Art-Net, sACN, MQTT, WebSocket, HTTP REST, Socket.IO.'
   },
   {
     title: 'P2P',

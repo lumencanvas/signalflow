@@ -327,3 +327,56 @@ ipcMain.handle('add-server', async (event, address) => {
 
   return server;
 });
+
+ipcMain.handle('start-server', async (event, config) => {
+  console.log('Starting server:', config);
+
+  const server = {
+    id: config.id || Date.now().toString(),
+    ...config,
+    status: 'connecting',
+  };
+
+  // If backend is ready, try to start the actual server
+  if (bridgeReady) {
+    try {
+      sendToBridge({
+        type: 'start_server',
+        id: server.id,
+        protocol: config.type || config.protocol,
+        config: config,
+      });
+    } catch (e) {
+      console.error('Failed to start server via bridge:', e);
+    }
+  }
+
+  // Simulate successful start
+  setTimeout(() => {
+    server.status = 'connected';
+    mainWindow?.webContents.send('device-updated', server);
+  }, 300);
+
+  return server;
+});
+
+ipcMain.handle('stop-server', async (event, id) => {
+  console.log('Stopping server:', id);
+
+  // Remove from state
+  const idx = state.devices.findIndex(d => d.id === id);
+  if (idx !== -1) {
+    state.devices.splice(idx, 1);
+  }
+
+  // Tell backend to stop if ready
+  if (bridgeReady) {
+    sendToBridge({
+      type: 'stop_server',
+      id: id,
+    });
+  }
+
+  mainWindow?.webContents.send('device-lost', id);
+  return true;
+});

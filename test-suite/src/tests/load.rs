@@ -136,14 +136,16 @@ async fn test_roundtrip_throughput() -> TestResult {
     ).await
 }
 
-/// Test: Large payload handling
+/// Test: Large payload handling (tests near the 64KB limit)
 async fn test_large_payload() -> TestResult {
     run_test(
-        "Load: Large payload (64KB)",
+        "Load: Large payload (near 64KB limit)",
         Duration::from_secs(10),
         || async {
-            // Create a large array
-            let large_array: Vec<Value> = (0..8192)
+            // Create a large array - 6000 floats is ~54KB which is under the 64KB limit
+            // (Each MessagePack float is ~9 bytes with overhead)
+            const ARRAY_SIZE: usize = 6000;
+            let large_array: Vec<Value> = (0..ARRAY_SIZE)
                 .map(|i| Value::Float(i as f64))
                 .collect();
 
@@ -161,7 +163,7 @@ async fn test_large_payload() -> TestResult {
 
             let size = encoded.len();
             if size > 65535 {
-                return Err(format!("Payload too large: {} bytes", size));
+                return Err(format!("Payload too large: {} bytes (max is 65535)", size));
             }
 
             let start = Instant::now();
@@ -172,7 +174,7 @@ async fn test_large_payload() -> TestResult {
                 Message::Set(set) => {
                     match set.value {
                         Value::Array(arr) => {
-                            if arr.len() != 8192 {
+                            if arr.len() != ARRAY_SIZE {
                                 return Err(format!("Array size mismatch: {}", arr.len()));
                             }
                         }
@@ -183,8 +185,9 @@ async fn test_large_payload() -> TestResult {
             }
 
             tracing::info!(
-                "Large payload: {} bytes, encode {:.2}ms, decode {:.2}ms",
+                "Large payload: {} bytes (~{}KB), encode {:.2}ms, decode {:.2}ms",
                 size,
+                size / 1024,
                 encode_time.as_secs_f64() * 1000.0,
                 decode_time.as_secs_f64() * 1000.0
             );

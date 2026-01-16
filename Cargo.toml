@@ -9,12 +9,9 @@ members = [
     "crates/clasp-client",
     "crates/clasp-embedded",
     "crates/clasp-wasm",
+    "crates/clasp-cli",
     "tools/clasp-service",
     "test-suite",
-    # Tools temporarily disabled - need API updates
-    # "tools/clasp-cli",
-    # "tools/clasp-router",
-    # "tools/clasp-test",
 ]
 
 [workspace.package]
@@ -22,9 +19,13 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/lumencanvas/clasp"
+homepage = "https://clasp-protocol.dev"
+documentation = "https://docs.rs/clasp-core"
 rust-version = "1.75"
 authors = ["LumenCanvas"]
 description = "Creative Low-Latency Application Streaming Protocol"
+keywords = ["osc", "midi", "dmx", "artnet", "protocol"]
+categories = ["multimedia", "network-programming"]
 
 [workspace.dependencies]
 # Async runtime

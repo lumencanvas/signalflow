@@ -1,7 +1,7 @@
 {
-  "name": "@signalflow/core",
+  "name": "@clasp-protocol/core",
   "version": "0.1.0",
-  "description": "SignalFlow client for JavaScript/TypeScript",
+  "description": "CLASP protocol client for JavaScript/TypeScript - Creative Low-Latency Application Streaming Protocol",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -30,17 +30,29 @@
     "vitest": "^1.0.0"
   },
   "license": "MIT",
+  "author": "LumenCanvas",
+  "homepage": "https://clasp-protocol.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lumencanvas/signalflow"
+    "url": "https://github.com/lumencanvas/clasp"
+  },
+  "bugs": {
+    "url": "https://github.com/lumencanvas/clasp/issues"
   },
   "keywords": [
-    "signalflow",
+    "clasp",
+    "clasp-protocol",
     "osc",
     "midi",
     "dmx",
     "artnet",
+    "mqtt",
+    "websocket",
     "creative",
-    "protocol"
+    "protocol",
+    "real-time",
+    "audio",
+    "visual",
+    "lighting"
   ]
 }

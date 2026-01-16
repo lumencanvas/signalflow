@@ -1009,16 +1009,16 @@ mod tests {
         let mut state = TransformState::default();
 
         assert_eq!(
-            transform.apply(&Value::Int(0), &mut state).as_string(),
-            Some("off".to_string())
+            transform.apply(&Value::Int(0), &mut state).as_str(),
+            Some("off")
         );
         assert_eq!(
-            transform.apply(&Value::Int(1), &mut state).as_string(),
-            Some("on".to_string())
+            transform.apply(&Value::Int(1), &mut state).as_str(),
+            Some("on")
         );
         assert_eq!(
-            transform.apply(&Value::Int(99), &mut state).as_string(),
-            Some("unknown".to_string())
+            transform.apply(&Value::Int(99), &mut state).as_str(),
+            Some("unknown")
         );
     }
 

@@ -1,0 +1,198 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build-rust:
+    name: Build Rust (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: clasp-service
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact: clasp-service
+            cross: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: clasp-service
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: clasp-service
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: clasp-service.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build (native)
+        if: ${{ !matrix.cross }}
+        run: |
+          cargo build --release --target ${{ matrix.target }} -p clasp-service
+          cargo build --release --target ${{ matrix.target }} -p clasp-cli
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: |
+          cross build --release --target ${{ matrix.target }} -p clasp-service
+          cross build --release --target ${{ matrix.target }} -p clasp-cli
+
+      - name: Package binaries
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/${{ matrix.target }}/release/clasp-service.exe dist/
+            cp target/${{ matrix.target }}/release/clasp.exe dist/
+          else
+            cp target/${{ matrix.target }}/release/clasp-service dist/
+            cp target/${{ matrix.target }}/release/clasp dist/
+          fi
+          cd dist
+          tar -czvf clasp-${{ matrix.target }}.tar.gz *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-${{ matrix.target }}
+          path: dist/clasp-${{ matrix.target }}.tar.gz
+
+  build-electron:
+    name: Build Electron (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: macos-latest
+            target: mac
+          - os: windows-latest
+            target: win
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/bridge/package-lock.json
+
+      - name: Build Rust service
+        run: cargo build --release -p clasp-service
+
+      - name: Install dependencies
+        working-directory: apps/bridge
+        run: npm ci
+
+      - name: Build Electron app
+        working-directory: apps/bridge
+        run: npm run build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload macOS DMG
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-bridge-macos-dmg
+          path: apps/bridge/release/*.dmg
+
+      - name: Upload macOS ZIP
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-bridge-macos-zip
+          path: apps/bridge/release/*-mac.zip
+
+      - name: Upload Linux AppImage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-bridge-linux-appimage
+          path: apps/bridge/release/*.AppImage
+
+      - name: Upload Linux deb
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-bridge-linux-deb
+          path: apps/bridge/release/*.deb
+
+      - name: Upload Windows installer
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clasp-bridge-windows-installer
+          path: apps/bridge/release/*.exe
+
+  create-release:
+    name: Create Release
+    needs: [build-rust, build-electron]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display artifacts
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
