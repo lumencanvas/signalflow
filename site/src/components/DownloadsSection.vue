@@ -1,4 +1,6 @@
 <script setup>
+import ScreenshotCarousel from './ScreenshotCarousel.vue'
+
 const downloads = [
   {
     platform: 'macOS',
@@ -42,6 +44,8 @@ const features = [
       The CLASP Bridge desktop app provides a visual interface for protocol bridging,
       signal mapping, and monitoring.
     </p>
+
+    <ScreenshotCarousel />
 
     <div class="features">
       <div class="feature" v-for="feature in features" :key="feature">
