@@ -68,7 +68,7 @@ enum DmxCommand {
     Stop,
 }
 
-/// DMX-512 to SignalFlow bridge
+/// DMX-512 to Clasp bridge
 pub struct DmxBridge {
     config: BridgeConfig,
     dmx_config: DmxBridgeConfig,

@@ -1,4 +1,4 @@
-//! SignalFlow Embedded
+//! Clasp Embedded
 //!
 //! Minimal no_std implementation for embedded devices.
 //! This crate provides the "Lite" profile for constrained devices.

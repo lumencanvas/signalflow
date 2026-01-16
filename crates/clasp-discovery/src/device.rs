@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-/// A discovered SignalFlow device
+/// A discovered Clasp device
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
     /// Unique device identifier

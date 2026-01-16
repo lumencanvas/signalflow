@@ -308,7 +308,7 @@ impl WebSocketBridge {
                                 match msg {
                                     Some(Ok(ws_msg)) => {
                                         if let Some(clasp_msg) = Self::parse_message(&ws_msg, format, &namespace) {
-                                            let _ = event_tx.send(BridgeEvent::ToSignalFlow(clasp_msg)).await;
+                                            let _ = event_tx.send(BridgeEvent::ToClasp(clasp_msg)).await;
                                         }
                                     }
                                     Some(Err(e)) => {
@@ -408,7 +408,7 @@ impl WebSocketBridge {
                                         match msg {
                                             Ok(ws_msg) => {
                                                 if let Some(clasp_msg) = Self::parse_message(&ws_msg, format, &namespace) {
-                                                    let _ = event_tx.send(BridgeEvent::ToSignalFlow(clasp_msg)).await;
+                                                    let _ = event_tx.send(BridgeEvent::ToClasp(clasp_msg)).await;
                                                 }
                                             }
                                             Err(e) => {

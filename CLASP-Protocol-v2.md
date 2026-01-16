@@ -234,7 +234,7 @@ ws.binaryType = 'arraybuffer';
 For P2P connections:
 
 ```javascript
-const dc = peerConnection.createDataChannel('signalflow', {
+const dc = peerConnection.createDataChannel('clasp', {
   ordered: false,      // Allow out-of-order for streams
   maxRetransmits: 0    // No retransmits for Q0 (fire)
 });
@@ -242,7 +242,7 @@ const dc = peerConnection.createDataChannel('signalflow', {
 
 For reliable messages (Q1/Q2), create a second channel:
 ```javascript
-const dcReliable = peerConnection.createDataChannel('signalflow-reliable', {
+const dcReliable = peerConnection.createDataChannel('clasp-reliable', {
   ordered: true
 });
 ```
@@ -758,7 +758,7 @@ JSON Web Tokens (JWT) with CLASP claims:
 
 ```javascript
 {
-  "iss": "signalflow:lumencanvas",
+  "iss": "clasp:lumencanvas",
   "sub": "user:moheeb",
   "iat": 1704067200,
   "exp": 1704153600,
@@ -948,7 +948,7 @@ sf.set('/lumen/scene/0/layer/0/opacity', 0.5);
 ### Connection
 
 ```javascript
-import { CLASP } from 'signalflow';
+import { CLASP } from 'clasp';
 
 // Simple connection
 const sf = new CLASP('wss://localhost:7330');
@@ -1024,7 +1024,7 @@ sf.bundle([...], { at: sf.time() + 100000 }); // 100ms from now
 ### Discovery
 
 ```javascript
-import { discover } from 'signalflow';
+import { discover } from 'clasp';
 
 // Find devices on LAN (native only, not browser)
 const devices = await discover({ timeout: 5000 });
@@ -1044,7 +1044,7 @@ const signals = await sf.query('/lumen/**');
 ## 10.3 Python API
 
 ```python
-from signalflow import CLASP
+from clasp import Clasp
 
 # Connect
 sf = CLASP('wss://localhost:7330')
@@ -1064,7 +1064,7 @@ sf.run()  # or use asyncio
 ## 10.4 Embedded C API
 
 ```c
-#include "signalflow.h"
+#include "clasp.h"
 
 // Initialize (UDP mode)
 sf_ctx_t* sf = sf_init_udp("192.168.1.100", 7331);
@@ -1114,7 +1114,7 @@ That's it. No discovery, no encryption, no complex state management.
 Conformance is verified by the official test suite:
 
 ```bash
-npx signalflow-test ws://localhost:7330 --level standard
+npx clasp-test ws://localhost:7330 --level standard
 ```
 
 ---
@@ -1169,10 +1169,10 @@ npx signalflow-test ws://localhost:7330 --level standard
 
 | Name | Language | Status | Notes |
 |------|----------|--------|-------|
-| `signalflow-js` | JavaScript | Reference | Browser + Node.js |
-| `signalflow-py` | Python | Reference | Sync + async |
-| `signalflow-rs` | Rust | Reference | Native + WASM |
-| `signalflow-c` | C | Reference | Embedded friendly |
+| `clasp-js` | JavaScript | Reference | Browser + Node.js |
+| `clasp-py` | Python | Reference | Sync + async |
+| `clasp-rs` | Rust | Reference | Native + WASM |
+| `clasp-c` | C | Reference | Embedded friendly |
 
 ## 13.2 Router Implementation
 
@@ -1184,7 +1184,7 @@ Reference router features:
 - Web admin UI
 
 ```bash
-npx signalflow-router --port 7330 --discovery mdns
+npx clasp-router --port 7330 --discovery mdns
 ```
 
 ---

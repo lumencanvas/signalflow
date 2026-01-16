@@ -1,5 +1,5 @@
 {
-  "name": "signalflow-monorepo",
+  "name": "clasp-monorepo",
   "private": true,
   "workspaces": [
     "packages/*"

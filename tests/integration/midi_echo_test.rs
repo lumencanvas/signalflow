@@ -1,6 +1,6 @@
 //! MIDI Echo Test
 //!
-//! Tests MIDI <-> SignalFlow conversion
+//! Tests MIDI <-> CLASP conversion
 //! Note: These tests require a MIDI loopback device or virtual MIDI port
 
 use clasp_bridge::{MidiBridge, MidiBridgeConfig};
@@ -106,7 +106,7 @@ async fn test_midi_bridge_lifecycle() {
 
 #[test]
 fn test_clasp_to_midi_conversion() {
-    // Test converting SignalFlow messages to MIDI bytes
+    // Test converting CLASP messages to MIDI bytes
 
     // CC message
     let cc_address = "/midi/device/ch/0/cc/1";
@@ -118,7 +118,7 @@ fn test_clasp_to_midi_conversion() {
     let value: u8 = 64;
 
     let midi_bytes = vec![0xB0 | channel, cc_num, value];
-    println!("SignalFlow -> MIDI CC: {:?}", midi_bytes);
+    println!("CLASP -> MIDI CC: {:?}", midi_bytes);
     assert_eq!(midi_bytes, vec![0xB0, 1, 64]);
 
     // Pitch bend message
@@ -131,5 +131,5 @@ fn test_clasp_to_midi_conversion() {
     let msb = ((adjusted >> 7) & 0x7F) as u8;
 
     let bend_bytes = vec![0xE0 | bend_channel, lsb, msb];
-    println!("SignalFlow -> MIDI Bend: {:?}", bend_bytes);
+    println!("CLASP -> MIDI Bend: {:?}", bend_bytes);
 }

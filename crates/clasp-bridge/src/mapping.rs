@@ -3,12 +3,12 @@
 use clasp_core::Value;
 use std::collections::HashMap;
 
-/// Maps between protocol addresses and SignalFlow addresses
+/// Maps between protocol addresses and Clasp addresses
 #[derive(Debug, Clone)]
 pub struct AddressMapping {
     /// Protocol address pattern
     pub from: String,
-    /// SignalFlow address pattern
+    /// Clasp address pattern
     pub to: String,
     /// Value transformation
     pub transform: Option<ValueTransform>,
@@ -28,7 +28,7 @@ impl AddressMapping {
         self
     }
 
-    /// Apply mapping to convert protocol address to SignalFlow address
+    /// Apply mapping to convert protocol address to Clasp address
     pub fn map_address(&self, addr: &str) -> Option<String> {
         // Simple pattern matching
         if self.from.contains('*') {

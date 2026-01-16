@@ -58,7 +58,7 @@ impl Session {
         Ok(())
     }
 
-    /// Send a SignalFlow message
+    /// Send a Clasp message
     pub async fn send_message(&self, message: &Message) -> Result<(), clasp_core::Error> {
         let data = clasp_core::codec::encode(message)?;
         self.send(data)

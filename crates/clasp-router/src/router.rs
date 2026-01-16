@@ -38,7 +38,7 @@ pub struct RouterConfig {
 impl Default for RouterConfig {
     fn default() -> Self {
         Self {
-            name: "SignalFlow Router".to_string(),
+            name: "Clasp Router".to_string(),
             features: vec![
                 "param".to_string(),
                 "event".to_string(),
@@ -51,7 +51,7 @@ impl Default for RouterConfig {
     }
 }
 
-/// SignalFlow router
+/// Clasp router
 pub struct Router {
     config: RouterConfig,
     /// Active sessions

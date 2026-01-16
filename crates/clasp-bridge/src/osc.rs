@@ -19,7 +19,7 @@ pub struct OscBridgeConfig {
     pub bind_addr: String,
     /// Remote address to send to (optional)
     pub remote_addr: Option<String>,
-    /// Address prefix for SignalFlow
+    /// Address prefix for Clasp
     pub namespace: String,
 }
 
@@ -33,7 +33,7 @@ impl Default for OscBridgeConfig {
     }
 }
 
-/// OSC to SignalFlow bridge
+/// OSC to Clasp bridge
 pub struct OscBridge {
     config: BridgeConfig,
     osc_config: OscBridgeConfig,
@@ -58,11 +58,11 @@ impl OscBridge {
         }
     }
 
-    /// Convert OSC message to SignalFlow message
+    /// Convert OSC message to Clasp message
     fn osc_to_clasp(&self, msg: &OscMessage) -> Option<Message> {
         let address = format!("{}{}", self.osc_config.namespace, msg.addr);
 
-        // Convert OSC args to SignalFlow value
+        // Convert OSC args to Clasp value
         let value = if msg.args.is_empty() {
             Value::Null
         } else if msg.args.len() == 1 {
@@ -80,7 +80,7 @@ impl OscBridge {
         }))
     }
 
-    /// Convert SignalFlow message to OSC
+    /// Convert Clasp message to OSC
     fn clasp_to_osc(&self, msg: &Message) -> Option<OscPacket> {
         match msg {
             Message::Set(set) => {
@@ -162,7 +162,7 @@ impl Bridge for OscBridge {
                             Ok((_, packet)) => {
                                 if let Some(messages) = packet_to_messages(&packet, &namespace) {
                                     for msg in messages {
-                                        if tx.send(BridgeEvent::ToSignalFlow(msg)).await.is_err() {
+                                        if tx.send(BridgeEvent::ToClasp(msg)).await.is_err() {
                                             break;
                                         }
                                     }
@@ -235,7 +235,7 @@ impl Bridge for OscBridge {
     }
 }
 
-/// Convert OSC argument to SignalFlow value
+/// Convert OSC argument to Clasp value
 fn osc_arg_to_value(arg: &OscType) -> Value {
     match arg {
         OscType::Int(i) => Value::Int(*i as i64),
@@ -251,7 +251,7 @@ fn osc_arg_to_value(arg: &OscType) -> Value {
     }
 }
 
-/// Convert SignalFlow value to OSC arguments
+/// Convert Clasp value to OSC arguments
 fn value_to_osc_args(value: &Value) -> Vec<OscType> {
     match value {
         Value::Null => vec![],
@@ -265,7 +265,7 @@ fn value_to_osc_args(value: &Value) -> Vec<OscType> {
     }
 }
 
-/// Convert OSC packet to SignalFlow messages
+/// Convert OSC packet to Clasp messages
 fn packet_to_messages(packet: &OscPacket, namespace: &str) -> Option<Vec<Message>> {
     match packet {
         OscPacket::Message(msg) => {

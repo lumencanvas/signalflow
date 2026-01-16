@@ -75,7 +75,7 @@ async fn main() {
     let mut events = bridge.start().await.unwrap();
 
     while let Some(event) = events.recv().await {
-        if let BridgeEvent::ToSignalFlow(Message::Set(msg)) = event {
+        if let BridgeEvent::ToClasp(Message::Set(msg)) = event {
             println!("Address: {}", msg.address);
             println!("Value: {:?}", msg.value);
         }

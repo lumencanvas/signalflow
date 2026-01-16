@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose as both 'clasp' and 'signalflow' for compatibility
+// Expose CLASP API to the renderer process
 const api = {
   // Device/Server management
   getDevices: () => ipcRenderer.invoke('get-devices'),

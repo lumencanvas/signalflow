@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 use tracing::{debug, info, warn};
 
-/// Discover SignalFlow devices via UDP broadcast
+/// Discover Clasp devices via UDP broadcast
 pub async fn discover(port: u16, tx: mpsc::Sender<DiscoveryEvent>) -> Result<()> {
     // Bind to any available port
     let transport = UdpTransport::bind("0.0.0.0:0")
@@ -55,7 +55,7 @@ pub async fn discover(port: u16, tx: mpsc::Sender<DiscoveryEvent>) -> Result<()>
                 if let clasp_transport::TransportEvent::Data(data) = event {
                     debug!("Received {} bytes from {}", data.len(), from);
 
-                    // Try to decode as SignalFlow message
+                    // Try to decode as Clasp message
                     match codec::decode(&data) {
                         Ok((msg, _)) => {
                             if let Message::Welcome(welcome) = msg {

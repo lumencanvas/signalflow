@@ -1,15 +1,15 @@
-//! SignalFlow Client Library
+//! Clasp Client Library
 //!
-//! High-level async client for SignalFlow protocol.
+//! High-level async client for Clasp protocol.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use clasp_client::SignalFlow;
+//! use clasp_client::Clasp;
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
-//!     let sf = SignalFlow::connect("wss://localhost:7330").await?;
+//!     let sf = Clasp::connect("wss://localhost:7330").await?;
 //!
 //!     // Subscribe to changes
 //!     sf.subscribe("/lumen/scene/*/layer/*/opacity", |value, address| {
@@ -27,14 +27,14 @@ pub mod client;
 pub mod builder;
 pub mod error;
 
-pub use client::SignalFlow;
-pub use builder::SignalFlowBuilder;
+pub use client::Clasp;
+pub use builder::ClaspBuilder;
 pub use error::{ClientError, Result};
 
 /// Prelude for convenient imports
 pub mod prelude {
-    pub use crate::client::SignalFlow;
-    pub use crate::builder::SignalFlowBuilder;
+    pub use crate::client::Clasp;
+    pub use crate::builder::ClaspBuilder;
     pub use crate::error::{ClientError, Result};
     pub use clasp_core::{Message, Value, SignalType};
 }

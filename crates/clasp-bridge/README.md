@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     while let Some(event) = events.recv().await {
         match event {
-            BridgeEvent::ToSignalFlow(msg) => {
+            BridgeEvent::ToClasp(msg) => {
                 println!("Received: {:?}", msg);
             }
             BridgeEvent::Connected => println!("Bridge connected"),

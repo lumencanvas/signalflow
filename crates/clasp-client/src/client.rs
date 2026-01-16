@@ -1,4 +1,4 @@
-//! Main SignalFlow client implementation
+//! Main Clasp client implementation
 
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -14,14 +14,14 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, info, warn};
 
-use crate::builder::SignalFlowBuilder;
+use crate::builder::ClaspBuilder;
 use crate::error::{ClientError, Result};
 
 /// Subscription callback type
 pub type SubscriptionCallback = Box<dyn Fn(Value, &str) + Send + Sync>;
 
-/// A SignalFlow client
-pub struct SignalFlow {
+/// A Clasp client
+pub struct Clasp {
     url: String,
     name: String,
     features: Vec<String>,
@@ -54,7 +54,7 @@ pub struct SignalFlow {
     pending_gets: Arc<DashMap<String, oneshot::Sender<Value>>>,
 }
 
-impl SignalFlow {
+impl Clasp {
     /// Create a new client (use builder for more options)
     pub fn new(
         url: &str,
@@ -83,13 +83,13 @@ impl SignalFlow {
     }
 
     /// Create a builder
-    pub fn builder(url: &str) -> SignalFlowBuilder {
-        SignalFlowBuilder::new(url)
+    pub fn builder(url: &str) -> ClaspBuilder {
+        ClaspBuilder::new(url)
     }
 
     /// Connect to server (convenience method)
     pub async fn connect_to(url: &str) -> Result<Self> {
-        SignalFlowBuilder::new(url).connect().await
+        ClaspBuilder::new(url).connect().await
     }
 
     /// Internal connect

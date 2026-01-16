@@ -257,7 +257,7 @@ impl Bridge for MqttBridge {
                             unlock: false,
                         });
 
-                        if tx.send(BridgeEvent::ToSignalFlow(msg)).await.is_err() {
+                        if tx.send(BridgeEvent::ToClasp(msg)).await.is_err() {
                             break;
                         }
                     }

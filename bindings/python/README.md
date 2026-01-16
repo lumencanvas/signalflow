@@ -1,22 +1,22 @@
-# SignalFlow Python Client
+# CLASP Python Client
 
-A Python client for the SignalFlow protocol - a universal protocol for creative tools communication.
+A Python client for the CLASP protocol - Creative Low-Latency Application Streaming Protocol for creative tools communication.
 
 ## Installation
 
 ```bash
-pip install signalflow
+pip install clasp-to
 ```
 
 ## Quick Start
 
 ```python
 import asyncio
-from signalflow import SignalFlow
+from clasp import Clasp
 
 async def main():
-    # Connect to a SignalFlow server
-    sf = SignalFlow('ws://localhost:7330')
+    # Connect to a CLASP server
+    sf = Clasp('ws://localhost:7330')
     await sf.connect()
 
     # Subscribe to parameter changes
@@ -43,11 +43,11 @@ asyncio.run(main())
 ## Builder Pattern
 
 ```python
-from signalflow import SignalFlowBuilder
+from clasp import ClaspBuilder
 
 async def main():
     client = await (
-        SignalFlowBuilder('ws://localhost:7330')
+        ClaspBuilder('ws://localhost:7330')
         .with_name('My Python App')
         .with_features(['param', 'event'])
         .with_reconnect(True, interval=5.0)
@@ -60,7 +60,7 @@ async def main():
 
 ## API Reference
 
-### SignalFlow
+### Clasp
 
 - `connect()` - Connect to server
 - `close()` - Close connection
@@ -87,7 +87,7 @@ async def main():
 
 ## Address Patterns
 
-SignalFlow supports wildcard patterns:
+CLASP supports wildcard patterns:
 
 - `*` - Match single path segment
 - `**` - Match multiple path segments
@@ -95,6 +95,10 @@ SignalFlow supports wildcard patterns:
 Examples:
 - `/lumen/layer/*/opacity` - All layer opacities
 - `/lumen/**/enabled` - All enabled properties
+
+## Documentation
+
+Visit **[clasp.to](https://clasp.to)** for full documentation.
 
 ## License
 

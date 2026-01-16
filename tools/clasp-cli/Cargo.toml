@@ -1,0 +1,23 @@
+[package]
+name = "clasp-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLASP CLI tool for debugging and testing"
+
+[[bin]]
+name = "clasp"
+path = "src/main.rs"
+
+[dependencies]
+clasp-core.workspace = true
+clasp-client.workspace = true
+clasp-discovery.workspace = true
+
+tokio.workspace = true
+futures.workspace = true
+clap = { version = "4.4", features = ["derive"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

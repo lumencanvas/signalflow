@@ -39,7 +39,7 @@ impl Default for ArtNetBridgeConfig {
     }
 }
 
-/// Art-Net to SignalFlow bridge
+/// Art-Net to Clasp bridge
 pub struct ArtNetBridge {
     config: BridgeConfig,
     artnet_config: ArtNetBridgeConfig,
@@ -181,7 +181,7 @@ impl Bridge for ArtNetBridge {
                                     artnet_to_clasp(&command, &namespace, &universes, &dmx_state)
                                 {
                                     for msg in messages {
-                                        if tx.send(BridgeEvent::ToSignalFlow(msg)).await.is_err() {
+                                        if tx.send(BridgeEvent::ToClasp(msg)).await.is_err() {
                                             break;
                                         }
                                     }
@@ -258,7 +258,7 @@ impl Bridge for ArtNetBridge {
     }
 }
 
-/// Convert Art-Net command to SignalFlow messages
+/// Convert Art-Net command to Clasp messages
 fn artnet_to_clasp(
     command: &ArtCommand,
     namespace: &str,

@@ -5,15 +5,15 @@ use mdns_sd::{ServiceDaemon, ServiceEvent};
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-/// mDNS service type for SignalFlow
+/// mDNS service type for Clasp
 const SERVICE_TYPE: &str = "_clasp._tcp.local.";
 
-/// Discover SignalFlow devices via mDNS
+/// Discover Clasp devices via mDNS
 pub async fn discover(tx: mpsc::Sender<DiscoveryEvent>) -> Result<()> {
     // Create mDNS daemon
     let mdns = ServiceDaemon::new().map_err(|e| DiscoveryError::Mdns(e.to_string()))?;
 
-    // Browse for SignalFlow services
+    // Browse for Clasp services
     let receiver = mdns
         .browse(SERVICE_TYPE)
         .map_err(|e| DiscoveryError::Mdns(e.to_string()))?;
@@ -106,7 +106,7 @@ pub async fn discover(tx: mpsc::Sender<DiscoveryEvent>) -> Result<()> {
     Ok(())
 }
 
-/// Advertise a SignalFlow service via mDNS
+/// Advertise a Clasp service via mDNS
 pub struct ServiceAdvertiser {
     mdns: ServiceDaemon,
     fullname: Option<String>,
@@ -122,7 +122,7 @@ impl ServiceAdvertiser {
         })
     }
 
-    /// Advertise a SignalFlow service
+    /// Advertise a Clasp service
     pub fn advertise(
         &mut self,
         name: &str,
@@ -168,7 +168,7 @@ impl ServiceAdvertiser {
             .register(service_info)
             .map_err(|e| DiscoveryError::Mdns(e.to_string()))?;
 
-        info!("Advertising SignalFlow service: {} on port {}", name, port);
+        info!("Advertising Clasp service: {} on port {}", name, port);
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 //! Address parsing and pattern matching
 //!
-//! SignalFlow addresses follow this format:
+//! Clasp addresses follow this format:
 //! ```text
 //! /namespace/category/instance/property
 //! /lumen/scene/0/layer/3/opacity
@@ -13,7 +13,7 @@
 
 use crate::{Error, Result};
 
-/// A parsed SignalFlow address
+/// A parsed Clasp address
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Address {
     raw: String,

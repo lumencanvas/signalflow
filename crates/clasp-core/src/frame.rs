@@ -1,6 +1,6 @@
 //! Binary frame encoding/decoding
 //!
-//! SignalFlow frame format:
+//! Clasp frame format:
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────────┐
 //! │ Byte 0:     Magic (0x53 = 'S')                                  │
@@ -65,7 +65,7 @@ impl FrameFlags {
     }
 }
 
-/// A SignalFlow frame
+/// A Clasp frame
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub flags: FrameFlags,

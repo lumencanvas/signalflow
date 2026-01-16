@@ -1,4 +1,4 @@
-//! SignalFlow Bridge Service
+//! CLASP Bridge Service
 //!
 //! A JSON-RPC style service that can be spawned by Electron to manage protocol bridges.
 //! Communicates via stdin/stdout with JSON messages.
@@ -138,7 +138,7 @@ impl BridgeService {
                 tokio::spawn(async move {
                     while let Some(event) = event_rx.recv().await {
                         match event {
-                            BridgeEvent::ToSignalFlow(msg) => {
+                            BridgeEvent::ToClasp(msg) => {
                                 // Extract address and value from the message
                                 let (address, value) = match &msg {
                                     Message::Set(set) => {
@@ -263,7 +263,7 @@ impl BridgeService {
     }
 }
 
-/// Convert SignalFlow Value to JSON
+/// Convert CLASP Value to JSON
 fn value_to_json(value: &Value) -> serde_json::Value {
     match value {
         Value::Null => serde_json::json!(null),
@@ -285,7 +285,7 @@ fn value_to_json(value: &Value) -> serde_json::Value {
     }
 }
 
-/// Convert JSON to SignalFlow Value
+/// Convert JSON to CLASP Value
 fn json_to_value(value: &serde_json::Value) -> Value {
     match value {
         serde_json::Value::Null => Value::Null,
@@ -351,7 +351,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("SignalFlow Bridge Service starting...");
+    info!("CLASP Bridge Service starting...");
 
     // Channel for sending async responses
     let (tx, mut rx) = mpsc::channel::<Response>(100);

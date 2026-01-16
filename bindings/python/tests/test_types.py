@@ -1,7 +1,7 @@
-"""Tests for SignalFlow types."""
+"""Tests for CLASP types."""
 
 import pytest
-from signalflow.types import (
+from clasp.types import (
     QoS,
     SignalType,
     MessageType,

@@ -1,9 +1,9 @@
 //! Client builder pattern
 
-use crate::{SignalFlow, Result};
+use crate::{Clasp, Result};
 
-/// Builder for SignalFlow client
-pub struct SignalFlowBuilder {
+/// Builder for Clasp client
+pub struct ClaspBuilder {
     url: String,
     name: String,
     features: Vec<String>,
@@ -12,12 +12,12 @@ pub struct SignalFlowBuilder {
     reconnect_interval_ms: u64,
 }
 
-impl SignalFlowBuilder {
+impl ClaspBuilder {
     /// Create a new builder
     pub fn new(url: &str) -> Self {
         Self {
             url: url.to_string(),
-            name: "SignalFlow Client".to_string(),
+            name: "Clasp Client".to_string(),
             features: vec![
                 "param".to_string(),
                 "event".to_string(),
@@ -60,8 +60,8 @@ impl SignalFlowBuilder {
     }
 
     /// Build and connect
-    pub async fn connect(self) -> Result<SignalFlow> {
-        let mut client = SignalFlow::new(
+    pub async fn connect(self) -> Result<Clasp> {
+        let mut client = Clasp::new(
             &self.url,
             self.name,
             self.features,

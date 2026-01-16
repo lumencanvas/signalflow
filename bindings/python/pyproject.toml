@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "signalflow"
+name = "clasp-to"
 version = "0.1.0"
-description = "SignalFlow client for Python - Universal creative protocol"
+description = "CLASP client for Python - Creative Low-Latency Application Streaming Protocol"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Multimedia",
     "Topic :: System :: Networking",
 ]
-keywords = ["signalflow", "osc", "midi", "dmx", "artnet", "creative", "protocol"]
+keywords = ["clasp", "osc", "midi", "dmx", "artnet", "creative", "protocol"]
 
 [project.optional-dependencies]
 dev = [
@@ -36,12 +36,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lumencanvas/signalflow"
-Documentation = "https://signalflow.dev/docs/python"
-Repository = "https://github.com/lumencanvas/signalflow"
+Homepage = "https://clasp.to"
+Documentation = "https://clasp.to/docs/python"
+Repository = "https://github.com/lumencanvas/clasp"
 
 [tool.hatch.build.targets.wheel]
-packages = ["python/signalflow"]
+packages = ["python/clasp"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

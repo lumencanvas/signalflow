@@ -337,7 +337,7 @@ async fn set_signal(
         unlock: false,
     });
 
-    if let Err(e) = state.event_tx.send(BridgeEvent::ToSignalFlow(msg)).await {
+    if let Err(e) = state.event_tx.send(BridgeEvent::ToClasp(msg)).await {
         error!("Failed to send set event: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -380,7 +380,7 @@ async fn publish_event(
         timestamp: None,
     });
 
-    if let Err(e) = state.event_tx.send(BridgeEvent::ToSignalFlow(msg)).await {
+    if let Err(e) = state.event_tx.send(BridgeEvent::ToClasp(msg)).await {
         error!("Failed to send publish event: {}", e);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -416,7 +416,7 @@ async fn delete_signal(
             unlock: false,
         });
 
-        let _ = state.event_tx.send(BridgeEvent::ToSignalFlow(msg)).await;
+        let _ = state.event_tx.send(BridgeEvent::ToClasp(msg)).await;
 
         Json(serde_json::json!({
             "address": address,

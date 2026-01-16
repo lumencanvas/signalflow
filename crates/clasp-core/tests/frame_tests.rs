@@ -1,4 +1,4 @@
-//! Frame encoding tests for SignalFlow core
+//! Frame encoding tests for Clasp core
 
 use clasp_core::{Frame, QoS, MAGIC_BYTE};
 

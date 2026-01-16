@@ -45,7 +45,7 @@ impl MidiSender {
     }
 }
 
-/// MIDI to SignalFlow bridge
+/// MIDI to Clasp bridge
 pub struct MidiBridge {
     config: BridgeConfig,
     midi_config: MidiBridgeConfig,
@@ -81,7 +81,7 @@ impl MidiBridge {
 
     /// List available MIDI input ports
     pub fn list_input_ports() -> Result<Vec<String>> {
-        let midi_in = MidiInput::new("SignalFlow MIDI Scanner")
+        let midi_in = MidiInput::new("Clasp MIDI Scanner")
             .map_err(|e| BridgeError::Protocol(e.to_string()))?;
 
         let ports = midi_in.ports();
@@ -93,7 +93,7 @@ impl MidiBridge {
 
     /// List available MIDI output ports
     pub fn list_output_ports() -> Result<Vec<String>> {
-        let midi_out = MidiOutput::new("SignalFlow MIDI Scanner")
+        let midi_out = MidiOutput::new("Clasp MIDI Scanner")
             .map_err(|e| BridgeError::Protocol(e.to_string()))?;
 
         let ports = midi_out.ports();
@@ -163,7 +163,7 @@ impl Bridge for MidiBridge {
         let running = self.running.clone();
 
         let input_thread = std::thread::spawn(move || {
-            let midi_in = match MidiInput::new("SignalFlow MIDI Input") {
+            let midi_in = match MidiInput::new("Clasp MIDI Input") {
                 Ok(m) => m,
                 Err(e) => {
                     warn!("Failed to create MIDI input: {}", e);
@@ -198,7 +198,7 @@ impl Bridge for MidiBridge {
                             let rt = tokio::runtime::Handle::try_current();
                             if let Ok(handle) = rt {
                                 handle.spawn(async move {
-                                    let _ = tx.send(BridgeEvent::ToSignalFlow(msg)).await;
+                                    let _ = tx.send(BridgeEvent::ToClasp(msg)).await;
                                 });
                             }
                         });
@@ -227,7 +227,7 @@ impl Bridge for MidiBridge {
         let (midi_tx, midi_rx) = std::sync::mpsc::channel::<Vec<u8>>();
 
         let output_thread = std::thread::spawn(move || {
-            let midi_out = match MidiOutput::new("SignalFlow MIDI Output") {
+            let midi_out = match MidiOutput::new("Clasp MIDI Output") {
                 Ok(m) => m,
                 Err(e) => {
                     warn!("Failed to create MIDI output: {}", e);
@@ -301,7 +301,7 @@ impl Bridge for MidiBridge {
             .as_ref()
             .ok_or_else(|| BridgeError::Send("No MIDI output connected".to_string()))?;
 
-        // Convert SignalFlow to MIDI
+        // Convert Clasp to MIDI
         if let Some(midi_msg) = clasp_to_midi(&message, &self.midi_config) {
             sender
                 .send(midi_msg)
@@ -320,7 +320,7 @@ impl Bridge for MidiBridge {
     }
 }
 
-/// Convert MIDI message bytes to SignalFlow (standalone function for callback)
+/// Convert MIDI message bytes to Clasp (standalone function for callback)
 fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
     if message.is_empty() {
         return None;
@@ -448,7 +448,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
     }
 }
 
-/// Convert SignalFlow message to MIDI bytes
+/// Convert Clasp message to MIDI bytes
 fn clasp_to_midi(message: &Message, _config: &MidiBridgeConfig) -> Option<Vec<u8>> {
     match message {
         Message::Set(set) => {

@@ -9,8 +9,8 @@ use crate::Result;
 /// Events from a bridge
 #[derive(Debug, Clone)]
 pub enum BridgeEvent {
-    /// Message to send to SignalFlow
-    ToSignalFlow(Message),
+    /// Message to send to Clasp
+    ToClasp(Message),
     /// Bridge connected
     Connected,
     /// Bridge disconnected
@@ -55,7 +55,7 @@ pub trait Bridge: Send + Sync {
     /// Stop the bridge
     async fn stop(&mut self) -> Result<()>;
 
-    /// Send a message from SignalFlow to the bridged protocol
+    /// Send a message from Clasp to the bridged protocol
     async fn send(&self, message: Message) -> Result<()>;
 
     /// Check if the bridge is running

@@ -1,6 +1,6 @@
 //! Art-Net and DMX Echo Tests
 //!
-//! Tests Art-Net and DMX <-> SignalFlow conversion
+//! Tests Art-Net and DMX <-> CLASP conversion
 
 use clasp_bridge::{ArtNetBridge, ArtNetBridgeConfig, DmxBridge, DmxBridgeConfig, DmxInterfaceType};
 use clasp_bridge::{Bridge, BridgeEvent};
@@ -122,7 +122,7 @@ fn test_list_dmx_ports() {
 
 #[tokio::test]
 async fn test_artnet_clasp_conversion() {
-    // Test SignalFlow -> Art-Net conversion
+    // Test CLASP -> Art-Net conversion
     let config = ArtNetBridgeConfig {
         bind_addr: "127.0.0.1:6457".to_string(),
         remote_addr: Some("127.0.0.1:6458".to_string()),
@@ -133,7 +133,7 @@ async fn test_artnet_clasp_conversion() {
     let mut bridge = ArtNetBridge::new(config);
     let _rx = bridge.start().await.expect("Failed to start bridge");
 
-    // Create SignalFlow set message for DMX channel
+    // Create CLASP set message for DMX channel
     let msg = Message::Set(SetMessage {
         address: "/artnet/1/10".to_string(), // Universe 1, Channel 10
         value: Value::Int(200),

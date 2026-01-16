@@ -10,7 +10,7 @@
     "lint": "eslint src electron"
   },
   "dependencies": {
-    "@clasp/core": "file:../../bindings/js/packages/clasp-core"
+    "@clasp-to/core": "file:../../bindings/js/packages/clasp-core"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

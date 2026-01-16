@@ -4,7 +4,7 @@ This guide covers publishing CLASP to Cargo (crates.io) and npm.
 
 ## Pre-Publishing Checklist
 
-- [ ] Rename GitHub repo from `signalflow` to `clasp`
+- [x] Rename GitHub repo from `signalflow` to `clasp`
 - [ ] Run `cargo test --workspace` to verify everything builds
 - [ ] Run `cargo clippy --workspace` to check for warnings
 
@@ -61,7 +61,7 @@ cargo publish -p clasp-core --dry-run
 ### Setup (One-time)
 
 1. Create account at https://npmjs.com
-2. Create organization `@clasp-protocol` at https://www.npmjs.com/org/create
+2. Create organization `@clasp-to` at https://www.npmjs.com/org/create
 3. Login locally:
    ```bash
    npm login
@@ -70,12 +70,35 @@ cargo publish -p clasp-core --dry-run
 ### Publish
 
 ```bash
-cd bindings/js/packages/signalflow-core
+cd bindings/js/packages/clasp-core
 npm run build
 npm publish --access public
 ```
 
-**Package name:** `@clasp-protocol/core`
+**Package name:** `@clasp-to/core`
+
+---
+
+## PyPI
+
+### Setup (One-time)
+
+1. Create account at https://pypi.org
+2. Create API token at https://pypi.org/manage/account/token/
+3. Configure credentials:
+   ```bash
+   pip install build twine
+   ```
+
+### Publish
+
+```bash
+cd bindings/python
+python -m build
+twine upload dist/*
+```
+
+**Package name:** `clasp-to`
 
 ---
 
@@ -86,7 +109,8 @@ npm publish --access public
 | Cargo | `clasp-cli` | `cargo install clasp-cli` |
 | Cargo | `clasp-core` | `clasp-core = "0.1"` in Cargo.toml |
 | Cargo | `clasp-bridge` | `clasp-bridge = "0.1"` in Cargo.toml |
-| npm | `@clasp-protocol/core` | `npm install @clasp-protocol/core` |
+| npm | `@clasp-to/core` | `npm install @clasp-to/core` |
+| PyPI | `clasp-to` | `pip install clasp-to` |
 
 ---
 

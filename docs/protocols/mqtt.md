@@ -93,7 +93,7 @@ async fn main() {
     let mut events = bridge.start().await.unwrap();
 
     while let Some(event) = events.recv().await {
-        if let BridgeEvent::ToSignalFlow(msg) = event {
+        if let BridgeEvent::ToClasp(msg) = event {
             println!("Received: {:?}", msg);
         }
     }

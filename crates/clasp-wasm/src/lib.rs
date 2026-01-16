@@ -1,6 +1,6 @@
-//! SignalFlow WebAssembly bindings
+//! Clasp WebAssembly bindings
 //!
-//! This crate provides WebAssembly bindings for SignalFlow,
+//! This crate provides WebAssembly bindings for Clasp,
 //! enabling browser-based clients.
 
 use wasm_bindgen::prelude::*;
@@ -26,9 +26,9 @@ pub fn init() {
     set_panic_hook();
 }
 
-/// SignalFlow WASM client
+/// Clasp WASM client
 #[wasm_bindgen]
-pub struct SignalFlowWasm {
+pub struct ClaspWasm {
     ws: WebSocket,
     session_id: Rc<RefCell<Option<String>>>,
     connected: Rc<RefCell<bool>>,
@@ -41,15 +41,15 @@ pub struct SignalFlowWasm {
 }
 
 #[wasm_bindgen]
-impl SignalFlowWasm {
-    /// Create a new SignalFlow client
+impl ClaspWasm {
+    /// Create a new Clasp client
     #[wasm_bindgen(constructor)]
-    pub fn new(url: &str) -> Result<SignalFlowWasm, JsValue> {
+    pub fn new(url: &str) -> Result<ClaspWasm, JsValue> {
         // Create WebSocket with subprotocol
         let ws = WebSocket::new_with_str(url, WS_SUBPROTOCOL)?;
         ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
 
-        let client = SignalFlowWasm {
+        let client = ClaspWasm {
             ws,
             session_id: Rc::new(RefCell::new(None)),
             connected: Rc::new(RefCell::new(false)),
@@ -82,7 +82,7 @@ impl SignalFlowWasm {
             // Send HELLO
             let hello = Message::Hello(HelloMessage {
                 version: PROTOCOL_VERSION,
-                name: "SignalFlow WASM Client".to_string(),
+                name: "Clasp WASM Client".to_string(),
                 features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
                 capabilities: None,
                 token: None,
@@ -298,7 +298,7 @@ impl SignalFlowWasm {
     }
 }
 
-/// Convert SignalFlow Value to JsValue
+/// Convert Clasp Value to JsValue
 fn value_to_js(value: &Value) -> JsValue {
     match value {
         Value::Null => JsValue::NULL,
@@ -327,7 +327,7 @@ fn value_to_js(value: &Value) -> JsValue {
     }
 }
 
-/// Convert JsValue to SignalFlow Value
+/// Convert JsValue to Clasp Value
 fn js_to_value(js: &JsValue) -> Value {
     if js.is_null() || js.is_undefined() {
         Value::Null

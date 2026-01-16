@@ -1,6 +1,6 @@
 //! OSC Echo Test
 //!
-//! Tests bidirectional OSC <-> SignalFlow conversion
+//! Tests bidirectional OSC <-> CLASP conversion
 
 use clasp_bridge::{Bridge, BridgeEvent, OscBridge, OscBridgeConfig};
 use clasp_core::{Message, SetMessage, Value};
@@ -37,9 +37,9 @@ async fn test_osc_to_clasp() {
         .send_to(&bytes, "127.0.0.1:9001")
         .expect("Failed to send OSC");
 
-    // Receive converted SignalFlow message
+    // Receive converted CLASP message
     match tokio::time::timeout(Duration::from_secs(1), rx.recv()).await {
-        Ok(Some(BridgeEvent::ToSignalFlow(msg))) => {
+        Ok(Some(BridgeEvent::ToClasp(msg))) => {
             if let Message::Set(set) = msg {
                 assert_eq!(set.address, "/osc/test/param");
                 // Value should be the float converted
@@ -77,7 +77,7 @@ async fn test_clasp_to_osc() {
         _ => panic!("Bridge did not connect"),
     }
 
-    // Send SignalFlow message through bridge
+    // Send CLASP message through bridge
     let msg = Message::Set(SetMessage {
         address: "/osc/test/output".to_string(),
         value: Value::Float(0.5),
@@ -105,7 +105,7 @@ async fn test_clasp_to_osc() {
 
 #[tokio::test]
 async fn test_osc_echo_roundtrip() {
-    // This test sends OSC -> SignalFlow -> OSC
+    // This test sends OSC -> CLASP -> OSC
     let config = OscBridgeConfig {
         listen_addr: "127.0.0.1:9021".to_string(),
         send_addr: "127.0.0.1:9022".to_string(),
@@ -138,8 +138,8 @@ async fn test_osc_echo_roundtrip() {
         .send_to(&bytes, "127.0.0.1:9021")
         .expect("Failed to send");
 
-    // Receive SignalFlow message from bridge
-    if let Ok(Some(BridgeEvent::ToSignalFlow(msg))) =
+    // Receive CLASP message from bridge
+    if let Ok(Some(BridgeEvent::ToClasp(msg))) =
         tokio::time::timeout(Duration::from_secs(1), rx.recv()).await
     {
         // Echo it back through the bridge

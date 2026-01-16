@@ -1,5 +1,5 @@
 #!/bin/bash
-# SignalFlow Bridge Tests
+# CLASP Bridge Tests
 # Run this script to test all protocol bridges
 
 set -e
@@ -8,21 +8,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo "==================================="
-echo "SignalFlow Bridge Protocol Tests"
+echo "CLASP Bridge Protocol Tests"
 echo "==================================="
 echo ""
 
 cd "$PROJECT_ROOT"
 
 # Build the project first
-echo "Building SignalFlow..."
-cargo build -p signalflow-bridge --features "osc,midi,artnet,dmx"
+echo "Building CLASP..."
+cargo build -p clasp-bridge --features "osc,midi,artnet,dmx"
 echo "Build complete."
 echo ""
 
 # Run unit tests
 echo "Running unit tests..."
-cargo test -p signalflow-bridge -- --nocapture
+cargo test -p clasp-bridge -- --nocapture
 echo ""
 
 # Run integration tests
@@ -37,22 +37,22 @@ echo "==================================="
 # Test OSC (requires no special hardware)
 echo ""
 echo "--- OSC Tests ---"
-cargo test -p signalflow-bridge osc -- --nocapture 2>/dev/null || echo "OSC tests completed (some may require network)"
+cargo test -p clasp-bridge osc -- --nocapture 2>/dev/null || echo "OSC tests completed (some may require network)"
 
 # Test MIDI (list available ports)
 echo ""
 echo "--- MIDI Port Discovery ---"
-cargo test -p signalflow-bridge test_list_midi_ports -- --nocapture 2>/dev/null || echo "MIDI discovery completed"
+cargo test -p clasp-bridge test_list_midi_ports -- --nocapture 2>/dev/null || echo "MIDI discovery completed"
 
 # Test Art-Net
 echo ""
 echo "--- Art-Net Tests ---"
-cargo test -p signalflow-bridge artnet -- --nocapture 2>/dev/null || echo "Art-Net tests completed"
+cargo test -p clasp-bridge artnet -- --nocapture 2>/dev/null || echo "Art-Net tests completed"
 
 # Test DMX
 echo ""
 echo "--- DMX Tests ---"
-cargo test -p signalflow-bridge dmx -- --nocapture 2>/dev/null || echo "DMX tests completed"
+cargo test -p clasp-bridge dmx -- --nocapture 2>/dev/null || echo "DMX tests completed"
 
 echo ""
 echo "==================================="

@@ -1,11 +1,11 @@
-//! Error types for SignalFlow
+//! Error types for Clasp
 
 use thiserror::Error;
 
-/// Result type alias for SignalFlow operations
+/// Result type alias for Clasp operations
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// SignalFlow error types
+/// Clasp error types
 #[derive(Error, Debug)]
 pub enum Error {
     /// Invalid magic byte in frame header

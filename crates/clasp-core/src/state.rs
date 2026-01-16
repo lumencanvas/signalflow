@@ -1,4 +1,4 @@
-//! State management for SignalFlow params
+//! State management for Clasp params
 //!
 //! Provides conflict resolution and revision tracking for stateful parameters.
 

@@ -173,7 +173,7 @@ impl Transport for WebSocketTransport {
                                     .await;
                             }
                             WsMessage::Text(text) => {
-                                // Convert text to bytes (shouldn't happen in SignalFlow)
+                                // Convert text to bytes (shouldn't happen in Clasp)
                                 warn!("Received text message, converting to bytes");
                                 let _ = event_tx_clone
                                     .send(TransportEvent::Data(Bytes::from(text)))

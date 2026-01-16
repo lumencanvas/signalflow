@@ -1,4 +1,4 @@
-//! Timing utilities for SignalFlow
+//! Timing utilities for Clasp
 //!
 //! Provides clock synchronization and timestamp handling.
 

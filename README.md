@@ -5,6 +5,7 @@
 [![CI](https://github.com/lumencanvas/clasp/actions/workflows/ci.yml/badge.svg)](https://github.com/lumencanvas/clasp/actions/workflows/ci.yml)
 [![Release](https://github.com/lumencanvas/clasp/actions/workflows/release.yml/badge.svg)](https://github.com/lumencanvas/clasp/releases)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-clasp.to-teal)](https://clasp.to)
 
 CLASP is a universal protocol bridge and signal router for creative applications. It unifies disparate protocols—OSC, MIDI, DMX, Art-Net, MQTT, WebSocket, HTTP—into a single, routable message system optimized for real-time performance.
 
@@ -80,12 +81,25 @@ clasp --help
 
 ### As a Library
 
+**Rust:**
 ```toml
 # Cargo.toml
 [dependencies]
 clasp-core = "0.1"
 clasp-bridge = { version = "0.1", features = ["osc", "mqtt"] }
 ```
+
+**JavaScript/TypeScript:**
+```bash
+npm install @clasp-to/core
+```
+
+**Python:**
+```bash
+pip install clasp-to
+```
+
+### Rust Example
 
 ```rust
 use clasp_bridge::{OscBridge, OscBridgeConfig, Bridge};
@@ -108,10 +122,12 @@ async fn main() {
 
 ## Documentation
 
-- [Getting Started](docs/getting-started/)
-- [Protocol Specification](docs/spec/)
-- [API Reference](docs/api/)
-- [Examples](docs/examples/)
+Visit **[clasp.to](https://clasp.to)** for full documentation.
+
+- [Getting Started](https://clasp.to/docs/getting-started)
+- [Protocol Specification](https://clasp.to/docs/protocol)
+- [API Reference](https://clasp.to/docs/api)
+- [Examples](https://clasp.to/docs/examples)
 
 ## Project Structure
 

@@ -1,4 +1,4 @@
-//! SignalFlow Discovery
+//! Clasp Discovery
 //!
 //! Provides device discovery mechanisms:
 //! - mDNS/Bonjour for LAN auto-discovery
@@ -55,7 +55,7 @@ impl Default for DiscoveryConfig {
     }
 }
 
-/// Discover SignalFlow devices
+/// Discover Clasp devices
 pub struct Discovery {
     config: DiscoveryConfig,
     devices: std::collections::HashMap<String, Device>,

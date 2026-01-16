@@ -1,6 +1,6 @@
-//! SignalFlow Router
+//! Clasp Router
 //!
-//! The router is the central hub for SignalFlow communication:
+//! The router is the central hub for Clasp communication:
 //! - Manages client sessions
 //! - Routes messages between clients
 //! - Maintains parameter state

@@ -1,4 +1,4 @@
-//! MessagePack encoding/decoding for SignalFlow messages
+//! MessagePack encoding/decoding for Clasp messages
 
 use crate::{Error, Frame, Message, QoS, Result};
 use bytes::Bytes;

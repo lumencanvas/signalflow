@@ -1,4 +1,4 @@
-//! Codec tests for SignalFlow core
+//! Codec tests for Clasp core
 
 use clasp_core::{codec, Message, Value, SetMessage, PublishMessage, HelloMessage, WelcomeMessage, SubscribeMessage, SignalType, QoS};
 

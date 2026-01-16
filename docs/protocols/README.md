@@ -37,7 +37,7 @@ Bridges emit events through a channel:
 
 ```rust
 pub enum BridgeEvent {
-    ToSignalFlow(Message),  // Message received from external protocol
+    ToClasp(Message),  // Message received from external protocol
     Connected,              // Bridge connected successfully
     Disconnected { reason: Option<String> },
     Error(String),
