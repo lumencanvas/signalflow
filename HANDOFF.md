@@ -1,512 +1,298 @@
 # CLASP Project Handoff
 
-**Creative Low-Latency Application Streaming Protocol**
-
-This document outlines the planned work to expand CLASP - a full-featured protocol bridging and API gateway platform.
-
----
-
-## Phase 1: Rebrand to CLASP (COMPLETED)
-
-### 1.1 Update Project Identity
-- [x] Replace all "SignalFlow" references with "CLASP"
-- [x] Replace all "signalflow" in code with "clasp"
-- [x] Update package names:
-  - `signalflow-core` → `clasp-core`
-  - `signalflow-transport` → `clasp-transport`
-  - `signalflow-discovery` → `clasp-discovery`
-  - `signalflow-bridge` → `clasp-bridge`
-  - `signalflow-router` → `clasp-router`
-  - `signalflow-client` → `clasp-client`
-  - `signalflow-embedded` → `clasp-embedded`
-  - `signalflow-wasm` → `clasp-wasm`
-- [x] Update Cargo.toml workspace and all crate Cargo.toml files
-- [x] Update package.json files
-- [x] Update repository references
-
-### 1.2 Logo & Branding Assets
-- [ ] Save new CLASP logo to `assets/logo.svg`
-- [ ] Create favicon variants (16x16, 32x32, 64x64, 180x180)
-- [ ] Create app icons for Electron (icns, ico, png)
-- [ ] Update titlebar icon in app
-- [ ] Create social preview image for GitHub
-- [ ] Update color scheme if needed (current: teal accent on paper brutalist)
-
-### 1.3 Update App UI
-- [ ] Replace "SIGNALFLOW BRIDGE" titlebar text with "CLASP"
-- [ ] Update version badge
-- [ ] Update status bar protocol text
-- [ ] Update any references to "SignalFlow Protocol v2"
-
-### Files Updated:
-```
-Cargo.toml - DONE
-crates/*/Cargo.toml - DONE
-apps/bridge/package.json - DONE
-apps/bridge/electron/preload.js - DONE
-tools/clasp-service/ - DONE
-tools/clasp-cli/ - DONE (renamed from sf-cli)
-tools/clasp-router/ - DONE (renamed from sf-router)
-tools/clasp-test/ - DONE (renamed from sf-test)
-README.md - DONE
-bindings/python/ - DONE (renamed module to clasp)
-bindings/js/packages/clasp-core/ - DONE (renamed from signalflow-core)
-```
+**Last Updated:** 2026-01-16
+**Current Version:** v0.1.0 (release in progress)
 
 ---
 
-## Phase 2: New Protocol Support
+## Project Overview
 
-### 2.1 MQTT Bridge
-**Rust Crate: `clasp-bridge/src/mqtt.rs`**
+CLASP (Creative Low-Latency Application Streaming Protocol) is a universal protocol bridge for creative applications. It connects MIDI controllers, OSC apps, DMX lights, Art-Net fixtures, MQTT sensors, and WebSocket interfaces through a unified address space.
 
-- [ ] Add `rumqttc` or `paho-mqtt` to dependencies
-- [ ] Implement `MqttBridge` struct
-- [ ] Support MQTT 3.1.1 and 5.0
-- [ ] Configuration:
-  ```rust
-  struct MqttBridgeConfig {
-      broker_url: String,        // mqtt://localhost:1883
-      client_id: String,
-      username: Option<String>,
-      password: Option<String>,
-      topics: Vec<String>,       // Subscribe topics
-      qos: u8,                   // 0, 1, or 2
-      clean_session: bool,
-      keep_alive_secs: u16,
-      tls: Option<TlsConfig>,
-  }
-  ```
-- [ ] Implement topic-to-address mapping (MQTT topic → CLASP address)
-- [ ] Support wildcards: `+` (single level) and `#` (multi-level)
-- [ ] Bidirectional: Subscribe and Publish
-- [ ] Handle retained messages
-- [ ] Handle Last Will and Testament (LWT)
+- **Website:** https://clasp.to
+- **GitHub:** https://github.com/lumencanvas/clasp
+- **Maintained by:** LumenCanvas (https://lumencanvas.studio)
 
-**Frontend Updates:**
-- [ ] Add MQTT to protocol dropdowns
-- [ ] Add MQTT-specific fields in bridge/mapping modals:
-  - Broker URL
-  - Client ID
-  - Username/Password (optional)
-  - Topic pattern
-  - QoS level
-  - TLS toggle
+---
 
-### 2.2 WebSocket Bridge
-**Rust Crate: `clasp-bridge/src/websocket.rs`**
+## Published Packages
 
-- [ ] Use existing `tokio-tungstenite` dependency
-- [ ] Implement `WebSocketBridge` struct
-- [ ] Support both client and server modes
-- [ ] Configuration:
-  ```rust
-  struct WebSocketBridgeConfig {
-      mode: WsMode,              // Client or Server
-      url: String,               // ws://localhost:8080 or bind address
-      path: Option<String>,      // /ws for server mode
-      subprotocols: Vec<String>,
-      headers: HashMap<String, String>,
-      ping_interval: Option<Duration>,
-      message_format: WsMessageFormat,  // JSON, MsgPack, Raw
-  }
-  ```
-- [ ] Auto-reconnect for client mode
-- [ ] Multiple client support for server mode
-- [ ] Binary and text message support
-- [ ] Heartbeat/ping-pong handling
+| Platform | Package | Version | Registry |
+|----------|---------|---------|----------|
+| Rust | clasp-core | 0.1.0 | [crates.io](https://crates.io/crates/clasp-core) |
+| Rust | clasp-transport | 0.1.0 | [crates.io](https://crates.io/crates/clasp-transport) |
+| Rust | clasp-discovery | 0.1.0 | [crates.io](https://crates.io/crates/clasp-discovery) |
+| Rust | clasp-router | 0.1.0 | [crates.io](https://crates.io/crates/clasp-router) |
+| Rust | clasp-client | 0.1.0 | [crates.io](https://crates.io/crates/clasp-client) |
+| Rust | clasp-bridge | 0.1.0 | [crates.io](https://crates.io/crates/clasp-bridge) |
+| Rust | clasp-cli | 0.1.0 | [crates.io](https://crates.io/crates/clasp-cli) |
+| JavaScript | @clasp-to/core | 0.1.0 | [npm](https://www.npmjs.com/package/@clasp-to/core) |
+| Python | clasp-to | 0.1.0 | [PyPI](https://pypi.org/project/clasp-to/) |
 
-**Frontend Updates:**
-- [ ] Add WebSocket to protocol dropdowns
-- [ ] Add WS-specific fields:
-  - Mode (Client/Server)
-  - URL or bind address
-  - Path (for server)
-  - Message format (JSON/MsgPack/Raw)
-  - Headers (key-value pairs)
+---
 
-### 2.3 Socket.IO Bridge
-**Rust Crate: `clasp-bridge/src/socketio.rs`**
+## What's Implemented & Verified
 
-- [ ] Add `rust-socketio` or `socketio-rs` to dependencies
-- [ ] Implement `SocketIOBridge` struct
-- [ ] Support Socket.IO v4 protocol
-- [ ] Configuration:
-  ```rust
-  struct SocketIOBridgeConfig {
-      url: String,
-      namespace: String,         // Default: "/"
-      events: Vec<String>,       // Events to listen for
-      auth: Option<serde_json::Value>,
-      reconnect: bool,
-      transports: Vec<Transport>, // WebSocket, Polling
-  }
-  ```
-- [ ] Event-to-address mapping (Socket.IO event → CLASP address)
-- [ ] Support acknowledgments
-- [ ] Support rooms (for server mode)
-- [ ] Binary event support
+### Signal Types (all 5)
+| Type | QoS | Persisted | Description |
+|------|-----|-----------|-------------|
+| Param | Confirm | Yes | Stateful values (faders, settings) |
+| Event | Confirm | No | One-shot triggers |
+| Stream | Fire | No | High-rate data (30-60+ Hz) |
+| Gesture | Fire | No | Phased input (start/move/end) |
+| Timeline | Commit | Yes | Time-indexed automation |
 
-**Frontend Updates:**
-- [ ] Add Socket.IO to protocol dropdowns
-- [ ] Add Socket.IO-specific fields:
-  - Server URL
-  - Namespace
-  - Event names (comma-separated or list)
-  - Auth payload (JSON editor)
+### Transports
+- **WebSocket** - Primary transport, port 7330, subprotocol `clasp.v2`
+- **WebRTC** - DataChannels with ICE/NAT traversal
+- **QUIC** - Low-latency UDP-based
+- **UDP** - Raw UDP for embedded
+- **BLE** - Bluetooth Low Energy with GATT services
 
-### 2.4 HTTP/REST Bridge
-**Rust Crate: `clasp-bridge/src/http.rs`**
+### Protocol Bridges (8 implemented)
+| Protocol | File | Status |
+|----------|------|--------|
+| OSC | `clasp-bridge/src/osc.rs` | Bidirectional, bundles, timestamps |
+| MIDI | `clasp-bridge/src/midi.rs` | CC, notes, program change, pitchbend |
+| Art-Net | `clasp-bridge/src/artnet.rs` | Multiple universes, polling |
+| DMX | `clasp-bridge/src/dmx.rs` | ENTTEC Pro/Open, FTDI |
+| MQTT | `clasp-bridge/src/mqtt.rs` | v3.1.1 and v5, TLS |
+| WebSocket | `clasp-bridge/src/websocket.rs` | JSON bridge |
+| Socket.IO | `clasp-bridge/src/socketio.rs` | Rooms, namespaces |
+| HTTP | `clasp-bridge/src/http.rs` | REST API |
 
-This is the most complex addition - a full REST API server/client.
+### Discovery
+- **mDNS** - `_clasp._tcp.local` service type
+- **UDP Broadcast** - Fallback on port 7331
 
-#### 2.4.1 REST Server Mode
-- [ ] Add `axum` or `actix-web` to dependencies
-- [ ] Implement `HttpServerBridge` struct
-- [ ] Configuration:
-  ```rust
-  struct HttpServerConfig {
-      bind_addr: String,         // 0.0.0.0:3000
-      endpoints: Vec<EndpointConfig>,
-      cors: Option<CorsConfig>,
-      auth: Option<AuthConfig>,
-      rate_limit: Option<RateLimitConfig>,
-  }
+### State Management
+- Revision tracking on all params
+- Conflict strategies: LWW (default), Max, Min, Lock, Merge
 
-  struct EndpointConfig {
-      path: String,              // /api/lights/:id
-      method: HttpMethod,        // GET, POST, PUT, DELETE, PATCH
-      params: Vec<ParamConfig>,  // Path params, query params
-      body_schema: Option<JsonSchema>,
-      response_schema: Option<JsonSchema>,
-      clasp_address: String,     // Target CLASP address to trigger
-      transform: TransformConfig,
-  }
+### Client SDKs
+All have: `connect`, `set`, `get`, `emit`, `stream`, `subscribe/on`, `bundle`
 
-  struct ParamConfig {
-      name: String,
-      location: ParamLocation,   // Path, Query, Header, Body
-      required: bool,
-      default: Option<serde_json::Value>,
-      mapping: String,           // How to map to CLASP message
-  }
-  ```
-- [ ] Dynamic endpoint registration
-- [ ] Path parameter extraction (`:id`, `:name`)
-- [ ] Query parameter handling
-- [ ] Request body parsing (JSON, form-data, raw)
-- [ ] Response generation from CLASP messages
-- [ ] Request/response logging
-- [ ] OpenAPI spec generation
+- **JavaScript** - `@clasp-to/core` (npm)
+- **Python** - `clasp-to` (PyPI)
+- **Rust** - `clasp-client` (crates.io)
 
-#### 2.4.2 REST Client Mode
-- [ ] Implement `HttpClientBridge` struct
-- [ ] Configuration:
-  ```rust
-  struct HttpClientConfig {
-      base_url: String,
-      endpoints: Vec<ClientEndpointConfig>,
-      auth: Option<ClientAuthConfig>,
-      timeout: Duration,
-      retry: Option<RetryConfig>,
-  }
+### CLI Tool
+Binary: `clasp` (from clasp-cli crate)
 
-  struct ClientEndpointConfig {
-      trigger_address: String,   // CLASP address that triggers this
-      method: HttpMethod,
-      path: String,
-      headers: HashMap<String, String>,
-      body_template: Option<String>,  // Handlebars/template
-      response_mapping: String,  // How to map response to CLASP
-  }
-  ```
-- [ ] Template-based request building
-- [ ] Response parsing and mapping
-- [ ] Authentication (Basic, Bearer, API Key, OAuth2)
-- [ ] Retry with backoff
-- [ ] Request queuing
+Commands: `discover`, `get`, `set`, `watch`, `emit`, `stream`, `info`, `repl`
 
-#### 2.4.3 REST API Designer UI
-This needs a dedicated UI section in the app:
+### Desktop App (CLASP Bridge)
+Location: `apps/bridge/`
 
-- [ ] New "API" tab in main interface
-- [ ] Endpoint list view
-- [ ] Endpoint editor:
-  - Method selector (GET/POST/PUT/DELETE/PATCH)
-  - Path input with param highlighting
-  - Param configuration table
-  - Request body schema editor (JSON)
-  - Response schema editor (JSON)
-  - Test button to send sample request
-  - Map to CLASP address selector
-  - Transform configuration
-- [ ] API documentation preview
-- [ ] Export OpenAPI spec button
-- [ ] Import from OpenAPI spec
-- [ ] cURL command generator
+- Electron app with visual UI
+- Bridge configuration
+- Signal mapping with transforms (scale, invert, clamp, threshold, expression)
+- Real-time monitor
+- Learn mode for MIDI/OSC
 
-**Frontend Files to Create:**
+---
+
+## What's NOT Implemented
+
+These were removed from the website after audit:
+
+| Feature | Notes |
+|---------|-------|
+| **sACN/E1.31** | Empty feature flag in Cargo.toml, no implementation |
+| **C Embedded SDK** | Only Rust embedded exists (`clasp-embedded`) |
+| **WAN Rendezvous** | Only local discovery (mDNS + UDP broadcast) |
+
+---
+
+## Release Status
+
+### v0.1.0 Release
+**Status:** In progress (workflow running)
+
+**Monitor:** `gh run watch --repo lumencanvas/clasp`
+
+### Build Targets
+| Platform | Target | Status |
+|----------|--------|--------|
+| Linux x64 | x86_64-unknown-linux-gnu | Building |
+| macOS Intel | x86_64-apple-darwin | Building |
+| macOS ARM | aarch64-apple-darwin | Building |
+| Windows | x86_64-pc-windows-msvc | Building |
+| Linux ARM | aarch64-unknown-linux-gnu | **Disabled** (OpenSSL cross-compile issues) |
+
+### Desktop App Artifacts
+- macOS: `.dmg` (ARM and Intel)
+- Windows: `.exe` installer, `.zip` portable
+- Linux: `.AppImage`, `.deb`
+
+### Download Links (in DownloadsSection.vue)
 ```
-apps/bridge/src/components/api-designer.js
-apps/bridge/src/styles/api-designer.css
+CLASP.Bridge-arm64.dmg     # macOS Apple Silicon
+CLASP.Bridge-x64.dmg       # macOS Intel
+CLASP.Bridge-Setup.exe     # Windows Installer
+CLASP.Bridge-portable.exe  # Windows Portable
+CLASP.Bridge.AppImage      # Linux AppImage
+clasp-bridge.deb           # Linux Debian
+```
+
+**Note:** v0.1.0 used default electron-builder names with versions (e.g., `CLASP.Bridge-0.1.0-arm64.dmg`). The electron-builder config has been updated to produce version-less filenames. These will take effect in v0.1.1+.
+
+---
+
+## Repository Structure
+
+```
+clasp/
+├── crates/                    # Rust workspace
+│   ├── clasp-core/           # Types, codec, state management
+│   ├── clasp-transport/      # WebSocket, QUIC, UDP, BLE, WebRTC
+│   ├── clasp-discovery/      # mDNS, UDP broadcast
+│   ├── clasp-router/         # Message routing, pattern matching
+│   ├── clasp-client/         # High-level async client
+│   ├── clasp-bridge/         # Protocol bridges
+│   ├── clasp-service/        # Background service binary
+│   ├── clasp-embedded/       # no_std embedded (Rust only)
+│   └── clasp-cli/            # CLI tool
+├── bindings/
+│   ├── js/packages/clasp-core/  # @clasp-to/core
+│   └── python/                   # clasp-to
+├── apps/
+│   └── bridge/               # Electron desktop app
+├── site/                     # Vue.js website
+│   └── src/components/       # Key: SpecSection, ApiSection, DownloadsSection
+├── .github/workflows/
+│   ├── ci.yml               # CI on push/PR
+│   └── release.yml          # Release on v* tags
+└── HANDOFF.md               # This file
 ```
 
 ---
 
-## Phase 3: Enhanced Mapping System
+## Key Files Reference
 
-### 3.1 Advanced Transform Functions
-- [ ] **Expression Engine**: Allow JavaScript-like expressions
-  ```
-  value * 2 + 10
-  Math.round(value)
-  value > 0.5 ? 1 : 0
-  ```
-- [ ] **Lookup Tables**: Map discrete values
-  ```
-  { 0: "off", 1: "low", 2: "medium", 3: "high" }
-  ```
-- [ ] **Curve Functions**: Non-linear transforms
-  - Ease-in, ease-out, ease-in-out
-  - Exponential, logarithmic
-  - Custom bezier curves
-- [ ] **Aggregation**: Combine multiple values
-  - Average, sum, min, max
-  - Moving average
-  - Rate of change
-
-### 3.2 Conditional Routing
-- [ ] Route based on value conditions
-- [ ] Route based on source metadata
-- [ ] Multi-target routing (one source → multiple targets)
-- [ ] Priority-based routing
-
-### 3.3 Message Construction
-- [ ] Build complex messages from multiple sources
-- [ ] Template-based message formatting
-- [ ] JSON path extraction and injection
-- [ ] Array/object manipulation
-
-### 3.4 Payload Field Mapping
-For protocols with structured payloads:
-- [ ] Map specific JSON fields to/from CLASP values
-- [ ] Support nested paths: `data.sensors[0].temperature`
-- [ ] Array element selection
-- [ ] Default values for missing fields
+| Purpose | File |
+|---------|------|
+| Protocol spec | `site/src/components/SpecSection.vue` |
+| SDK examples | `site/src/components/ApiSection.vue` |
+| Download links | `site/src/components/DownloadsSection.vue` |
+| Feature claims | `site/src/components/CapabilitiesSection.vue` |
+| Screenshot carousel | `site/src/components/ScreenshotCarousel.vue` |
+| Release workflow | `.github/workflows/release.yml` |
+| CI workflow | `.github/workflows/ci.yml` |
+| Electron config | `apps/bridge/package.json` |
+| Core types | `crates/clasp-core/src/types.rs` |
+| Frame format | `crates/clasp-core/src/frame.rs` |
+| JS client | `bindings/js/packages/clasp-core/src/client.ts` |
 
 ---
 
-## Phase 4: Protocol Improvements
+## Commands
 
-### 4.1 CLASP Protocol Specification
-- [ ] Define formal message format specification
-- [ ] Document address naming conventions
-- [ ] Define standard message types
-- [ ] Version negotiation protocol
-- [ ] Security/authentication layer spec
+```bash
+# Build all Rust crates
+cargo build --workspace
 
-### 4.2 Core Library Enhancements
-- [ ] Add HTTP transport option
-- [ ] Add QUIC transport option (already have quinn)
-- [ ] Message batching for high-throughput
-- [ ] Message compression
-- [ ] Message encryption
-- [ ] Request-response patterns
-- [ ] Streaming patterns
+# Run tests
+cargo test --workspace
 
----
+# Build desktop app
+cd apps/bridge && npm install && npm run build
 
-## Phase 5: Documentation Site
+# Run desktop app in dev
+cd apps/bridge && npm run dev
 
-### 5.1 Create Documentation Structure
-```
-docs/
-├── index.md                 # Overview
-├── getting-started/
-│   ├── installation.md
-│   ├── quick-start.md
-│   └── first-bridge.md
-├── concepts/
-│   ├── protocol.md          # CLASP protocol spec
-│   ├── addresses.md         # Address naming
-│   ├── messages.md          # Message formats
-│   ├── bridges.md           # Bridge concepts
-│   └── mappings.md          # Mapping concepts
-├── protocols/
-│   ├── osc.md
-│   ├── midi.md
-│   ├── dmx.md
-│   ├── artnet.md
-│   ├── mqtt.md
-│   ├── websocket.md
-│   ├── socketio.md
-│   └── http-rest.md
-├── app/
-│   ├── overview.md
-│   ├── bridges-tab.md
-│   ├── mappings-tab.md
-│   ├── api-designer.md
-│   └── monitor.md
-├── api/
-│   ├── rust-sdk.md
-│   ├── javascript-sdk.md
-│   └── rest-api.md
-├── examples/
-│   ├── osc-to-midi.md
-│   ├── mqtt-to-dmx.md
-│   ├── rest-api-gateway.md
-│   └── home-automation.md
-└── reference/
-    ├── config.md
-    ├── transforms.md
-    └── cli.md
-```
+# Build website
+cd site && npm install && npm run build
 
-### 5.2 Documentation Site Setup
-- [ ] Use VitePress, Docusaurus, or Astro Starlight
-- [ ] Configure site with CLASP branding
-- [ ] Add search functionality
-- [ ] Add API reference generation
-- [ ] GitHub Pages deployment
+# Serve website locally
+cd site && npm run dev
 
-### 5.3 Write Core Documentation
-- [ ] Protocol specification document
-- [ ] Getting started guide
-- [ ] Each protocol's bridge documentation
-- [ ] REST API designer tutorial
-- [ ] Example walkthroughs
+# Check release status
+gh run list --repo lumencanvas/clasp
 
----
+# Watch release
+gh run watch --repo lumencanvas/clasp
 
-## Phase 6: Service & CLI Improvements
-
-### 6.1 Unified CLASP Service
-Rename `sf-bridge-service` to `clasp-service`:
-- [ ] Rename tool directory
-- [ ] Add all new protocol handlers
-- [ ] Add REST server capability
-- [ ] Add configuration file support (YAML/TOML)
-- [ ] Add hot-reload for config changes
-- [ ] Add metrics/stats endpoint
-
-### 6.2 CLI Tool
-Create `clasp-cli`:
-- [ ] `clasp init` - Initialize project config
-- [ ] `clasp serve` - Start the service
-- [ ] `clasp bridge create` - Create bridge from CLI
-- [ ] `clasp mapping create` - Create mapping from CLI
-- [ ] `clasp send` - Send test message
-- [ ] `clasp monitor` - Terminal-based signal monitor
-- [ ] `clasp docs` - Generate API docs
-
----
-
-## Implementation Priority Order
-
-### Sprint 1: Foundation (Week 1-2)
-1. Rebrand to CLASP (names, logos, UI)
-2. WebSocket bridge (simplest new protocol)
-3. Basic docs site structure
-
-### Sprint 2: Real-time Protocols (Week 3-4)
-1. MQTT bridge
-2. Socket.IO bridge
-3. Enhanced mapping transforms
-
-### Sprint 3: REST Gateway (Week 5-7)
-1. HTTP REST server mode
-2. HTTP REST client mode
-3. API Designer UI
-4. OpenAPI generation
-
-### Sprint 4: Polish (Week 8)
-1. Documentation completion
-2. CLI tool
-3. Testing & bug fixes
-4. Example projects
-
----
-
-## Technical Decisions Needed
-
-1. **HTTP Framework**: Axum vs Actix-web vs Warp?
-   - Recommendation: Axum (Tokio ecosystem, good ergonomics)
-
-2. **MQTT Client**: rumqttc vs paho-mqtt?
-   - Recommendation: rumqttc (pure Rust, async)
-
-3. **Socket.IO**: rust-socketio vs custom implementation?
-   - Recommendation: rust-socketio (maintained, complete)
-
-4. **Docs Framework**: VitePress vs Docusaurus vs Starlight?
-   - Recommendation: VitePress (lightweight, Vue-based)
-
-5. **Config Format**: YAML vs TOML vs JSON?
-   - Recommendation: TOML for config files, JSON for API
-
----
-
-## File Changes Summary
-
-### New Files to Create
-```
-assets/logo.svg
-assets/favicon.ico
-assets/icon.icns
-assets/icon.ico
-
-crates/clasp-bridge/src/mqtt.rs
-crates/clasp-bridge/src/websocket.rs
-crates/clasp-bridge/src/socketio.rs
-crates/clasp-bridge/src/http/mod.rs
-crates/clasp-bridge/src/http/server.rs
-crates/clasp-bridge/src/http/client.rs
-
-apps/bridge/src/components/api-designer.js
-apps/bridge/src/styles/api-designer.css
-
-tools/clasp-service/ (rename from sf-bridge-service)
-tools/clasp-cli/
-
-docs/ (entire directory)
-```
-
-### Files to Rename/Update
-```
-All Cargo.toml files (workspace + crates)
-All package.json files
-All source files with "signalflow" references
-README.md
-LICENSE files (update project name)
+# Create new release
+git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 ```
 
 ---
 
-## Current State
+## TODO / Next Steps
 
-The project currently has:
-- ✅ Core protocol library (Rust)
-- ✅ OSC, MIDI, Art-Net, DMX bridges
-- ✅ MQTT, WebSocket, Socket.IO bridges
-- ✅ HTTP/REST bridge
-- ✅ Electron desktop app with Paper Brutalist UI
-- ✅ Tabbed interface (Bridges, Mappings, Monitor)
-- ✅ Basic mapping system with transforms
-- ✅ Learn mode for address capture
-- ✅ Rust bridge service (JSON-RPC via stdin/stdout)
-- ✅ Documentation website at clasp.to
-- ✅ Complete rebrand from SignalFlow to CLASP
-- ✅ Python bindings (clasp-to)
-- ✅ JavaScript/TypeScript bindings (@clasp-to/core)
+### Immediate
+1. **Release v0.1.1** - Trigger a new release to get proper artifact filenames (fixed in electron-builder config)
+2. **Test downloads** - Download and run on each platform after v0.1.1
 
-Next steps:
-- [ ] Publish to crates.io
-- [ ] Publish to npm
-- [ ] Publish to PyPI
-- [ ] Create GitHub release with binaries
+### Short Term
+3. **Add aarch64-linux builds** - Create Cross.toml with OpenSSL or use vendored OpenSSL
+4. **Code signing** - macOS notarization, Windows Authenticode
+
+### Medium Term
+5. **Implement sACN/E1.31** - If there's demand, create `clasp-bridge/src/sacn.rs`
+6. **C bindings** - FFI wrapper around `clasp-embedded` if needed
+7. **WAN discovery** - Public endpoint registration service
+
+### Documentation
+8. **API reference docs** - Generate from Rust doc comments
+9. **Integration guides** - TouchOSC, Resolume, QLab, etc.
+10. **Video tutorials** - Getting started, common use cases
 
 ---
 
-*Last Updated: 2026-01-15*
-*Project: CLASP - Creative Low-Latency Application Streaming Protocol*
-*Website: https://clasp.to*
+## Recent Session Summary (2026-01-16)
+
+### Completed
+1. Added screenshot carousel to site (5 app screenshots)
+2. Fixed Tux logo for Linux downloads
+3. Rewrote spec documentation for developers
+4. **Full audit of site claims vs implementation**
+5. Removed false claims:
+   - sACN/E1.31 (not implemented)
+   - C SDK (only Rust embedded exists)
+   - WAN rendezvous (not implemented)
+   - ±1ms timing claim (unverified)
+6. Fixed API examples:
+   - Rust: `publish` → `emit`
+   - JS: removed `meta` callback param
+7. Fixed release workflow (removed failing aarch64-linux)
+8. Retriggered v0.1.0 release
+9. **v0.1.0 released successfully** - All builds passed
+10. **Fixed electron-builder artifact naming** - Configured consistent filenames without version numbers
+11. **Added macOS dual-architecture builds** - Both ARM and Intel DMGs will now be built
+12. **Updated download URLs** - Windows portable now `.exe` instead of `.zip`
+
+### Release History
+- v0.1.0 attempt 1: Failed (OpenSSL cross-compile for aarch64-linux)
+- v0.1.0 attempt 2: **Success** (aarch64-linux disabled)
+- v0.1.1: Pending (needed for correct artifact filenames)
+
+---
+
+## Wire Protocol Summary
+
+```
+Frame: 4-12 bytes header + MessagePack payload
+
+Byte 0:     0x53 ('S' magic)
+Byte 1:     Flags [QoS:2][TS:1][Enc:1][Cmp:1][Rsv:3]
+Bytes 2-3:  Payload length (uint16 BE)
+[Bytes 4-11: Timestamp if TS flag set]
+Payload:    MessagePack message
+
+QoS: 00=Fire, 01=Confirm, 10=Commit
+
+Default port: 7330 (WebSocket)
+Discovery port: 7331 (UDP broadcast)
+Subprotocol: clasp.v2
+```
+
+---
+
+## Contact
+
+- **Project:** CLASP - Creative Low-Latency Application Streaming Protocol
+- **Maintainer:** LumenCanvas
+- **Website:** https://lumencanvas.studio
+- **Issues:** https://github.com/lumencanvas/clasp/issues

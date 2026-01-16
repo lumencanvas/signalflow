@@ -15,7 +15,7 @@ const downloads = [
     desc: 'Windows 10/11',
     links: [
       { label: 'Installer (.exe)', url: 'https://github.com/lumencanvas/clasp/releases/latest/download/CLASP.Bridge-Setup.exe' },
-      { label: 'Portable (.zip)', url: 'https://github.com/lumencanvas/clasp/releases/latest/download/CLASP.Bridge-win.zip' }
+      { label: 'Portable (.exe)', url: 'https://github.com/lumencanvas/clasp/releases/latest/download/CLASP.Bridge-portable.exe' }
     ]
   },
   {

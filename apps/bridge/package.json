@@ -37,13 +37,28 @@
     },
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg", "zip"]
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "artifactName": "CLASP.Bridge-${arch}.${ext}"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": ["nsis", "portable"],
+      "artifactName": "CLASP.Bridge-Setup.${ext}"
+    },
+    "nsis": {
+      "artifactName": "CLASP.Bridge-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "CLASP.Bridge-portable.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": ["AppImage", "deb"],
+      "artifactName": "CLASP.Bridge.${ext}"
+    },
+    "deb": {
+      "artifactName": "clasp-bridge.${ext}"
     }
   },
   "author": {
