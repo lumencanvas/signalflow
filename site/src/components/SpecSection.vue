@@ -356,7 +356,9 @@ const signalTypes = [
         >
           <h3 @click="toggleSection(specSections[1])">1. What is CLASP?</h3>
           <div class="spec-content">
-            <p>CLASP is a <b>pub/sub protocol</b> designed for creative applications: lighting, audio, video, IoT. Think MQTT but optimized for real-time media.</p>
+            <p>CLASP is a <b>universal protocol bridge</b> for creative applications. It connects everything—MIDI controllers, OSC apps, DMX lights, Art-Net fixtures, MQTT sensors, WebSocket interfaces—through a single unified address space.</p>
+
+            <p style="margin-top: 1rem;">Under the hood, it's a <b>pub/sub protocol</b> (like MQTT) optimized for real-time media. But the killer feature is that it <b>bridges all your existing gear</b>: your TouchOSC tablet can control your DMX lights while your MIDI controller adjusts your VJ software—all through CLASP.</p>
 
             <p style="margin-top: 1rem;"><b>Core concepts:</b></p>
             <ul>
@@ -366,14 +368,14 @@ const signalTypes = [
               <li><b>Wildcards:</b> Subscribe to patterns: <code>/lights/*</code> or <code>/lights/**</code></li>
             </ul>
 
-            <p style="margin-top: 1rem;"><b>Why not just use OSC/MIDI/MQTT?</b></p>
+            <p style="margin-top: 1rem;"><b>Why not just use OSC/MIDI/MQTT directly?</b></p>
             <ul>
               <li><b>vs OSC:</b> CLASP has state. Late-joining clients get current values, not just future changes.</li>
               <li><b>vs MIDI:</b> CLASP has meaningful addresses (not channel/CC numbers) and works over networks.</li>
-              <li><b>vs MQTT:</b> CLASP has typed signals (param vs event), clock sync, and sub-ms latency.</li>
+              <li><b>vs MQTT:</b> CLASP has typed signals (param vs event), built-in clock sync, and sub-ms latency.</li>
             </ul>
 
-            <p style="margin-top: 1rem;">CLASP can <b>bridge</b> all these protocols, so you don't have to choose—your MIDI controller and OSC app can talk through CLASP.</p>
+            <p style="margin-top: 1rem;">You don't have to choose—CLASP bridges them all. Keep using your existing gear and software.</p>
           </div>
         </section>
 
