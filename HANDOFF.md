@@ -228,6 +228,12 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 ### Short Term
 3. **Add aarch64-linux builds** - Create Cross.toml with OpenSSL or use vendored OpenSSL
 4. **Code signing** - macOS notarization, Windows Authenticode
+   - **Current workaround:** Users run `xattr -cr /Applications/CLASP\ Bridge.app`
+   - **To fix properly:** Need Apple Developer account ($99/yr), set up electron-builder signing:
+     - `CSC_LINK` - base64 encoded .p12 certificate
+     - `CSC_KEY_PASSWORD` - certificate password
+     - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` for notarization
+     - Add `@electron/notarize` package and `afterSign` hook
 
 ### Medium Term
 5. **Implement sACN/E1.31** - If there's demand, create `clasp-bridge/src/sacn.rs`
@@ -264,6 +270,12 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 12. **Updated download URLs** - Windows portable now `.exe` instead of `.zip`
 13. **v0.1.1 released successfully** - All artifacts now have version-less filenames
 14. **v0.1.2 released successfully** - New risograph-style CLASP logo as app icon
+15. **Redesigned site for developer appeal**:
+    - Larger logo (120px → 180px)
+    - New LayersSection: features + bridges + code sample (removed wire format)
+    - Moved desktop app section before full spec
+    - Condensed spacing throughout
+16. **Added macOS Gatekeeper workaround** - Note with `xattr -cr` command on downloads page
 
 ### Release History
 - v0.1.0 attempt 1: Failed (OpenSSL cross-compile for aarch64-linux)
