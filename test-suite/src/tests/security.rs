@@ -7,9 +7,9 @@
 //! 4. Rate limits are enforced
 //! 5. Invalid tokens are rejected
 
-use crate::{TestResult, TestSuite};
 use crate::tests::helpers::run_test;
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+use crate::{TestResult, TestSuite};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -68,18 +68,15 @@ fn create_test_token(claims: &ClaspClaims) -> Result<String, String> {
         &Header::default(),
         claims,
         &EncodingKey::from_secret(SECRET),
-    ).map_err(|e| format!("Failed to create token: {:?}", e))
+    )
+    .map_err(|e| format!("Failed to create token: {:?}", e))
 }
 
 fn validate_test_token(token: &str) -> Result<ClaspClaims, String> {
     let validation = Validation::new(Algorithm::HS256);
-    decode::<ClaspClaims>(
-        token,
-        &DecodingKey::from_secret(SECRET),
-        &validation,
-    )
-    .map(|data| data.claims)
-    .map_err(|e| format!("Token validation failed: {:?}", e))
+    decode::<ClaspClaims>(token, &DecodingKey::from_secret(SECRET), &validation)
+        .map(|data| data.claims)
+        .map_err(|e| format!("Token validation failed: {:?}", e))
 }
 
 fn current_timestamp() -> u64 {
@@ -117,7 +114,8 @@ async fn test_jwt_generation() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: JWT token validation
@@ -155,7 +153,8 @@ async fn test_jwt_validation() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Read scope enforcement
@@ -219,7 +218,8 @@ async fn test_read_scope() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Write scope enforcement
@@ -234,7 +234,7 @@ async fn test_write_scope() -> TestResult {
                 iat: now,
                 exp: now + 3600,
                 clasp: ClaspCapabilities {
-                    read: vec!["/**".to_string()], // Can read everything
+                    read: vec!["/**".to_string()],                // Can read everything
                     write: vec!["/lumen/scene/0/**".to_string()], // Can only write to scene 0
                     constraints: HashMap::new(),
                 },
@@ -280,7 +280,8 @@ async fn test_write_scope() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Address constraints (value range)
@@ -314,11 +315,7 @@ async fn test_address_constraints() -> TestResult {
             let validated = validate_test_token(&token)?;
 
             // Check if value is within constraints
-            fn check_value_constraint(
-                caps: &ClaspCapabilities,
-                address: &str,
-                value: f64,
-            ) -> bool {
+            fn check_value_constraint(caps: &ClaspCapabilities, address: &str, value: f64) -> bool {
                 // Find matching constraint
                 for (pattern, constraint) in &caps.constraints {
                     let matches = if pattern.ends_with("/**") {
@@ -360,7 +357,8 @@ async fn test_address_constraints() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Rate limit constraints
@@ -405,7 +403,8 @@ async fn test_rate_limit_constraints() -> TestResult {
                 None => Err("Missing fader constraint".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Expired token rejection
@@ -441,7 +440,8 @@ async fn test_expired_token() -> TestResult {
                 }
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Invalid signature rejection
@@ -467,7 +467,8 @@ async fn test_invalid_signature() -> TestResult {
                 &Header::default(),
                 &claims,
                 &EncodingKey::from_secret(b"wrong-secret"),
-            ).map_err(|e| format!("Failed to create token: {:?}", e))?;
+            )
+            .map_err(|e| format!("Failed to create token: {:?}", e))?;
 
             // Should fail validation due to invalid signature
             match validate_test_token(&token) {
@@ -475,7 +476,8 @@ async fn test_invalid_signature() -> TestResult {
                 Err(_) => Ok(()), // Expected to fail
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Wildcard scope patterns
@@ -510,7 +512,8 @@ async fn test_wildcard_scopes() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Scope intersection (read vs write)
@@ -547,14 +550,21 @@ async fn test_scope_intersection() -> TestResult {
 
             // Verify scopes are preserved
             if validated.clasp.read.len() != 3 {
-                return Err(format!("Expected 3 read scopes, got {}", validated.clasp.read.len()));
+                return Err(format!(
+                    "Expected 3 read scopes, got {}",
+                    validated.clasp.read.len()
+                ));
             }
 
             if validated.clasp.write.len() != 2 {
-                return Err(format!("Expected 2 write scopes, got {}", validated.clasp.write.len()));
+                return Err(format!(
+                    "Expected 2 write scopes, got {}",
+                    validated.clasp.write.len()
+                ));
             }
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }

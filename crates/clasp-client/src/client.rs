@@ -1,14 +1,16 @@
 //! Main Clasp client implementation
 
 use bytes::Bytes;
-use dashmap::DashMap;
-use parking_lot::{Mutex, RwLock};
 use clasp_core::{
     codec, time::ClockSync, BundleMessage, GetMessage, HelloMessage, Message, PublishMessage,
     SetMessage, SignalType, SubscribeMessage, SubscribeOptions, UnsubscribeMessage, Value,
     PROTOCOL_VERSION,
 };
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
+use dashmap::DashMap;
+use parking_lot::{Mutex, RwLock};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
@@ -169,7 +171,9 @@ impl Clasp {
                     ));
                 }
                 None => {
-                    return Err(ClientError::ConnectionFailed("Connection closed".to_string()));
+                    return Err(ClientError::ConnectionFailed(
+                        "Connection closed".to_string(),
+                    ));
                 }
                 _ => {}
             }

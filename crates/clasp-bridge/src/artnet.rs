@@ -1,9 +1,9 @@
 //! Art-Net bridge
 
-use async_trait::async_trait;
 use artnet_protocol::{ArtCommand, Output, Poll};
-use parking_lot::Mutex;
+use async_trait::async_trait;
 use clasp_core::{Message, SetMessage, Value};
+use parking_lot::Mutex;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -198,9 +198,7 @@ impl Bridge for ArtNetBridge {
                 }
             }
 
-            let _ = tx
-                .send(BridgeEvent::Disconnected { reason: None })
-                .await;
+            let _ = tx.send(BridgeEvent::Disconnected { reason: None }).await;
         });
 
         Ok(rx)

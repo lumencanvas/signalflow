@@ -15,21 +15,21 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub mod types;
-pub mod codec;
-pub mod frame;
 pub mod address;
+pub mod codec;
+pub mod error;
+pub mod frame;
 pub mod state;
 pub mod time;
-pub mod error;
+pub mod types;
 
-pub use types::*;
-pub use codec::{encode, decode};
-pub use frame::Frame;
 pub use address::Address;
+pub use codec::{decode, encode};
+pub use error::{Error, Result};
+pub use frame::Frame;
 pub use state::ParamState;
 pub use time::Timestamp;
-pub use error::{Error, Result};
+pub use types::*;
 
 /// Protocol version
 pub const PROTOCOL_VERSION: u8 = 2;

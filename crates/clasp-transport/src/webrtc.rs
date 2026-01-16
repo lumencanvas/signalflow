@@ -146,10 +146,9 @@ impl WebRtcTransport {
             })?;
 
         // Create answer
-        let answer = peer_connection
-            .create_answer(None)
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("Create answer failed: {}", e)))?;
+        let answer = peer_connection.create_answer(None).await.map_err(|e| {
+            TransportError::ConnectionFailed(format!("Create answer failed: {}", e))
+        })?;
 
         peer_connection
             .set_local_description(answer.clone())
@@ -232,12 +231,14 @@ impl WebRtcTransport {
 
     async fn create_peer_connection(config: &WebRtcConfig) -> Result<Arc<RTCPeerConnection>> {
         let mut m = MediaEngine::default();
-        m.register_default_codecs()
-            .map_err(|e| TransportError::ConnectionFailed(format!("Codec registration failed: {}", e)))?;
+        m.register_default_codecs().map_err(|e| {
+            TransportError::ConnectionFailed(format!("Codec registration failed: {}", e))
+        })?;
 
         let mut registry = Registry::new();
-        registry = register_default_interceptors(registry, &mut m)
-            .map_err(|e| TransportError::ConnectionFailed(format!("Interceptor registration failed: {}", e)))?;
+        registry = register_default_interceptors(registry, &mut m).map_err(|e| {
+            TransportError::ConnectionFailed(format!("Interceptor registration failed: {}", e))
+        })?;
 
         let api = APIBuilder::new()
             .with_media_engine(m)
@@ -258,10 +259,9 @@ impl WebRtcTransport {
             ..Default::default()
         };
 
-        let peer_connection = api
-            .new_peer_connection(rtc_config)
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("PeerConnection creation failed: {}", e)))?;
+        let peer_connection = api.new_peer_connection(rtc_config).await.map_err(|e| {
+            TransportError::ConnectionFailed(format!("PeerConnection creation failed: {}", e))
+        })?;
 
         // Set up connection state handler
         peer_connection.on_peer_connection_state_change(Box::new(move |state| {
@@ -272,9 +272,7 @@ impl WebRtcTransport {
         Ok(Arc::new(peer_connection))
     }
 
-    async fn create_unreliable_channel(
-        pc: &Arc<RTCPeerConnection>,
-    ) -> Result<Arc<RTCDataChannel>> {
+    async fn create_unreliable_channel(pc: &Arc<RTCPeerConnection>) -> Result<Arc<RTCDataChannel>> {
         let options = RTCDataChannelInit {
             ordered: Some(false),
             max_retransmits: Some(0),
@@ -284,7 +282,9 @@ impl WebRtcTransport {
         let channel = pc
             .create_data_channel("clasp", Some(options))
             .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("DataChannel creation failed: {}", e)))?;
+            .map_err(|e| {
+                TransportError::ConnectionFailed(format!("DataChannel creation failed: {}", e))
+            })?;
 
         info!("Created unreliable DataChannel 'clasp'");
         Ok(channel)
@@ -299,7 +299,9 @@ impl WebRtcTransport {
         let channel = pc
             .create_data_channel("clasp-reliable", Some(options))
             .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("DataChannel creation failed: {}", e)))?;
+            .map_err(|e| {
+                TransportError::ConnectionFailed(format!("DataChannel creation failed: {}", e))
+            })?;
 
         info!("Created reliable DataChannel 'clasp-reliable'");
         Ok(channel)

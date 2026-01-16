@@ -8,17 +8,16 @@
 //! 5. Support scheduled bundles across devices
 //! 6. Handle conflict resolution correctly
 
-use crate::{TestResult, TestSuite};
 use crate::tests::helpers::run_test;
+use crate::{TestResult, TestSuite};
 use clasp_core::{
-    Message, Value, SignalType, QoS,
-    HelloMessage, WelcomeMessage, SetMessage, PublishMessage,
-    SubscribeMessage, BundleMessage, SyncMessage, AckMessage,
-    ErrorMessage, QueryMessage, UnsubscribeMessage,
-    codec::{encode, decode, encode_with_options},
+    codec::{decode, encode, encode_with_options},
+    AckMessage, BundleMessage, ErrorMessage, HelloMessage, Message, PublishMessage, QoS,
+    QueryMessage, SetMessage, SignalType, SubscribeMessage, SyncMessage, UnsubscribeMessage, Value,
+    WelcomeMessage,
 };
-use std::time::Duration;
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub async fn run_tests(suite: &mut TestSuite) {
     suite.add_result(test_message_encoding().await);
@@ -42,13 +41,16 @@ async fn test_message_encoding() -> TestResult {
             let msg = Message::Hello(HelloMessage {
                 version: 2,
                 name: "Test Client".to_string(),
-                features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
+                features: vec![
+                    "param".to_string(),
+                    "event".to_string(),
+                    "stream".to_string(),
+                ],
                 capabilities: None,
                 token: None,
             });
 
-            let encoded = encode(&msg)
-                .map_err(|e| format!("Failed to encode Hello: {:?}", e))?;
+            let encoded = encode(&msg).map_err(|e| format!("Failed to encode Hello: {:?}", e))?;
 
             // Verify magic byte
             if encoded[0] != 0x53 {
@@ -56,8 +58,8 @@ async fn test_message_encoding() -> TestResult {
             }
 
             // Decode and verify
-            let (decoded, _frame) = decode(&encoded)
-                .map_err(|e| format!("Failed to decode Hello: {:?}", e))?;
+            let (decoded, _frame) =
+                decode(&encoded).map_err(|e| format!("Failed to decode Hello: {:?}", e))?;
 
             match decoded {
                 Message::Hello(hello) => {
@@ -75,7 +77,8 @@ async fn test_message_encoding() -> TestResult {
                 _ => Err("Expected Hello message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Message decoding
@@ -93,11 +96,10 @@ async fn test_message_decoding() -> TestResult {
                 token: None,
             });
 
-            let encoded = encode(&msg)
-                .map_err(|e| format!("Failed to encode: {:?}", e))?;
+            let encoded = encode(&msg).map_err(|e| format!("Failed to encode: {:?}", e))?;
 
-            let (decoded, _) = decode(&encoded)
-                .map_err(|e| format!("Failed to decode: {:?}", e))?;
+            let (decoded, _) =
+                decode(&encoded).map_err(|e| format!("Failed to decode: {:?}", e))?;
 
             match decoded {
                 Message::Welcome(welcome) => {
@@ -115,7 +117,8 @@ async fn test_message_decoding() -> TestResult {
                 _ => Err("Expected Welcome message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: All message types
@@ -167,15 +170,13 @@ async fn test_all_message_types() -> TestResult {
                 }),
                 Message::Bundle(BundleMessage {
                     timestamp: Some(1704067200000000),
-                    messages: vec![
-                        Message::Set(SetMessage {
-                            address: "/bundle/1".to_string(),
-                            value: Value::Int(1),
-                            revision: None,
-                            lock: false,
-                            unlock: false,
-                        }),
-                    ],
+                    messages: vec![Message::Set(SetMessage {
+                        address: "/bundle/1".to_string(),
+                        value: Value::Int(1),
+                        revision: None,
+                        lock: false,
+                        unlock: false,
+                    })],
                 }),
                 Message::Sync(SyncMessage {
                     t1: 1000000,
@@ -203,8 +204,8 @@ async fn test_all_message_types() -> TestResult {
             ];
 
             for (i, msg) in messages.iter().enumerate() {
-                let encoded = encode(msg)
-                    .map_err(|e| format!("Message {} encode failed: {:?}", i, e))?;
+                let encoded =
+                    encode(msg).map_err(|e| format!("Message {} encode failed: {:?}", i, e))?;
 
                 let (decoded, _) = decode(&encoded)
                     .map_err(|e| format!("Message {} decode failed: {:?}", i, e))?;
@@ -218,67 +219,72 @@ async fn test_all_message_types() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: All value types
 async fn test_value_types() -> TestResult {
-    run_test(
-        "CLASP: All value types",
-        Duration::from_secs(5),
-        || async {
-            // Note: With #[serde(untagged)], Bytes and Array can be ambiguous in MessagePack
-            // because bytes that look like small integers can be deserialized as Array.
-            // We test Array with mixed types (including non-integers) to avoid ambiguity.
-            let values: Vec<Value> = vec![
-                Value::Null,
-                Value::Bool(true),
-                Value::Bool(false),
-                Value::Int(0),
-                Value::Int(i64::MAX),
-                Value::Int(i64::MIN),
-                Value::Float(0.0),
-                Value::Float(std::f64::consts::PI),
-                Value::String("".to_string()),
-                Value::String("Hello, World!".to_string()),
-                // Array with mixed types (avoids ambiguity with Bytes)
-                Value::Array(vec![Value::Int(1), Value::Float(2.0), Value::String("three".to_string())]),
-                Value::Map(HashMap::new()),
-                Value::Map({
-                    let mut m = HashMap::new();
-                    m.insert("key".to_string(), Value::Int(42));
-                    m
-                }),
-            ];
+    run_test("CLASP: All value types", Duration::from_secs(5), || async {
+        // Note: With #[serde(untagged)], Bytes and Array can be ambiguous in MessagePack
+        // because bytes that look like small integers can be deserialized as Array.
+        // We test Array with mixed types (including non-integers) to avoid ambiguity.
+        let values: Vec<Value> = vec![
+            Value::Null,
+            Value::Bool(true),
+            Value::Bool(false),
+            Value::Int(0),
+            Value::Int(i64::MAX),
+            Value::Int(i64::MIN),
+            Value::Float(0.0),
+            Value::Float(std::f64::consts::PI),
+            Value::String("".to_string()),
+            Value::String("Hello, World!".to_string()),
+            // Array with mixed types (avoids ambiguity with Bytes)
+            Value::Array(vec![
+                Value::Int(1),
+                Value::Float(2.0),
+                Value::String("three".to_string()),
+            ]),
+            Value::Map(HashMap::new()),
+            Value::Map({
+                let mut m = HashMap::new();
+                m.insert("key".to_string(), Value::Int(42));
+                m
+            }),
+        ];
 
-            for (i, val) in values.iter().enumerate() {
-                let msg = Message::Set(SetMessage {
-                    address: format!("/test/value/{}", i),
-                    value: val.clone(),
-                    revision: None,
-                    lock: false,
-                    unlock: false,
-                });
+        for (i, val) in values.iter().enumerate() {
+            let msg = Message::Set(SetMessage {
+                address: format!("/test/value/{}", i),
+                value: val.clone(),
+                revision: None,
+                lock: false,
+                unlock: false,
+            });
 
-                let encoded = encode(&msg)
-                    .map_err(|e| format!("Value {} encode failed: {:?}", i, e))?;
+            let encoded =
+                encode(&msg).map_err(|e| format!("Value {} encode failed: {:?}", i, e))?;
 
-                let (decoded, _) = decode(&encoded)
-                    .map_err(|e| format!("Value {} decode failed: {:?}", i, e))?;
+            let (decoded, _) =
+                decode(&encoded).map_err(|e| format!("Value {} decode failed: {:?}", i, e))?;
 
-                match decoded {
-                    Message::Set(set) => {
-                        if set.value != *val {
-                            return Err(format!("Value {} mismatch: {:?} != {:?}", i, set.value, val));
-                        }
+            match decoded {
+                Message::Set(set) => {
+                    if set.value != *val {
+                        return Err(format!(
+                            "Value {} mismatch: {:?} != {:?}",
+                            i, set.value, val
+                        ));
                     }
-                    _ => return Err(format!("Value {} not Set message", i)),
                 }
+                _ => return Err(format!("Value {} not Set message", i)),
             }
+        }
 
-            Ok(())
-        },
-    ).await
+        Ok(())
+    })
+    .await
 }
 
 /// Test: QoS levels
@@ -304,13 +310,17 @@ async fn test_qos_levels() -> TestResult {
                     .map_err(|e| format!("QoS {:?} decode failed: {:?}", qos, e))?;
 
                 if frame.flags.qos != qos {
-                    return Err(format!("QoS mismatch: expected {:?}, got {:?}", qos, frame.flags.qos));
+                    return Err(format!(
+                        "QoS mismatch: expected {:?}, got {:?}",
+                        qos, frame.flags.qos
+                    ));
                 }
             }
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Timestamp handling
@@ -332,8 +342,8 @@ async fn test_timestamp_handling() -> TestResult {
             let encoded = encode_with_options(&msg, Some(QoS::Confirm), Some(timestamp))
                 .map_err(|e| format!("Timestamp encode failed: {:?}", e))?;
 
-            let (_, frame) = decode(&encoded)
-                .map_err(|e| format!("Timestamp decode failed: {:?}", e))?;
+            let (_, frame) =
+                decode(&encoded).map_err(|e| format!("Timestamp decode failed: {:?}", e))?;
 
             match frame.timestamp {
                 Some(ts) => {
@@ -345,7 +355,8 @@ async fn test_timestamp_handling() -> TestResult {
                 None => Err("Expected timestamp in frame".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Address wildcards
@@ -398,7 +409,8 @@ async fn test_address_wildcards() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Bundle messages
@@ -438,11 +450,10 @@ async fn test_bundle_messages() -> TestResult {
                 ],
             });
 
-            let encoded = encode(&bundle)
-                .map_err(|e| format!("Bundle encode failed: {:?}", e))?;
+            let encoded = encode(&bundle).map_err(|e| format!("Bundle encode failed: {:?}", e))?;
 
-            let (decoded, _) = decode(&encoded)
-                .map_err(|e| format!("Bundle decode failed: {:?}", e))?;
+            let (decoded, _) =
+                decode(&encoded).map_err(|e| format!("Bundle decode failed: {:?}", e))?;
 
             match decoded {
                 Message::Bundle(b) => {
@@ -457,7 +468,8 @@ async fn test_bundle_messages() -> TestResult {
                 _ => Err("Expected Bundle message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Subscription patterns
@@ -480,11 +492,11 @@ async fn test_subscription_patterns() -> TestResult {
                 }),
             });
 
-            let encoded = encode(&subscribe)
-                .map_err(|e| format!("Subscribe encode failed: {:?}", e))?;
+            let encoded =
+                encode(&subscribe).map_err(|e| format!("Subscribe encode failed: {:?}", e))?;
 
-            let (decoded, _) = decode(&encoded)
-                .map_err(|e| format!("Subscribe decode failed: {:?}", e))?;
+            let (decoded, _) =
+                decode(&encoded).map_err(|e| format!("Subscribe decode failed: {:?}", e))?;
 
             match decoded {
                 Message::Subscribe(sub) => {
@@ -505,7 +517,8 @@ async fn test_subscription_patterns() -> TestResult {
                 _ => Err("Expected Subscribe message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: State revision tracking
@@ -523,11 +536,10 @@ async fn test_state_revision() -> TestResult {
                 unlock: false,
             });
 
-            let encoded1 = encode(&set1)
-                .map_err(|e| format!("Set1 encode failed: {:?}", e))?;
+            let encoded1 = encode(&set1).map_err(|e| format!("Set1 encode failed: {:?}", e))?;
 
-            let (decoded1, _) = decode(&encoded1)
-                .map_err(|e| format!("Set1 decode failed: {:?}", e))?;
+            let (decoded1, _) =
+                decode(&encoded1).map_err(|e| format!("Set1 decode failed: {:?}", e))?;
 
             match decoded1 {
                 Message::Set(set) => {
@@ -547,11 +559,10 @@ async fn test_state_revision() -> TestResult {
                 unlock: false,
             });
 
-            let encoded2 = encode(&set2)
-                .map_err(|e| format!("Set2 encode failed: {:?}", e))?;
+            let encoded2 = encode(&set2).map_err(|e| format!("Set2 encode failed: {:?}", e))?;
 
-            let (decoded2, _) = decode(&encoded2)
-                .map_err(|e| format!("Set2 decode failed: {:?}", e))?;
+            let (decoded2, _) =
+                decode(&encoded2).map_err(|e| format!("Set2 decode failed: {:?}", e))?;
 
             match decoded2 {
                 Message::Set(set) => {
@@ -566,5 +577,6 @@ async fn test_state_revision() -> TestResult {
                 _ => Err("Expected Set message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }

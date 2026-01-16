@@ -3,15 +3,15 @@
 //! This crate provides WebAssembly bindings for Clasp,
 //! enabling browser-based clients.
 
-use wasm_bindgen::prelude::*;
-use web_sys::{WebSocket, MessageEvent, CloseEvent, ErrorEvent};
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
+use wasm_bindgen::prelude::*;
+use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket};
 
 use clasp_core::{
-    codec, frame::Frame, HelloMessage, Message, SetMessage, SubscribeMessage,
-    SubscribeOptions, Value, PROTOCOL_VERSION, WS_SUBPROTOCOL,
+    codec, frame::Frame, HelloMessage, Message, SetMessage, SubscribeMessage, SubscribeOptions,
+    Value, PROTOCOL_VERSION, WS_SUBPROTOCOL,
 };
 
 #[cfg(feature = "console_error_panic_hook")]
@@ -83,7 +83,11 @@ impl ClaspWasm {
             let hello = Message::Hello(HelloMessage {
                 version: PROTOCOL_VERSION,
                 name: "Clasp WASM Client".to_string(),
-                features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
+                features: vec![
+                    "param".to_string(),
+                    "event".to_string(),
+                    "stream".to_string(),
+                ],
                 capabilities: None,
                 token: None,
             });
@@ -120,7 +124,9 @@ impl ClaspWasm {
                         }
                         Message::Set(set) => {
                             let js_value = value_to_js(&set.value);
-                            params_msg.borrow_mut().insert(set.address.clone(), js_value.clone());
+                            params_msg
+                                .borrow_mut()
+                                .insert(set.address.clone(), js_value.clone());
 
                             if let Some(callback) = on_message_msg.borrow().as_ref() {
                                 let _ = callback.call2(
@@ -133,7 +139,9 @@ impl ClaspWasm {
                         Message::Snapshot(snapshot) => {
                             for param in &snapshot.params {
                                 let js_value = value_to_js(&param.value);
-                                params_msg.borrow_mut().insert(param.address.clone(), js_value.clone());
+                                params_msg
+                                    .borrow_mut()
+                                    .insert(param.address.clone(), js_value.clone());
 
                                 if let Some(callback) = on_message_msg.borrow().as_ref() {
                                     let _ = callback.call2(
@@ -145,7 +153,9 @@ impl ClaspWasm {
                             }
                         }
                         Message::Publish(pub_msg) => {
-                            let value = pub_msg.value.as_ref()
+                            let value = pub_msg
+                                .value
+                                .as_ref()
                                 .or(pub_msg.payload.as_ref())
                                 .map(value_to_js)
                                 .unwrap_or(JsValue::NULL);
@@ -163,7 +173,8 @@ impl ClaspWasm {
                 }
             }
         }) as Box<dyn FnMut(MessageEvent)>);
-        self.ws.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+        self.ws
+            .set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
         onmessage.forget();
 
         // onclose handler
@@ -281,7 +292,11 @@ impl ClaspWasm {
 
     /// Get cached value
     pub fn get(&self, address: &str) -> JsValue {
-        self.params.borrow().get(address).cloned().unwrap_or(JsValue::NULL)
+        self.params
+            .borrow()
+            .get(address)
+            .cloned()
+            .unwrap_or(JsValue::NULL)
     }
 
     /// Close connection

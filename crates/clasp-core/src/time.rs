@@ -84,13 +84,15 @@ impl ClockSync {
         // Calculate jitter (variance of RTT)
         if self.rtt_history.len() >= 2 {
             let mean: u64 = self.rtt_history.iter().sum::<u64>() / self.rtt_history.len() as u64;
-            let variance: u64 = self.rtt_history
+            let variance: u64 = self
+                .rtt_history
                 .iter()
                 .map(|&x| {
                     let diff = x as i64 - mean as i64;
                     (diff * diff) as u64
                 })
-                .sum::<u64>() / self.rtt_history.len() as u64;
+                .sum::<u64>()
+                / self.rtt_history.len() as u64;
             self.jitter = (variance as f64).sqrt() as u64;
         }
 

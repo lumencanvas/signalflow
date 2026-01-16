@@ -75,8 +75,9 @@ impl SerialTransport {
     /// List available serial ports
     pub fn list_ports() -> Result<Vec<String>> {
         use tokio_serial::available_ports;
-        let ports = available_ports()
-            .map_err(|e| TransportError::ConnectionFailed(format!("Failed to list ports: {}", e)))?;
+        let ports = available_ports().map_err(|e| {
+            TransportError::ConnectionFailed(format!("Failed to list ports: {}", e))
+        })?;
         Ok(ports.into_iter().map(|p| p.port_name).collect())
     }
 
@@ -96,7 +97,10 @@ impl SerialTransport {
             .open_native_async()
             .map_err(|e| TransportError::ConnectionFailed(format!("Failed to open port: {}", e)))?;
 
-        info!("Serial port opened: {} @ {} baud", port_name, config.baud_rate);
+        info!(
+            "Serial port opened: {} @ {} baud",
+            port_name, config.baud_rate
+        );
 
         let port = Arc::new(tokio::sync::Mutex::new(port));
         let (tx, rx) = mpsc::channel(100);

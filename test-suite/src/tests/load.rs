@@ -7,16 +7,16 @@
 //! 4. Sustained load over time
 //! 5. Memory and resource usage
 
-use crate::{TestResult, TestSuite};
 use crate::tests::helpers::run_test;
+use crate::{TestResult, TestSuite};
 use clasp_core::{
-    Message, Value, SetMessage, PublishMessage, SignalType,
-    codec::{encode, decode},
+    codec::{decode, encode},
+    Message, PublishMessage, SetMessage, SignalType, Value,
 };
 use hdrhistogram::Histogram;
-use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 pub async fn run_tests(suite: &mut TestSuite) {
     suite.add_result(test_encoding_throughput().await);
@@ -61,7 +61,8 @@ async fn test_encoding_throughput() -> TestResult {
             tracing::info!("Encoding rate: {:.0} msg/s", rate);
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Message decoding throughput
@@ -98,7 +99,8 @@ async fn test_decoding_throughput() -> TestResult {
             tracing::info!("Decoding rate: {:.0} msg/s", rate);
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Full roundtrip throughput
@@ -133,7 +135,8 @@ async fn test_roundtrip_throughput() -> TestResult {
             tracing::info!("Roundtrip rate: {:.0} msg/s", rate);
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Large payload handling (tests near the 64KB limit)
@@ -145,9 +148,7 @@ async fn test_large_payload() -> TestResult {
             // Create a large array - 6000 floats is ~54KB which is under the 64KB limit
             // (Each MessagePack float is ~9 bytes with overhead)
             const ARRAY_SIZE: usize = 6000;
-            let large_array: Vec<Value> = (0..ARRAY_SIZE)
-                .map(|i| Value::Float(i as f64))
-                .collect();
+            let large_array: Vec<Value> = (0..ARRAY_SIZE).map(|i| Value::Float(i as f64)).collect();
 
             let msg = Message::Set(SetMessage {
                 address: "/test/large".to_string(),
@@ -167,20 +168,19 @@ async fn test_large_payload() -> TestResult {
             }
 
             let start = Instant::now();
-            let (decoded, _) = decode(&encoded).map_err(|e| format!("Large decode failed: {:?}", e))?;
+            let (decoded, _) =
+                decode(&encoded).map_err(|e| format!("Large decode failed: {:?}", e))?;
             let decode_time = start.elapsed();
 
             match decoded {
-                Message::Set(set) => {
-                    match set.value {
-                        Value::Array(arr) => {
-                            if arr.len() != ARRAY_SIZE {
-                                return Err(format!("Array size mismatch: {}", arr.len()));
-                            }
+                Message::Set(set) => match set.value {
+                    Value::Array(arr) => {
+                        if arr.len() != ARRAY_SIZE {
+                            return Err(format!("Array size mismatch: {}", arr.len()));
                         }
-                        _ => return Err("Expected Array value".to_string()),
                     }
-                }
+                    _ => return Err("Expected Array value".to_string()),
+                },
                 _ => return Err("Expected Set message".to_string()),
             }
 
@@ -194,7 +194,8 @@ async fn test_large_payload() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Many small messages
@@ -245,7 +246,8 @@ async fn test_many_small_messages() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Concurrent encoding (multi-threaded)
@@ -285,7 +287,9 @@ async fn test_concurrent_encoding() -> TestResult {
             }
 
             for handle in handles {
-                handle.await.map_err(|e| format!("Thread failed: {:?}", e))?;
+                handle
+                    .await
+                    .map_err(|e| format!("Thread failed: {:?}", e))?;
             }
 
             let elapsed = start.elapsed();
@@ -301,10 +305,15 @@ async fn test_concurrent_encoding() -> TestResult {
                 return Err(format!("Concurrent rate too low: {:.0} msg/s", rate));
             }
 
-            tracing::info!("Concurrent rate: {:.0} msg/s across {} threads", rate, thread_count);
+            tracing::info!(
+                "Concurrent rate: {:.0} msg/s across {} threads",
+                rate,
+                thread_count
+            );
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Memory stability under load
@@ -330,10 +339,10 @@ async fn test_memory_stability() -> TestResult {
                         unlock: false,
                     });
 
-                    let encoded = encode(&msg)
-                        .map_err(|e| format!("Encode {} failed: {:?}", idx, e))?;
-                    let _ = decode(&encoded)
-                        .map_err(|e| format!("Decode {} failed: {:?}", idx, e))?;
+                    let encoded =
+                        encode(&msg).map_err(|e| format!("Encode {} failed: {:?}", idx, e))?;
+                    let _ =
+                        decode(&encoded).map_err(|e| format!("Decode {} failed: {:?}", idx, e))?;
 
                     // Don't keep any references - let memory be freed
                 }
@@ -346,7 +355,8 @@ async fn test_memory_stability() -> TestResult {
             tracing::info!("Memory stability: {} messages processed", count);
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Latency distribution
@@ -370,10 +380,8 @@ async fn test_latency_distribution() -> TestResult {
                 });
 
                 let start = Instant::now();
-                let encoded = encode(&msg)
-                    .map_err(|e| format!("Encode failed: {:?}", e))?;
-                let _ = decode(&encoded)
-                    .map_err(|e| format!("Decode failed: {:?}", e))?;
+                let encoded = encode(&msg).map_err(|e| format!("Encode failed: {:?}", e))?;
+                let _ = decode(&encoded).map_err(|e| format!("Decode failed: {:?}", e))?;
                 let elapsed = start.elapsed();
 
                 // Record in microseconds
@@ -387,7 +395,10 @@ async fn test_latency_distribution() -> TestResult {
 
             tracing::info!(
                 "Latency: p50={}us, p95={}us, p99={}us, max={}us",
-                p50, p95, p99, max
+                p50,
+                p95,
+                p99,
+                max
             );
 
             // Sanity check - roundtrip should be under 1ms at p99
@@ -397,5 +408,6 @@ async fn test_latency_distribution() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }

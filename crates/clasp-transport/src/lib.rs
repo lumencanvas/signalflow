@@ -32,23 +32,23 @@ pub mod ble;
 #[cfg(feature = "webrtc")]
 pub mod webrtc;
 
-pub use error::{TransportError, Result};
-pub use traits::{Transport, TransportEvent, TransportSender, TransportReceiver, TransportServer};
+pub use error::{Result, TransportError};
+pub use traits::{Transport, TransportEvent, TransportReceiver, TransportSender, TransportServer};
 
 #[cfg(feature = "websocket")]
-pub use websocket::{WebSocketTransport, WebSocketConfig, WebSocketServer};
+pub use websocket::{WebSocketConfig, WebSocketServer, WebSocketTransport};
 
 #[cfg(feature = "udp")]
-pub use udp::{UdpTransport, UdpConfig};
+pub use udp::{UdpConfig, UdpTransport};
 
 #[cfg(feature = "ble")]
-pub use ble::{BleTransport, BleConfig};
+pub use ble::{BleConfig, BleTransport};
 
 #[cfg(feature = "webrtc")]
-pub use webrtc::{WebRtcTransport, WebRtcConfig};
+pub use webrtc::{WebRtcConfig, WebRtcTransport};
 
 #[cfg(feature = "quic")]
-pub use quic::{QuicTransport, QuicConfig, QuicConnection};
+pub use quic::{QuicConfig, QuicConnection, QuicTransport};
 
 #[cfg(feature = "serial")]
-pub use serial::{SerialTransport, SerialConfig};
+pub use serial::{SerialConfig, SerialTransport};

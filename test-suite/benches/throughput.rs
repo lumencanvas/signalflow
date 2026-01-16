@@ -1,7 +1,7 @@
 //! Throughput Benchmarks for CLASP Protocol
 
+use clasp_core::{decode, encode, Message, SignalType, Value};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use clasp_core::{Message, Value, SignalType, encode, decode};
 
 fn bench_encode_set(c: &mut Criterion) {
     let msg = Message::Set {
@@ -14,11 +14,7 @@ fn bench_encode_set(c: &mut Criterion) {
     let mut group = c.benchmark_group("encode");
     group.throughput(Throughput::Elements(1));
 
-    group.bench_function("set_float", |b| {
-        b.iter(|| {
-            black_box(encode(&msg).unwrap())
-        })
-    });
+    group.bench_function("set_float", |b| b.iter(|| black_box(encode(&msg).unwrap())));
 
     group.finish();
 }
@@ -36,9 +32,7 @@ fn bench_decode_set(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
 
     group.bench_function("set_float", |b| {
-        b.iter(|| {
-            black_box(decode(&encoded).unwrap())
-        })
+        b.iter(|| black_box(decode(&encoded).unwrap()))
     });
 
     group.finish();
@@ -125,9 +119,7 @@ fn bench_bundle(c: &mut Criterion) {
 }
 
 fn bench_large_array(c: &mut Criterion) {
-    let large_array: Vec<Value> = (0..512)
-        .map(|i| Value::Float(i as f64 / 512.0))
-        .collect();
+    let large_array: Vec<Value> = (0..512).map(|i| Value::Float(i as f64 / 512.0)).collect();
 
     let msg = Message::Set {
         address: "/large/array".to_string(),

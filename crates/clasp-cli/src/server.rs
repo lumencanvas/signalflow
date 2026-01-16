@@ -27,7 +27,11 @@ pub async fn run_server(
         _ => {
             println!(
                 "{}",
-                format!("Unknown protocol: {}. Use quic, tcp, or websocket.", protocol).red()
+                format!(
+                    "Unknown protocol: {}. Use quic, tcp, or websocket.",
+                    protocol
+                )
+                .red()
             );
             Ok(())
         }
@@ -41,7 +45,7 @@ async fn run_quic_server(
 ) -> Result<()> {
     #[cfg(feature = "quic")]
     {
-        use clasp_transport::{QuicTransport, QuicConfig};
+        use clasp_transport::{QuicConfig, QuicTransport};
 
         let config = QuicConfig::default();
         let addr = format!("{}:{}", bind, port);
@@ -84,21 +88,13 @@ async fn run_quic_server(
     }
 }
 
-async fn run_tcp_server(
-    bind: &str,
-    port: u16,
-    shutdown_rx: &mut mpsc::Receiver<()>,
-) -> Result<()> {
+async fn run_tcp_server(bind: &str, port: u16, shutdown_rx: &mut mpsc::Receiver<()>) -> Result<()> {
     use tokio::net::TcpListener;
 
     let addr = format!("{}:{}", bind, port);
     let listener = TcpListener::bind(&addr).await?;
 
-    println!(
-        "{} TCP server listening on {}",
-        "OK".green().bold(),
-        addr
-    );
+    println!("{} TCP server listening on {}", "OK".green().bold(), addr);
     println!("  Protocol:  CLASP over TCP");
     println!("  Press Ctrl+C to stop");
 
@@ -152,12 +148,8 @@ async fn handle_tcp_connection(mut stream: tokio::net::TcpStream) -> Result<()> 
     Ok(())
 }
 
-async fn run_ws_server(
-    bind: &str,
-    port: u16,
-    shutdown_rx: &mut mpsc::Receiver<()>,
-) -> Result<()> {
-    use clasp_bridge::{WebSocketBridge, WebSocketBridgeConfig, WsMode, Bridge};
+async fn run_ws_server(bind: &str, port: u16, shutdown_rx: &mut mpsc::Receiver<()>) -> Result<()> {
+    use clasp_bridge::{Bridge, WebSocketBridge, WebSocketBridgeConfig, WsMode};
 
     let config = WebSocketBridgeConfig {
         mode: WsMode::Server,

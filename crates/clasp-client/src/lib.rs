@@ -23,18 +23,18 @@
 //! }
 //! ```
 
-pub mod client;
 pub mod builder;
+pub mod client;
 pub mod error;
 
-pub use client::Clasp;
 pub use builder::ClaspBuilder;
+pub use client::Clasp;
 pub use error::{ClientError, Result};
 
 /// Prelude for convenient imports
 pub mod prelude {
-    pub use crate::client::Clasp;
     pub use crate::builder::ClaspBuilder;
+    pub use crate::client::Clasp;
     pub use crate::error::{ClientError, Result};
-    pub use clasp_core::{Message, Value, SignalType};
+    pub use clasp_core::{Message, SignalType, Value};
 }

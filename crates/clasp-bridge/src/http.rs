@@ -287,10 +287,7 @@ async fn list_signals(State(state): State<AppState>) -> impl IntoResponse {
     }))
 }
 
-async fn get_signal(
-    State(state): State<AppState>,
-    Path(path): Path<String>,
-) -> impl IntoResponse {
+async fn get_signal(State(state): State<AppState>, Path(path): Path<String>) -> impl IntoResponse {
     let address = format!("/{}", path);
     let signals = state.signals.read();
 

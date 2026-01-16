@@ -1,6 +1,9 @@
 //! Codec tests for Clasp core
 
-use clasp_core::{codec, Message, Value, SetMessage, PublishMessage, HelloMessage, WelcomeMessage, SubscribeMessage, SignalType, QoS};
+use clasp_core::{
+    codec, HelloMessage, Message, PublishMessage, QoS, SetMessage, SignalType, SubscribeMessage,
+    Value, WelcomeMessage,
+};
 
 #[test]
 fn test_encode_decode_hello() {
@@ -129,10 +132,14 @@ fn test_value_types() {
         Value::String("hello world".to_string()),
         Value::Bytes(vec![0x01, 0x02, 0x03]),
         Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
-        Value::Map(vec![
-            ("key1".to_string(), Value::Int(1)),
-            ("key2".to_string(), Value::String("value".to_string())),
-        ].into_iter().collect()),
+        Value::Map(
+            vec![
+                ("key1".to_string(), Value::Int(1)),
+                ("key2".to_string(), Value::String("value".to_string())),
+            ]
+            .into_iter()
+            .collect(),
+        ),
     ];
 
     for value in values {

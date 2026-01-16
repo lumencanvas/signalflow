@@ -1,7 +1,7 @@
 //! Codec benchmarks
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use clasp_core::{codec, Message, SetMessage, Value};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn encode_benchmark(c: &mut Criterion) {
     let msg = Message::Set(SetMessage {
@@ -13,9 +13,7 @@ fn encode_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("encode_set_message", |b| {
-        b.iter(|| {
-            black_box(codec::encode(&msg).unwrap())
-        })
+        b.iter(|| black_box(codec::encode(&msg).unwrap()))
     });
 }
 
@@ -30,9 +28,7 @@ fn decode_benchmark(c: &mut Criterion) {
     let encoded = codec::encode(&msg).unwrap();
 
     c.bench_function("decode_set_message", |b| {
-        b.iter(|| {
-            black_box(codec::decode::<Message>(&encoded).unwrap())
-        })
+        b.iter(|| black_box(codec::decode::<Message>(&encoded).unwrap()))
     });
 }
 
@@ -43,11 +39,10 @@ fn roundtrip_benchmark(c: &mut Criterion) {
             vec![
                 ("key1".to_string(), Value::Int(42)),
                 ("key2".to_string(), Value::String("value".to_string())),
-                ("key3".to_string(), Value::Array(vec![
-                    Value::Int(1),
-                    Value::Int(2),
-                    Value::Int(3),
-                ])),
+                (
+                    "key3".to_string(),
+                    Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
+                ),
             ]
             .into_iter()
             .collect(),
@@ -65,5 +60,10 @@ fn roundtrip_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, encode_benchmark, decode_benchmark, roundtrip_benchmark);
+criterion_group!(
+    benches,
+    encode_benchmark,
+    decode_benchmark,
+    roundtrip_benchmark
+);
 criterion_main!(benches);

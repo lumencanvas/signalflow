@@ -11,10 +11,10 @@
 //! 6. System handles load under stress testing
 
 use std::process::ExitCode;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use clasp_test_suite::{TestSuite, tests};
+use clasp_test_suite::{tests, TestSuite};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -23,10 +23,10 @@ async fn main() -> ExitCode {
         .with_max_level(Level::INFO)
         .with_target(false)
         .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    println!(r#"
+    println!(
+        r#"
    _____ _        _    ____  ____
   / ____| |      / \  / ___||  _ \
  | |    | |     / _ \ \___ \| |_) |
@@ -35,7 +35,8 @@ async fn main() -> ExitCode {
 
   Integration Test Suite v0.1.0
   Proving the protocol is REAL
-"#);
+"#
+    );
 
     let mut suite = TestSuite::new();
 

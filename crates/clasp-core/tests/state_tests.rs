@@ -1,6 +1,6 @@
 //! State management tests
 
-use clasp_core::state::{ParamState, ConflictStrategy, StateStore};
+use clasp_core::state::{ConflictStrategy, ParamState, StateStore};
 use clasp_core::Value;
 
 #[test]

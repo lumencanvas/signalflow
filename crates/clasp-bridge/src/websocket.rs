@@ -15,9 +15,8 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
-    accept_async, connect_async,
-    tungstenite::protocol::Message as WsMessage,
-    MaybeTlsStream, WebSocketStream,
+    accept_async, connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream,
+    WebSocketStream,
 };
 use tracing::{debug, error, info, warn};
 
@@ -155,9 +154,7 @@ impl WebSocketBridge {
                         let value = json
                             .get("value")
                             .map(|v| Self::json_to_value(v.clone()))
-                            .or_else(|| {
-                                json.get("data").map(|v| Self::json_to_value(v.clone()))
-                            })
+                            .or_else(|| json.get("data").map(|v| Self::json_to_value(v.clone())))
                             .unwrap_or_else(|| Self::json_to_value(json));
 
                         Some(Message::Set(SetMessage {
@@ -196,15 +193,13 @@ impl WebSocketBridge {
                         }))
                     }
                 }
-                WsMessageFormat::Raw | WsMessageFormat::Json => {
-                    Some(Message::Set(SetMessage {
-                        address: format!("{}/binary", prefix),
-                        value: Value::Bytes(data.clone()),
-                        revision: None,
-                        lock: false,
-                        unlock: false,
-                    }))
-                }
+                WsMessageFormat::Raw | WsMessageFormat::Json => Some(Message::Set(SetMessage {
+                    address: format!("{}/binary", prefix),
+                    value: Value::Bytes(data.clone()),
+                    revision: None,
+                    lock: false,
+                    unlock: false,
+                })),
             },
             _ => None,
         }
@@ -495,10 +490,7 @@ impl Bridge for WebSocketBridge {
             }
         }
 
-        info!(
-            "WebSocket bridge started in {:?} mode",
-            self.ws_config.mode
-        );
+        info!("WebSocket bridge started in {:?} mode", self.ws_config.mode);
         Ok(event_rx)
     }
 

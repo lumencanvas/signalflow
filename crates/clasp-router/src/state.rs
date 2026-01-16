@@ -1,8 +1,8 @@
 //! Router state management
 
-use dashmap::DashMap;
 use clasp_core::state::{ParamState, StateStore, UpdateError};
 use clasp_core::{Message, ParamValue, SetMessage, SnapshotMessage, Value};
+use dashmap::DashMap;
 use parking_lot::RwLock;
 
 use crate::SessionId;
@@ -43,10 +43,10 @@ impl RouterState {
         lock: bool,
         unlock: bool,
     ) -> Result<u64, UpdateError> {
-        let result = self
-            .params
-            .write()
-            .set(address, value.clone(), writer, revision, lock, unlock)?;
+        let result =
+            self.params
+                .write()
+                .set(address, value.clone(), writer, revision, lock, unlock)?;
 
         // Notify listeners
         if let Some(listeners) = self.listeners.get(address) {
@@ -133,7 +133,14 @@ mod tests {
         let state = RouterState::new();
 
         state
-            .set("/test/value", Value::Float(0.5), &"session1".to_string(), None, false, false)
+            .set(
+                "/test/value",
+                Value::Float(0.5),
+                &"session1".to_string(),
+                None,
+                false,
+                false,
+            )
             .unwrap();
 
         let value = state.get("/test/value").unwrap();
@@ -145,13 +152,34 @@ mod tests {
         let state = RouterState::new();
 
         state
-            .set("/test/a", Value::Float(1.0), &"s1".to_string(), None, false, false)
+            .set(
+                "/test/a",
+                Value::Float(1.0),
+                &"s1".to_string(),
+                None,
+                false,
+                false,
+            )
             .unwrap();
         state
-            .set("/test/b", Value::Float(2.0), &"s1".to_string(), None, false, false)
+            .set(
+                "/test/b",
+                Value::Float(2.0),
+                &"s1".to_string(),
+                None,
+                false,
+                false,
+            )
             .unwrap();
         state
-            .set("/other/c", Value::Float(3.0), &"s1".to_string(), None, false, false)
+            .set(
+                "/other/c",
+                Value::Float(3.0),
+                &"s1".to_string(),
+                None,
+                false,
+                false,
+            )
             .unwrap();
 
         let snapshot = state.snapshot("/test/**");

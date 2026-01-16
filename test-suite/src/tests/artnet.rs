@@ -7,8 +7,8 @@
 //! 4. Support Art-Net polling/discovery
 //! 5. Handle DMX value changes efficiently (delta detection)
 
+use crate::tests::helpers::{find_available_udp_port, run_test};
 use crate::{TestResult, TestSuite};
-use crate::tests::helpers::{run_test, find_available_udp_port};
 use artnet_protocol::*;
 use std::net::UdpSocket;
 use std::time::Duration;
@@ -32,8 +32,8 @@ async fn test_artnet_dmx_packet_parsing() -> TestResult {
         || async {
             // Create a DMX output packet
             let mut dmx_data = [0u8; 512];
-            dmx_data[0] = 255;  // Channel 1 at full
-            dmx_data[1] = 128;  // Channel 2 at half
+            dmx_data[0] = 255; // Channel 1 at full
+            dmx_data[1] = 128; // Channel 2 at half
             dmx_data[511] = 64; // Channel 512 at quarter
 
             let output = Output {
@@ -44,12 +44,13 @@ async fn test_artnet_dmx_packet_parsing() -> TestResult {
             };
 
             let command = ArtCommand::Output(output);
-            let bytes = command.write_to_buffer()
+            let bytes = command
+                .write_to_buffer()
                 .map_err(|e| format!("Failed to serialize: {:?}", e))?;
 
             // Parse it back
-            let parsed = ArtCommand::from_buffer(&bytes)
-                .map_err(|e| format!("Failed to parse: {:?}", e))?;
+            let parsed =
+                ArtCommand::from_buffer(&bytes).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
             match parsed {
                 ArtCommand::Output(out) => {
@@ -67,7 +68,8 @@ async fn test_artnet_dmx_packet_parsing() -> TestResult {
                 _ => Err("Expected Output command".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Generate valid Art-Net packets
@@ -86,7 +88,8 @@ async fn test_artnet_dmx_packet_generation() -> TestResult {
             };
 
             let command = ArtCommand::Output(output);
-            let bytes = command.write_to_buffer()
+            let bytes = command
+                .write_to_buffer()
                 .map_err(|e| format!("Failed to serialize: {:?}", e))?;
 
             // Verify header
@@ -101,7 +104,8 @@ async fn test_artnet_dmx_packet_generation() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Art-Net Poll request
@@ -112,7 +116,8 @@ async fn test_artnet_poll_request() -> TestResult {
         || async {
             let poll = Poll::default();
             let command = ArtCommand::Poll(poll);
-            let bytes = command.write_to_buffer()
+            let bytes = command
+                .write_to_buffer()
                 .map_err(|e| format!("Failed to serialize poll: {:?}", e))?;
 
             // Parse it back
@@ -124,7 +129,8 @@ async fn test_artnet_poll_request() -> TestResult {
                 _ => Err("Expected Poll command".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Art-Net Poll Reply
@@ -140,7 +146,8 @@ async fn test_artnet_poll_reply() -> TestResult {
             reply.version = [0, 14];
 
             let command = ArtCommand::PollReply(Box::new(reply));
-            let bytes = command.write_to_buffer()
+            let bytes = command
+                .write_to_buffer()
                 .map_err(|e| format!("Failed to serialize reply: {:?}", e))?;
 
             let parsed = ArtCommand::from_buffer(&bytes)
@@ -158,7 +165,8 @@ async fn test_artnet_poll_reply() -> TestResult {
                 _ => Err("Expected PollReply command".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Multiple Art-Net universes
@@ -179,7 +187,8 @@ async fn test_artnet_multiple_universes() -> TestResult {
                 };
 
                 let command = ArtCommand::Output(output);
-                let bytes = command.write_to_buffer()
+                let bytes = command
+                    .write_to_buffer()
                     .map_err(|e| format!("Universe {} serialize failed: {:?}", universe, e))?;
 
                 let parsed = ArtCommand::from_buffer(&bytes)
@@ -201,7 +210,8 @@ async fn test_artnet_multiple_universes() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: DMX value range (0-255)
@@ -228,11 +238,12 @@ async fn test_artnet_dmx_values() -> TestResult {
             };
 
             let command = ArtCommand::Output(output);
-            let bytes = command.write_to_buffer()
+            let bytes = command
+                .write_to_buffer()
                 .map_err(|e| format!("Failed to serialize: {:?}", e))?;
 
-            let parsed = ArtCommand::from_buffer(&bytes)
-                .map_err(|e| format!("Failed to parse: {:?}", e))?;
+            let parsed =
+                ArtCommand::from_buffer(&bytes).map_err(|e| format!("Failed to parse: {:?}", e))?;
 
             match parsed {
                 ArtCommand::Output(out) => {
@@ -240,7 +251,9 @@ async fn test_artnet_dmx_values() -> TestResult {
                         if out.data.as_ref()[i] != i as u8 {
                             return Err(format!(
                                 "Channel {} mismatch: expected {}, got {}",
-                                i + 1, i, out.data.as_ref()[i]
+                                i + 1,
+                                i,
+                                out.data.as_ref()[i]
                             ));
                         }
                     }
@@ -249,7 +262,8 @@ async fn test_artnet_dmx_values() -> TestResult {
                 _ => Err("Expected Output command".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Art-Net sequence numbers
@@ -268,7 +282,8 @@ async fn test_artnet_sequence_numbers() -> TestResult {
                 };
 
                 let command = ArtCommand::Output(output);
-                let bytes = command.write_to_buffer()
+                let bytes = command
+                    .write_to_buffer()
                     .map_err(|e| format!("Seq {} serialize failed: {:?}", seq, e))?;
 
                 let parsed = ArtCommand::from_buffer(&bytes)
@@ -289,68 +304,70 @@ async fn test_artnet_sequence_numbers() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Full Art-Net roundtrip through UDP
 async fn test_artnet_roundtrip() -> TestResult {
-    run_test(
-        "Art-Net: UDP roundtrip",
-        Duration::from_secs(5),
-        || async {
-            let port = find_available_udp_port();
+    run_test("Art-Net: UDP roundtrip", Duration::from_secs(5), || async {
+        let port = find_available_udp_port();
 
-            // Create receiver
-            let receiver = UdpSocket::bind(format!("127.0.0.1:{}", port))
-                .map_err(|e| format!("Failed to bind receiver: {}", e))?;
-            receiver.set_read_timeout(Some(Duration::from_secs(2)))
-                .map_err(|e| format!("Failed to set timeout: {}", e))?;
+        // Create receiver
+        let receiver = UdpSocket::bind(format!("127.0.0.1:{}", port))
+            .map_err(|e| format!("Failed to bind receiver: {}", e))?;
+        receiver
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .map_err(|e| format!("Failed to set timeout: {}", e))?;
 
-            // Create and send Art-Net packet
-            let mut dmx_data = [0u8; 512];
-            dmx_data[0] = 255;
-            dmx_data[255] = 128;
-            dmx_data[511] = 64;
+        // Create and send Art-Net packet
+        let mut dmx_data = [0u8; 512];
+        dmx_data[0] = 255;
+        dmx_data[255] = 128;
+        dmx_data[511] = 64;
 
-            let output = Output {
-                port_address: PortAddress::try_from(0u16).unwrap(),
-                data: dmx_data.to_vec().into(),
-                sequence: 1,
-                ..Default::default()
-            };
+        let output = Output {
+            port_address: PortAddress::try_from(0u16).unwrap(),
+            data: dmx_data.to_vec().into(),
+            sequence: 1,
+            ..Default::default()
+        };
 
-            let command = ArtCommand::Output(output);
-            let bytes = command.write_to_buffer()
-                .map_err(|e| format!("Failed to serialize: {:?}", e))?;
+        let command = ArtCommand::Output(output);
+        let bytes = command
+            .write_to_buffer()
+            .map_err(|e| format!("Failed to serialize: {:?}", e))?;
 
-            let sender = UdpSocket::bind("127.0.0.1:0")
-                .map_err(|e| format!("Failed to bind sender: {}", e))?;
-            sender.send_to(&bytes, format!("127.0.0.1:{}", port))
-                .map_err(|e| format!("Failed to send: {}", e))?;
+        let sender =
+            UdpSocket::bind("127.0.0.1:0").map_err(|e| format!("Failed to bind sender: {}", e))?;
+        sender
+            .send_to(&bytes, format!("127.0.0.1:{}", port))
+            .map_err(|e| format!("Failed to send: {}", e))?;
 
-            // Receive and verify
-            let mut buf = [0u8; 2048];
-            let (len, _) = receiver.recv_from(&mut buf)
-                .map_err(|e| format!("Failed to receive: {}", e))?;
+        // Receive and verify
+        let mut buf = [0u8; 2048];
+        let (len, _) = receiver
+            .recv_from(&mut buf)
+            .map_err(|e| format!("Failed to receive: {}", e))?;
 
-            let parsed = ArtCommand::from_buffer(&buf[..len])
-                .map_err(|e| format!("Failed to parse received: {:?}", e))?;
+        let parsed = ArtCommand::from_buffer(&buf[..len])
+            .map_err(|e| format!("Failed to parse received: {:?}", e))?;
 
-            match parsed {
-                ArtCommand::Output(out) => {
-                    if out.data.as_ref()[0] != 255 {
-                        return Err("Channel 1 not preserved".to_string());
-                    }
-                    if out.data.as_ref()[255] != 128 {
-                        return Err("Channel 256 not preserved".to_string());
-                    }
-                    if out.data.as_ref()[511] != 64 {
-                        return Err("Channel 512 not preserved".to_string());
-                    }
-                    Ok(())
+        match parsed {
+            ArtCommand::Output(out) => {
+                if out.data.as_ref()[0] != 255 {
+                    return Err("Channel 1 not preserved".to_string());
                 }
-                _ => Err("Expected Output command".to_string()),
+                if out.data.as_ref()[255] != 128 {
+                    return Err("Channel 256 not preserved".to_string());
+                }
+                if out.data.as_ref()[511] != 64 {
+                    return Err("Channel 512 not preserved".to_string());
+                }
+                Ok(())
             }
-        },
-    ).await
+            _ => Err("Expected Output command".to_string()),
+        }
+    })
+    .await
 }

@@ -109,13 +109,11 @@ impl ParamState {
                     _ => true, // Fall back to LWW for non-numeric
                 }
             }
-            ConflictStrategy::Min => {
-                match (&new_value, &self.value) {
-                    (Value::Float(new), Value::Float(old)) => new < old,
-                    (Value::Int(new), Value::Int(old)) => new < old,
-                    _ => true,
-                }
-            }
+            ConflictStrategy::Min => match (&new_value, &self.value) {
+                (Value::Float(new), Value::Float(old)) => new < old,
+                (Value::Int(new), Value::Int(old)) => new < old,
+                _ => true,
+            },
             ConflictStrategy::Lock => {
                 self.lock_holder.is_none() || self.lock_holder.as_deref() == Some(writer)
             }
@@ -265,13 +263,7 @@ mod tests {
     fn test_basic_update() {
         let mut state = ParamState::new(Value::Float(0.5), "session1".to_string());
 
-        let result = state.try_update(
-            Value::Float(0.75),
-            "session2",
-            None,
-            false,
-            false,
-        );
+        let result = state.try_update(Value::Float(0.75), "session2", None, false, false);
 
         assert!(result.is_ok());
         assert_eq!(state.revision, 2);
@@ -310,23 +302,11 @@ mod tests {
         assert_eq!(state.lock_holder, Some("session1".to_string()));
 
         // Session 2 tries to update - should fail
-        let result = state.try_update(
-            Value::Float(0.7),
-            "session2",
-            None,
-            false,
-            false,
-        );
+        let result = state.try_update(Value::Float(0.7), "session2", None, false, false);
         assert!(matches!(result, Err(UpdateError::LockHeld { .. })));
 
         // Session 1 can still update
-        let result = state.try_update(
-            Value::Float(0.8),
-            "session1",
-            None,
-            false,
-            false,
-        );
+        let result = state.try_update(Value::Float(0.8), "session1", None, false, false);
         assert!(result.is_ok());
     }
 
@@ -350,9 +330,15 @@ mod tests {
     fn test_state_store() {
         let mut store = StateStore::new();
 
-        store.set("/test/a", Value::Float(1.0), "s1", None, false, false).unwrap();
-        store.set("/test/b", Value::Float(2.0), "s1", None, false, false).unwrap();
-        store.set("/other/c", Value::Float(3.0), "s1", None, false, false).unwrap();
+        store
+            .set("/test/a", Value::Float(1.0), "s1", None, false, false)
+            .unwrap();
+        store
+            .set("/test/b", Value::Float(2.0), "s1", None, false, false)
+            .unwrap();
+        store
+            .set("/other/c", Value::Float(3.0), "s1", None, false, false)
+            .unwrap();
 
         assert_eq!(store.len(), 3);
 

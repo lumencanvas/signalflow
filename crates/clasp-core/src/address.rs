@@ -34,10 +34,7 @@ impl Address {
             )));
         }
 
-        let segments: Vec<String> = s[1..]
-            .split('/')
-            .map(|s| s.to_string())
-            .collect();
+        let segments: Vec<String> = s[1..].split('/').map(|s| s.to_string()).collect();
 
         // Validate segments
         for (i, seg) in segments.iter().enumerate() {

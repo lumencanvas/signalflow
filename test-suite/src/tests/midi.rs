@@ -7,8 +7,8 @@
 //! 4. Work with virtual MIDI ports (when available)
 //! 5. Handle high-rate MIDI streams
 
-use crate::{TestResult, TestSuite};
 use crate::tests::helpers::run_test;
+use crate::{TestResult, TestSuite};
 use std::time::Duration;
 
 pub async fn run_tests(suite: &mut TestSuite) {
@@ -144,13 +144,25 @@ fn parse_midi(data: &[u8]) -> Result<MidiMessage, String> {
 /// Generate MIDI bytes from a message
 fn generate_midi(msg: &MidiMessage) -> Vec<u8> {
     match msg {
-        MidiMessage::NoteOn { channel, note, velocity } => {
+        MidiMessage::NoteOn {
+            channel,
+            note,
+            velocity,
+        } => {
             vec![0x90 | channel, *note, *velocity]
         }
-        MidiMessage::NoteOff { channel, note, velocity } => {
+        MidiMessage::NoteOff {
+            channel,
+            note,
+            velocity,
+        } => {
             vec![0x80 | channel, *note, *velocity]
         }
-        MidiMessage::ControlChange { channel, control, value } => {
+        MidiMessage::ControlChange {
+            channel,
+            control,
+            value,
+        } => {
             vec![0xB0 | channel, *control, *value]
         }
         MidiMessage::ProgramChange { channel, program } => {
@@ -164,7 +176,11 @@ fn generate_midi(msg: &MidiMessage) -> Vec<u8> {
         MidiMessage::ChannelPressure { channel, pressure } => {
             vec![0xD0 | channel, *pressure]
         }
-        MidiMessage::PolyPressure { channel, note, pressure } => {
+        MidiMessage::PolyPressure {
+            channel,
+            note,
+            pressure,
+        } => {
             vec![0xA0 | channel, *note, *pressure]
         }
         MidiMessage::SysEx(data) => data.clone(),
@@ -182,7 +198,11 @@ async fn test_midi_cc_parsing() -> TestResult {
             let msg = parse_midi(&data)?;
 
             match msg {
-                MidiMessage::ControlChange { channel, control, value } => {
+                MidiMessage::ControlChange {
+                    channel,
+                    control,
+                    value,
+                } => {
                     if channel != 0 || control != 74 || value != 100 {
                         return Err(format!(
                             "CC mismatch: ch={}, cc={}, val={}",
@@ -209,7 +229,8 @@ async fn test_midi_cc_parsing() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse MIDI Note On messages
@@ -223,7 +244,11 @@ async fn test_midi_note_on_parsing() -> TestResult {
             let msg = parse_midi(&data)?;
 
             match msg {
-                MidiMessage::NoteOn { channel, note, velocity } => {
+                MidiMessage::NoteOn {
+                    channel,
+                    note,
+                    velocity,
+                } => {
                     if channel != 0 || note != 60 || velocity != 100 {
                         return Err(format!(
                             "Note On mismatch: ch={}, note={}, vel={}",
@@ -243,7 +268,8 @@ async fn test_midi_note_on_parsing() -> TestResult {
                 _ => Err("Velocity 0 should be Note Off".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse MIDI Note Off messages
@@ -256,7 +282,11 @@ async fn test_midi_note_off_parsing() -> TestResult {
             let msg = parse_midi(&data)?;
 
             match msg {
-                MidiMessage::NoteOff { channel, note, velocity } => {
+                MidiMessage::NoteOff {
+                    channel,
+                    note,
+                    velocity,
+                } => {
                     if channel != 0 || note != 60 || velocity != 64 {
                         return Err("Note Off values mismatch".to_string());
                     }
@@ -265,7 +295,8 @@ async fn test_midi_note_off_parsing() -> TestResult {
                 _ => Err("Expected NoteOff message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse Program Change messages
@@ -288,7 +319,8 @@ async fn test_midi_program_change() -> TestResult {
                 _ => Err("Expected ProgramChange message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse Pitch Bend messages
@@ -336,7 +368,8 @@ async fn test_midi_pitchbend() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse SysEx messages
@@ -359,7 +392,8 @@ async fn test_midi_sysex() -> TestResult {
                 _ => Err("Expected SysEx message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse Channel Pressure messages
@@ -381,7 +415,8 @@ async fn test_midi_channel_pressure() -> TestResult {
                 _ => Err("Expected ChannelPressure message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Parse Poly Pressure messages
@@ -394,7 +429,11 @@ async fn test_midi_poly_pressure() -> TestResult {
             let msg = parse_midi(&data)?;
 
             match msg {
-                MidiMessage::PolyPressure { channel, note, pressure } => {
+                MidiMessage::PolyPressure {
+                    channel,
+                    note,
+                    pressure,
+                } => {
                     if channel != 2 || note != 60 || pressure != 80 {
                         return Err("Poly Pressure mismatch".to_string());
                     }
@@ -403,7 +442,8 @@ async fn test_midi_poly_pressure() -> TestResult {
                 _ => Err("Expected PolyPressure message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Generate valid MIDI messages
@@ -414,13 +454,38 @@ async fn test_midi_message_generation() -> TestResult {
         || async {
             // Test roundtrip for all message types
             let messages = vec![
-                MidiMessage::NoteOn { channel: 0, note: 60, velocity: 127 },
-                MidiMessage::NoteOff { channel: 1, note: 64, velocity: 64 },
-                MidiMessage::ControlChange { channel: 2, control: 74, value: 100 },
-                MidiMessage::ProgramChange { channel: 3, program: 42 },
-                MidiMessage::PitchBend { channel: 4, value: 8192 },
-                MidiMessage::ChannelPressure { channel: 5, pressure: 100 },
-                MidiMessage::PolyPressure { channel: 6, note: 60, pressure: 80 },
+                MidiMessage::NoteOn {
+                    channel: 0,
+                    note: 60,
+                    velocity: 127,
+                },
+                MidiMessage::NoteOff {
+                    channel: 1,
+                    note: 64,
+                    velocity: 64,
+                },
+                MidiMessage::ControlChange {
+                    channel: 2,
+                    control: 74,
+                    value: 100,
+                },
+                MidiMessage::ProgramChange {
+                    channel: 3,
+                    program: 42,
+                },
+                MidiMessage::PitchBend {
+                    channel: 4,
+                    value: 8192,
+                },
+                MidiMessage::ChannelPressure {
+                    channel: 5,
+                    pressure: 100,
+                },
+                MidiMessage::PolyPressure {
+                    channel: 6,
+                    note: 60,
+                    pressure: 80,
+                },
             ];
 
             for original in messages {
@@ -437,7 +502,8 @@ async fn test_midi_message_generation() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: Virtual MIDI port availability (soft fail if no ports)
@@ -453,7 +519,10 @@ async fn test_midi_virtual_ports() -> TestResult {
                     tracing::info!("Found {} MIDI input ports", port_count);
                 }
                 Err(e) => {
-                    tracing::warn!("Could not create MIDI input: {}. Virtual ports may not be available.", e);
+                    tracing::warn!(
+                        "Could not create MIDI input: {}. Virtual ports may not be available.",
+                        e
+                    );
                     // This is not a failure - system might not have MIDI support
                 }
             }
@@ -464,12 +533,16 @@ async fn test_midi_virtual_ports() -> TestResult {
                     tracing::info!("Found {} MIDI output ports", port_count);
                 }
                 Err(e) => {
-                    tracing::warn!("Could not create MIDI output: {}. Virtual ports may not be available.", e);
+                    tracing::warn!(
+                        "Could not create MIDI output: {}. Virtual ports may not be available.",
+                        e
+                    );
                 }
             }
 
             // Always pass - this test is informational
             Ok(())
         },
-    ).await
+    )
+    .await
 }

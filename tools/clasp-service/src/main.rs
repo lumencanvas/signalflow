@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
 use clasp_bridge::{Bridge, BridgeEvent, OscBridge, OscBridgeConfig};
 use clasp_core::{Message, SetMessage, Value};
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info};
@@ -244,7 +244,12 @@ impl BridgeService {
             .collect()
     }
 
-    async fn send_signal(&self, bridge_id: &str, address: String, value: serde_json::Value) -> Result<()> {
+    async fn send_signal(
+        &self,
+        bridge_id: &str,
+        address: String,
+        value: serde_json::Value,
+    ) -> Result<()> {
         let bridges = self.bridges.read().await;
         if let Some(bridge) = bridges.get(bridge_id) {
             let sf_value = json_to_value(&value);
@@ -300,9 +305,7 @@ fn json_to_value(value: &serde_json::Value) -> Value {
             }
         }
         serde_json::Value::String(s) => Value::String(s.clone()),
-        serde_json::Value::Array(arr) => {
-            Value::Array(arr.iter().map(json_to_value).collect())
-        }
+        serde_json::Value::Array(arr) => Value::Array(arr.iter().map(json_to_value).collect()),
         serde_json::Value::Object(obj) => {
             let map: HashMap<String, Value> = obj
                 .iter()

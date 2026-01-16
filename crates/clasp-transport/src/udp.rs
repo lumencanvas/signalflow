@@ -191,9 +191,7 @@ impl UdpBroadcast {
             .await
             .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 
-        socket
-            .set_broadcast(true)
-            .map_err(TransportError::Io)?;
+        socket.set_broadcast(true).map_err(TransportError::Io)?;
 
         let broadcast_addr = SocketAddr::from(([255, 255, 255, 255], port));
 
@@ -234,10 +232,7 @@ mod tests {
         let mut receiver = server.start_receiver();
 
         // Send from client to server
-        client
-            .send_to(b"hello", server_addr)
-            .await
-            .unwrap();
+        client.send_to(b"hello", server_addr).await.unwrap();
 
         // Receive on server
         let (event, from) = receiver.recv_from().await.unwrap();

@@ -16,8 +16,8 @@
 //! - HTTP/REST (request-response API)
 
 pub mod error;
-pub mod traits;
 pub mod mapping;
+pub mod traits;
 pub mod transform;
 
 #[cfg(feature = "osc")]
@@ -45,9 +45,9 @@ pub mod socketio;
 pub mod http;
 
 pub use error::{BridgeError, Result};
-pub use traits::{Bridge, BridgeEvent, BridgeConfig};
 pub use mapping::{AddressMapping, ValueTransform};
-pub use transform::{Transform, TransformState, CurveType, Condition, Aggregator, AggregatorState};
+pub use traits::{Bridge, BridgeConfig, BridgeEvent};
+pub use transform::{Aggregator, AggregatorState, Condition, CurveType, Transform, TransformState};
 
 #[cfg(feature = "osc")]
 pub use osc::{OscBridge, OscBridgeConfig};
@@ -65,10 +65,10 @@ pub use dmx::{DmxBridge, DmxBridgeConfig, DmxInterfaceType};
 pub use mqtt::{MqttBridge, MqttBridgeConfig};
 
 #[cfg(feature = "websocket")]
-pub use websocket::{WebSocketBridge, WebSocketBridgeConfig, WsMode, WsMessageFormat};
+pub use websocket::{WebSocketBridge, WebSocketBridgeConfig, WsMessageFormat, WsMode};
 
 #[cfg(feature = "socketio")]
 pub use socketio::{SocketIOBridge, SocketIOBridgeConfig};
 
 #[cfg(feature = "http")]
-pub use http::{HttpBridge, HttpBridgeConfig, HttpMode, HttpMethod, EndpointConfig};
+pub use http::{EndpointConfig, HttpBridge, HttpBridgeConfig, HttpMethod, HttpMode};

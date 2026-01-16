@@ -9,13 +9,15 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{protocol::Message as WsMessage, http::Request},
+    tungstenite::{http::Request, protocol::Message as WsMessage},
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, info, warn};
 
 use crate::error::{Result, TransportError};
-use crate::traits::{Transport, TransportEvent, TransportReceiver, TransportSender, TransportServer};
+use crate::traits::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, TransportServer,
+};
 
 use clasp_core::WS_SUBPROTOCOL;
 

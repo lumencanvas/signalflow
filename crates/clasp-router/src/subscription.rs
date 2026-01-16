@@ -1,7 +1,7 @@
 //! Subscription management
 
-use dashmap::DashMap;
 use clasp_core::{address::Pattern, SignalType, SubscribeOptions};
+use dashmap::DashMap;
 use std::collections::HashSet;
 
 use crate::SessionId;

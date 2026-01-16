@@ -1,6 +1,6 @@
 //! Time and synchronization tests
 
-use clasp_core::time::{Timestamp, ClockSync, SessionTime, JitterBuffer};
+use clasp_core::time::{ClockSync, JitterBuffer, SessionTime, Timestamp};
 use std::time::Duration;
 
 #[test]
@@ -57,12 +57,7 @@ fn test_clock_sync_multiple_samples() {
     // Add multiple samples
     for i in 0..10 {
         let base = i * 1000;
-        sync.add_sample(
-            base,
-            base + 100,
-            base + 150,
-            base + 250,
-        );
+        sync.add_sample(base, base + 100, base + 150, base + 250);
     }
 
     // Should have averaged offset

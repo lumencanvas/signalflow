@@ -57,7 +57,10 @@ impl Default for MqttBridgeConfig {
         Self {
             broker_host: "localhost".to_string(),
             broker_port: 1883,
-            client_id: format!("clasp-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()),
+            client_id: format!(
+                "clasp-{}",
+                uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+            ),
             username: None,
             password: None,
             subscribe_topics: vec!["#".to_string()],

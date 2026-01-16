@@ -5,11 +5,7 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 /// Run a test with timeout and capture results
-pub async fn run_test<F, Fut>(
-    name: &str,
-    timeout_duration: Duration,
-    test_fn: F,
-) -> TestResult
+pub async fn run_test<F, Fut>(name: &str, timeout_duration: Duration, test_fn: F) -> TestResult
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<(), String>>,
@@ -53,11 +49,7 @@ pub fn find_available_udp_port() -> u16 {
 }
 
 /// Wait for a condition with timeout
-pub async fn wait_for<F, Fut>(
-    check: F,
-    interval: Duration,
-    max_wait: Duration,
-) -> bool
+pub async fn wait_for<F, Fut>(check: F, interval: Duration, max_wait: Duration) -> bool
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = bool>,

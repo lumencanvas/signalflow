@@ -75,7 +75,10 @@ pub async fn discover(tx: mpsc::Sender<DiscoveryEvent>) -> Result<()> {
 
                     device.info = DeviceInfo::default().with_features(features);
 
-                    info!("Discovered device: {} at {:?}", device.name, device.endpoints);
+                    info!(
+                        "Discovered device: {} at {:?}",
+                        device.name, device.endpoints
+                    );
 
                     if tx.send(DiscoveryEvent::Found(device)).await.is_err() {
                         break;
@@ -123,12 +126,7 @@ impl ServiceAdvertiser {
     }
 
     /// Advertise a Clasp service
-    pub fn advertise(
-        &mut self,
-        name: &str,
-        port: u16,
-        features: &[&str],
-    ) -> Result<()> {
+    pub fn advertise(&mut self, name: &str, port: u16, features: &[&str]) -> Result<()> {
         use mdns_sd::ServiceInfo;
 
         // Build feature string

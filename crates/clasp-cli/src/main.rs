@@ -165,7 +165,11 @@ async fn main() -> Result<()> {
     });
 
     match cli.command {
-        Commands::Server { protocol, bind, port } => {
+        Commands::Server {
+            protocol,
+            bind,
+            port,
+        } => {
             server::run_server(&protocol, &bind, port, &mut shutdown_rx).await?;
         }
 
@@ -208,7 +212,11 @@ async fn main() -> Result<()> {
             run_websocket(&mode, &url, &mut shutdown_rx).await?;
         }
 
-        Commands::Http { bind, base_path, cors } => {
+        Commands::Http {
+            bind,
+            base_path,
+            cors,
+        } => {
             println!(
                 "{} Starting HTTP server on {} (base: {})",
                 "CLASP".cyan().bold(),
@@ -218,7 +226,11 @@ async fn main() -> Result<()> {
             run_http_server(&bind, &base_path, cors, &mut shutdown_rx).await?;
         }
 
-        Commands::Pub { server, address, value } => {
+        Commands::Pub {
+            server,
+            address,
+            value,
+        } => {
             println!(
                 "{} Publishing to {} -> {}",
                 "CLASP".cyan().bold(),
@@ -304,10 +316,7 @@ async fn run_bridge(
             println!("  Use 'clasp http' for HTTP-specific options");
         }
         _ => {
-            println!(
-                "{}",
-                format!("Unknown bridge type: {}", bridge_type).red()
-            );
+            println!("{}", format!("Unknown bridge type: {}", bridge_type).red());
             return Ok(());
         }
     }
@@ -319,12 +328,8 @@ async fn run_bridge(
     Ok(())
 }
 
-async fn run_osc_server(
-    bind: &str,
-    port: u16,
-    shutdown_rx: &mut mpsc::Receiver<()>,
-) -> Result<()> {
-    use clasp_bridge::{OscBridge, OscBridgeConfig, Bridge};
+async fn run_osc_server(bind: &str, port: u16, shutdown_rx: &mut mpsc::Receiver<()>) -> Result<()> {
+    use clasp_bridge::{Bridge, OscBridge, OscBridgeConfig};
 
     let config = OscBridgeConfig {
         bind_addr: format!("{}:{}", bind, port),
@@ -360,7 +365,7 @@ async fn run_mqtt_bridge(
     topics: Vec<String>,
     shutdown_rx: &mut mpsc::Receiver<()>,
 ) -> Result<()> {
-    use clasp_bridge::{MqttBridge, MqttBridgeConfig, Bridge};
+    use clasp_bridge::{Bridge, MqttBridge, MqttBridgeConfig};
 
     let config = MqttBridgeConfig {
         broker_host: host.to_string(),
@@ -392,12 +397,8 @@ async fn run_mqtt_bridge(
     Ok(())
 }
 
-async fn run_websocket(
-    mode: &str,
-    url: &str,
-    shutdown_rx: &mut mpsc::Receiver<()>,
-) -> Result<()> {
-    use clasp_bridge::{WebSocketBridge, WebSocketBridgeConfig, WsMode, Bridge};
+async fn run_websocket(mode: &str, url: &str, shutdown_rx: &mut mpsc::Receiver<()>) -> Result<()> {
+    use clasp_bridge::{Bridge, WebSocketBridge, WebSocketBridgeConfig, WsMode};
 
     let ws_mode = match mode {
         "server" => WsMode::Server,
@@ -442,7 +443,7 @@ async fn run_http_server(
     cors: bool,
     shutdown_rx: &mut mpsc::Receiver<()>,
 ) -> Result<()> {
-    use clasp_bridge::{HttpBridge, HttpBridgeConfig, HttpMode, Bridge};
+    use clasp_bridge::{Bridge, HttpBridge, HttpBridgeConfig, HttpMode};
 
     let config = HttpBridgeConfig {
         mode: HttpMode::Server,
@@ -518,7 +519,12 @@ async fn subscribe_pattern(
 }
 
 fn print_info() {
-    println!("{}", "CLASP - Creative Low-Latency Application Streaming Protocol".cyan().bold());
+    println!(
+        "{}",
+        "CLASP - Creative Low-Latency Application Streaming Protocol"
+            .cyan()
+            .bold()
+    );
     println!();
     println!("Version:    {}", env!("CARGO_PKG_VERSION"));
     println!("Platform:   {}", std::env::consts::OS);

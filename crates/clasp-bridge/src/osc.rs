@@ -1,9 +1,9 @@
 //! OSC (Open Sound Control) bridge
 
 use async_trait::async_trait;
+use clasp_core::{Message, PublishMessage, SetMessage, SignalType, Value};
 use parking_lot::Mutex;
 use rosc::{OscMessage, OscPacket, OscType};
-use clasp_core::{Message, PublishMessage, SetMessage, SignalType, Value};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -180,9 +180,7 @@ impl Bridge for OscBridge {
                 }
             }
 
-            let _ = tx
-                .send(BridgeEvent::Disconnected { reason: None })
-                .await;
+            let _ = tx.send(BridgeEvent::Disconnected { reason: None }).await;
         });
 
         Ok(rx)
@@ -261,7 +259,9 @@ fn value_to_osc_args(value: &Value) -> Vec<OscType> {
         Value::String(s) => vec![OscType::String(s.clone())],
         Value::Bytes(b) => vec![OscType::Blob(b.clone())],
         Value::Array(arr) => arr.iter().flat_map(value_to_osc_args).collect(),
-        Value::Map(_) => vec![OscType::String(serde_json::to_string(value).unwrap_or_default())],
+        Value::Map(_) => vec![OscType::String(
+            serde_json::to_string(value).unwrap_or_default(),
+        )],
     }
 }
 

@@ -72,8 +72,9 @@ impl QuicTransport {
 
     /// Create a client with custom config
     pub fn new_client_with_config(config: QuicConfig) -> Result<Self> {
-        let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap())
-            .map_err(|e| TransportError::ConnectionFailed(format!("Endpoint creation failed: {}", e)))?;
+        let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).map_err(|e| {
+            TransportError::ConnectionFailed(format!("Endpoint creation failed: {}", e))
+        })?;
 
         // Configure client with dangerous (skip verification) for development
         // In production, proper certificate verification should be used
@@ -98,8 +99,9 @@ impl QuicTransport {
     ) -> Result<Self> {
         let server_config = Self::build_server_config(&config, cert_der, key_der)?;
 
-        let endpoint = Endpoint::server(server_config, bind_addr)
-            .map_err(|e| TransportError::ConnectionFailed(format!("Server endpoint failed: {}", e)))?;
+        let endpoint = Endpoint::server(server_config, bind_addr).map_err(|e| {
+            TransportError::ConnectionFailed(format!("Server endpoint failed: {}", e))
+        })?;
 
         info!("QUIC server listening on {}", bind_addr);
         Ok(Self { config, endpoint })
@@ -137,9 +139,9 @@ impl QuicTransport {
 
     /// Get the local address
     pub fn local_addr(&self) -> Result<SocketAddr> {
-        self.endpoint
-            .local_addr()
-            .map_err(|e| TransportError::ConnectionFailed(format!("Failed to get local addr: {}", e)))
+        self.endpoint.local_addr().map_err(|e| {
+            TransportError::ConnectionFailed(format!("Failed to get local addr: {}", e))
+        })
     }
 
     fn build_client_config(config: &QuicConfig) -> Result<ClientConfig> {
@@ -151,13 +153,15 @@ impl QuicTransport {
             .with_no_client_auth();
 
         let mut client_config = ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(crypto)
-                .map_err(|e| TransportError::ConnectionFailed(format!("Crypto config failed: {}", e)))?,
+            quinn::crypto::rustls::QuicClientConfig::try_from(crypto).map_err(|e| {
+                TransportError::ConnectionFailed(format!("Crypto config failed: {}", e))
+            })?,
         ));
 
         let mut transport = TransportConfig::default();
         if config.keep_alive_ms > 0 {
-            transport.keep_alive_interval(Some(std::time::Duration::from_millis(config.keep_alive_ms)));
+            transport
+                .keep_alive_interval(Some(std::time::Duration::from_millis(config.keep_alive_ms)));
         }
         transport.max_idle_timeout(Some(
             std::time::Duration::from_millis(config.idle_timeout_ms)
@@ -186,13 +190,15 @@ impl QuicTransport {
         server_crypto.alpn_protocols = vec![CLASP_ALPN.to_vec()];
 
         let mut server_config = ServerConfig::with_crypto(Arc::new(
-            quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto)
-                .map_err(|e| TransportError::ConnectionFailed(format!("Crypto config failed: {}", e)))?,
+            quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto).map_err(|e| {
+                TransportError::ConnectionFailed(format!("Crypto config failed: {}", e))
+            })?,
         ));
 
         let mut transport = TransportConfig::default();
         if config.keep_alive_ms > 0 {
-            transport.keep_alive_interval(Some(std::time::Duration::from_millis(config.keep_alive_ms)));
+            transport
+                .keep_alive_interval(Some(std::time::Duration::from_millis(config.keep_alive_ms)));
         }
         transport.max_idle_timeout(Some(
             std::time::Duration::from_millis(config.idle_timeout_ms)
@@ -271,11 +277,10 @@ impl QuicConnection {
 
     /// Open a bidirectional stream (reliable, ordered)
     pub async fn open_bi(&self) -> Result<(QuicSender, QuicReceiver)> {
-        let (send, recv) = self
-            .connection
-            .open_bi()
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("Open stream failed: {}", e)))?;
+        let (send, recv) =
+            self.connection.open_bi().await.map_err(|e| {
+                TransportError::ConnectionFailed(format!("Open stream failed: {}", e))
+            })?;
 
         let (tx, rx) = mpsc::channel(100);
         let connected = Arc::new(Mutex::new(true));
@@ -324,11 +329,9 @@ impl QuicConnection {
 
     /// Accept an incoming bidirectional stream
     pub async fn accept_bi(&self) -> Result<(QuicSender, QuicReceiver)> {
-        let (send, recv) = self
-            .connection
-            .accept_bi()
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("Accept stream failed: {}", e)))?;
+        let (send, recv) = self.connection.accept_bi().await.map_err(|e| {
+            TransportError::ConnectionFailed(format!("Accept stream failed: {}", e))
+        })?;
 
         let (tx, rx) = mpsc::channel(100);
         let connected = Arc::new(Mutex::new(true));
@@ -391,11 +394,10 @@ impl QuicConnection {
 
     /// Accept an incoming unidirectional stream
     pub async fn accept_uni(&self) -> Result<QuicReceiver> {
-        let recv = self
-            .connection
-            .accept_uni()
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("Accept uni failed: {}", e)))?;
+        let recv =
+            self.connection.accept_uni().await.map_err(|e| {
+                TransportError::ConnectionFailed(format!("Accept uni failed: {}", e))
+            })?;
 
         let (tx, rx) = mpsc::channel(100);
         let connected = Arc::new(Mutex::new(true));

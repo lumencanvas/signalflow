@@ -1,7 +1,7 @@
 //! UDP broadcast discovery
 
 use crate::{Device, DeviceInfo, DiscoveryError, DiscoveryEvent, Result};
-use clasp_core::{codec, Message, HelloMessage, PROTOCOL_VERSION};
+use clasp_core::{codec, HelloMessage, Message, PROTOCOL_VERSION};
 use clasp_transport::UdpTransport;
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
@@ -33,8 +33,7 @@ pub async fn discover(port: u16, tx: mpsc::Sender<DiscoveryEvent>) -> Result<()>
         token: None,
     });
 
-    let hello_bytes = codec::encode(&hello)
-        .map_err(|e| DiscoveryError::Network(e.to_string()))?;
+    let hello_bytes = codec::encode(&hello).map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
     info!("Broadcasting discovery request on port {}", port);
 
@@ -59,10 +58,8 @@ pub async fn discover(port: u16, tx: mpsc::Sender<DiscoveryEvent>) -> Result<()>
                     match codec::decode(&data) {
                         Ok((msg, _)) => {
                             if let Message::Welcome(welcome) = msg {
-                                let mut device = Device::new(
-                                    welcome.session.clone(),
-                                    welcome.name.clone(),
-                                );
+                                let mut device =
+                                    Device::new(welcome.session.clone(), welcome.name.clone());
 
                                 // Build WebSocket URL from source address
                                 let ws_url = format!(
@@ -73,10 +70,12 @@ pub async fn discover(port: u16, tx: mpsc::Sender<DiscoveryEvent>) -> Result<()>
                                 device = device.with_ws_endpoint(&ws_url);
                                 device = device.with_udp_endpoint(from);
 
-                                device.info = DeviceInfo::default()
-                                    .with_features(welcome.features);
+                                device.info = DeviceInfo::default().with_features(welcome.features);
 
-                                info!("Discovered device via broadcast: {} at {}", device.name, from);
+                                info!(
+                                    "Discovered device via broadcast: {} at {}",
+                                    device.name, from
+                                );
 
                                 if tx.send(DiscoveryEvent::Found(device)).await.is_err() {
                                     break;

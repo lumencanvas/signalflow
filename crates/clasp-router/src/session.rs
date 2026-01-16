@@ -1,9 +1,9 @@
 //! Session management
 
 use bytes::Bytes;
-use parking_lot::RwLock;
 use clasp_core::{Message, WelcomeMessage, PROTOCOL_VERSION};
 use clasp_transport::TransportSender;
+use parking_lot::RwLock;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;

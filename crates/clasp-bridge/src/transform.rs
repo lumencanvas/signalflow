@@ -9,7 +9,7 @@
 //! - JSON path extraction and injection
 
 use clasp_core::Value;
-use evalexpr::{eval_with_context_mut, HashMapContext, ContextWithMutableVariables};
+use evalexpr::{eval_with_context_mut, ContextWithMutableVariables, HashMapContext};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
@@ -24,9 +24,7 @@ pub enum Transform {
 
     /// Mathematical expression evaluation
     /// Variables: `value`, `index`, `time`
-    Expression {
-        expr: String,
-    },
+    Expression { expr: String },
 
     /// Scale from one range to another
     Scale {
@@ -37,10 +35,7 @@ pub enum Transform {
     },
 
     /// Clamp to range
-    Clamp {
-        min: f64,
-        max: f64,
-    },
+    Clamp { min: f64, max: f64 },
 
     /// Invert (1 - x for normalized values)
     Invert,
@@ -58,40 +53,25 @@ pub enum Transform {
     },
 
     /// Easing curve functions
-    Curve {
-        curve_type: CurveType,
-    },
+    Curve { curve_type: CurveType },
 
     /// Quantize to discrete steps
-    Quantize {
-        steps: u32,
-    },
+    Quantize { steps: u32 },
 
     /// Dead zone (values below threshold become 0)
-    DeadZone {
-        threshold: f64,
-    },
+    DeadZone { threshold: f64 },
 
     /// Smoothing with exponential moving average
-    Smooth {
-        factor: f64,
-    },
+    Smooth { factor: f64 },
 
     /// Rate limiter (max change per update)
-    RateLimit {
-        max_delta: f64,
-    },
+    RateLimit { max_delta: f64 },
 
     /// Threshold trigger (output 0 or 1 based on threshold)
-    Threshold {
-        value: f64,
-        mode: ThresholdMode,
-    },
+    Threshold { value: f64, mode: ThresholdMode },
 
     /// Modulo operation
-    Modulo {
-        divisor: f64,
-    },
+    Modulo { divisor: f64 },
 
     /// Absolute value
     Abs,
@@ -100,24 +80,16 @@ pub enum Transform {
     Negate,
 
     /// Power function
-    Power {
-        exponent: f64,
-    },
+    Power { exponent: f64 },
 
     /// Logarithm
-    Log {
-        base: Option<f64>,
-    },
+    Log { base: Option<f64> },
 
     /// Round to decimal places
-    Round {
-        decimals: u32,
-    },
+    Round { decimals: u32 },
 
     /// Chain multiple transforms
-    Chain {
-        transforms: Vec<Transform>,
-    },
+    Chain { transforms: Vec<Transform> },
 
     /// Conditional transform based on value
     Conditional {
@@ -127,9 +99,7 @@ pub enum Transform {
     },
 
     /// JSON path extraction (for complex values)
-    JsonPath {
-        path: String,
-    },
+    JsonPath { path: String },
 
     /// Map to different value type
     MapType {
@@ -193,12 +163,7 @@ pub enum CurveType {
     /// Bounce ease out
     BounceOut,
     /// Custom bezier curve
-    Bezier {
-        x1: f64,
-        y1: f64,
-        x2: f64,
-        y2: f64,
-    },
+    Bezier { x1: f64, y1: f64, x2: f64, y2: f64 },
 }
 
 /// Threshold mode
@@ -277,11 +242,14 @@ impl Transform {
         match self {
             Transform::Identity => value.clone(),
 
-            Transform::Expression { expr } => {
-                self.eval_expression(expr, value)
-            }
+            Transform::Expression { expr } => self.eval_expression(expr, value),
 
-            Transform::Scale { from_min, from_max, to_min, to_max } => {
+            Transform::Scale {
+                from_min,
+                from_max,
+                to_min,
+                to_max,
+            } => {
                 if let Some(v) = value.as_f64() {
                     let normalized = (v - from_min) / (from_max - from_min);
                     let scaled = to_min + normalized * (to_max - to_min);
@@ -331,9 +299,10 @@ impl Transform {
                     Value::Bool(b) => b.to_string(),
                     _ => return default.clone().unwrap_or_else(|| value.clone()),
                 };
-                table.get(&key).cloned().unwrap_or_else(|| {
-                    default.clone().unwrap_or_else(|| value.clone())
-                })
+                table
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_else(|| default.clone().unwrap_or_else(|| value.clone()))
             }
 
             Transform::Curve { curve_type } => {
@@ -400,12 +369,33 @@ impl Transform {
                 }
             }
 
-            Transform::Threshold { value: thresh, mode } => {
+            Transform::Threshold {
+                value: thresh,
+                mode,
+            } => {
                 if let Some(v) = value.as_f64() {
                     let result = match mode {
-                        ThresholdMode::Above => if v > *thresh { 1.0 } else { 0.0 },
-                        ThresholdMode::Below => if v < *thresh { 1.0 } else { 0.0 },
-                        ThresholdMode::Equal => if (v - thresh).abs() < 0.001 { 1.0 } else { 0.0 },
+                        ThresholdMode::Above => {
+                            if v > *thresh {
+                                1.0
+                            } else {
+                                0.0
+                            }
+                        }
+                        ThresholdMode::Below => {
+                            if v < *thresh {
+                                1.0
+                            } else {
+                                0.0
+                            }
+                        }
+                        ThresholdMode::Equal => {
+                            if (v - thresh).abs() < 0.001 {
+                                1.0
+                            } else {
+                                0.0
+                            }
+                        }
                     };
                     Value::Float(result)
                 } else {
@@ -482,7 +472,11 @@ impl Transform {
                 result
             }
 
-            Transform::Conditional { condition, if_true, if_false } => {
+            Transform::Conditional {
+                condition,
+                if_true,
+                if_false,
+            } => {
                 if condition.evaluate(value) {
                     if_true.apply(value, state)
                 } else {
@@ -490,49 +484,47 @@ impl Transform {
                 }
             }
 
-            Transform::JsonPath { path } => {
-                self.extract_json_path(value, path)
-            }
+            Transform::JsonPath { path } => self.extract_json_path(value, path),
 
-            Transform::MapType { to_type, .. } => {
-                match to_type {
-                    ValueType::Int => {
-                        if let Some(v) = value.as_f64() {
-                            Value::Int(v as i64)
-                        } else if let Some(s) = value.as_str().map(|s| s.to_string()) {
-                            s.parse::<i64>().map(Value::Int).unwrap_or_else(|_| value.clone())
-                        } else {
-                            value.clone()
-                        }
-                    }
-                    ValueType::Float => {
-                        if let Some(v) = value.as_i64() {
-                            Value::Float(v as f64)
-                        } else if let Some(s) = value.as_str().map(|s| s.to_string()) {
-                            s.parse::<f64>().map(Value::Float).unwrap_or_else(|_| value.clone())
-                        } else {
-                            value.clone()
-                        }
-                    }
-                    ValueType::Bool => {
-                        if let Some(v) = value.as_f64() {
-                            Value::Bool(v != 0.0)
-                        } else if let Some(v) = value.as_i64() {
-                            Value::Bool(v != 0)
-                        } else {
-                            value.clone()
-                        }
-                    }
-                    ValueType::String => {
-                        match value {
-                            Value::Int(i) => Value::String(i.to_string()),
-                            Value::Float(f) => Value::String(f.to_string()),
-                            Value::Bool(b) => Value::String(b.to_string()),
-                            _ => value.clone(),
-                        }
+            Transform::MapType { to_type, .. } => match to_type {
+                ValueType::Int => {
+                    if let Some(v) = value.as_f64() {
+                        Value::Int(v as i64)
+                    } else if let Some(s) = value.as_str().map(|s| s.to_string()) {
+                        s.parse::<i64>()
+                            .map(Value::Int)
+                            .unwrap_or_else(|_| value.clone())
+                    } else {
+                        value.clone()
                     }
                 }
-            }
+                ValueType::Float => {
+                    if let Some(v) = value.as_i64() {
+                        Value::Float(v as f64)
+                    } else if let Some(s) = value.as_str().map(|s| s.to_string()) {
+                        s.parse::<f64>()
+                            .map(Value::Float)
+                            .unwrap_or_else(|_| value.clone())
+                    } else {
+                        value.clone()
+                    }
+                }
+                ValueType::Bool => {
+                    if let Some(v) = value.as_f64() {
+                        Value::Bool(v != 0.0)
+                    } else if let Some(v) = value.as_i64() {
+                        Value::Bool(v != 0)
+                    } else {
+                        value.clone()
+                    }
+                }
+                ValueType::String => match value {
+                    Value::Int(i) => Value::String(i.to_string()),
+                    Value::Float(f) => Value::String(f.to_string()),
+                    Value::Bool(b) => Value::String(b.to_string()),
+                    _ => value.clone(),
+                },
+            },
 
             Transform::Bitwise { operation, operand } => {
                 if let Some(v) = value.as_i64() {
@@ -615,11 +607,12 @@ impl Transform {
             Value::String(s) => serde_json::Value::String(s.clone()),
             Value::Bool(b) => serde_json::Value::Bool(*b),
             Value::Bytes(b) => serde_json::Value::String(base64::encode(b)),
-            Value::Array(arr) => serde_json::Value::Array(
-                arr.iter().map(Self::value_to_json).collect()
-            ),
+            Value::Array(arr) => {
+                serde_json::Value::Array(arr.iter().map(Self::value_to_json).collect())
+            }
             Value::Map(m) => {
-                let obj: serde_json::Map<String, serde_json::Value> = m.iter()
+                let obj: serde_json::Map<String, serde_json::Value> = m
+                    .iter()
                     .map(|(k, v)| (k.clone(), Self::value_to_json(v)))
                     .collect();
                 serde_json::Value::Object(obj)
@@ -686,10 +679,18 @@ impl CurveType {
                 }
             }
             CurveType::ExpoIn => {
-                if t == 0.0 { 0.0 } else { 2_f64.powf(10.0 * t - 10.0) }
+                if t == 0.0 {
+                    0.0
+                } else {
+                    2_f64.powf(10.0 * t - 10.0)
+                }
             }
             CurveType::ExpoOut => {
-                if t == 1.0 { 1.0 } else { 1.0 - 2_f64.powf(-10.0 * t) }
+                if t == 1.0 {
+                    1.0
+                } else {
+                    1.0 - 2_f64.powf(-10.0 * t)
+                }
             }
             CurveType::ExpoInOut => {
                 if t == 0.0 {
@@ -807,7 +808,10 @@ impl Condition {
             Condition::LessThan { value: threshold } => {
                 value.as_f64().map(|v| v < *threshold).unwrap_or(false)
             }
-            Condition::Equals { value: target, tolerance } => {
+            Condition::Equals {
+                value: target,
+                tolerance,
+            } => {
                 if let Some(v) = value.as_f64() {
                     let tol = tolerance.unwrap_or(0.001);
                     (v - target).abs() < tol
@@ -815,9 +819,10 @@ impl Condition {
                     false
                 }
             }
-            Condition::InRange { min, max } => {
-                value.as_f64().map(|v| v >= *min && v <= *max).unwrap_or(false)
-            }
+            Condition::InRange { min, max } => value
+                .as_f64()
+                .map(|v| v >= *min && v <= *max)
+                .unwrap_or(false),
             Condition::Expression { expr } => {
                 let mut context = HashMapContext::new();
                 if let Some(v) = value.as_f64() {
@@ -827,15 +832,9 @@ impl Condition {
                     .map(|v| v.as_boolean().unwrap_or(false))
                     .unwrap_or(false)
             }
-            Condition::And { conditions } => {
-                conditions.iter().all(|c| c.evaluate(value))
-            }
-            Condition::Or { conditions } => {
-                conditions.iter().any(|c| c.evaluate(value))
-            }
-            Condition::Not { condition } => {
-                !condition.evaluate(value)
-            }
+            Condition::And { conditions } => conditions.iter().all(|c| c.evaluate(value)),
+            Condition::Or { conditions } => conditions.iter().any(|c| c.evaluate(value)),
+            Condition::Not { condition } => !condition.evaluate(value),
         }
     }
 }
@@ -897,22 +896,16 @@ impl Aggregator {
         }
 
         let result = match self {
-            Aggregator::Average => {
-                state.values.iter().sum::<f64>() / state.values.len() as f64
-            }
-            Aggregator::Sum => {
-                state.values.iter().sum()
-            }
-            Aggregator::Min => {
-                state.values.iter().cloned().fold(f64::INFINITY, f64::min)
-            }
-            Aggregator::Max => {
-                state.values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-            }
+            Aggregator::Average => state.values.iter().sum::<f64>() / state.values.len() as f64,
+            Aggregator::Sum => state.values.iter().sum(),
+            Aggregator::Min => state.values.iter().cloned().fold(f64::INFINITY, f64::min),
+            Aggregator::Max => state
+                .values
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max),
             Aggregator::Latest => value,
-            Aggregator::First => {
-                state.values.front().copied().unwrap_or(value)
-            }
+            Aggregator::First => state.values.front().copied().unwrap_or(value),
             Aggregator::Count => state.values.len() as f64,
             Aggregator::MovingAverage { .. } => {
                 state.values.iter().sum::<f64>() / state.values.len() as f64
@@ -937,9 +930,8 @@ impl Aggregator {
                     0.0
                 } else {
                     let mean = state.values.iter().sum::<f64>() / state.values.len() as f64;
-                    let variance = state.values.iter()
-                        .map(|v| (v - mean).powi(2))
-                        .sum::<f64>() / state.values.len() as f64;
+                    let variance = state.values.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
+                        / state.values.len() as f64;
                     variance.sqrt()
                 }
             }
@@ -1062,7 +1054,9 @@ mod tests {
                     to_min: 0.0,
                     to_max: 1.0,
                 },
-                Transform::Curve { curve_type: CurveType::EaseIn },
+                Transform::Curve {
+                    curve_type: CurveType::EaseIn,
+                },
             ],
         };
         let mut state = TransformState::default();
@@ -1076,13 +1070,23 @@ mod tests {
     fn test_conditional_transform() {
         let transform = Transform::Conditional {
             condition: Condition::GreaterThan { value: 0.5 },
-            if_true: Box::new(Transform::Expression { expr: "1.0".to_string() }),
-            if_false: Box::new(Transform::Expression { expr: "0.0".to_string() }),
+            if_true: Box::new(Transform::Expression {
+                expr: "1.0".to_string(),
+            }),
+            if_false: Box::new(Transform::Expression {
+                expr: "0.0".to_string(),
+            }),
         };
         let mut state = TransformState::default();
 
-        assert_eq!(transform.apply(&Value::Float(0.7), &mut state).as_f64(), Some(1.0));
-        assert_eq!(transform.apply(&Value::Float(0.3), &mut state).as_f64(), Some(0.0));
+        assert_eq!(
+            transform.apply(&Value::Float(0.7), &mut state).as_f64(),
+            Some(1.0)
+        );
+        assert_eq!(
+            transform.apply(&Value::Float(0.3), &mut state).as_f64(),
+            Some(0.0)
+        );
     }
 
     #[test]

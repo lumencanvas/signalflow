@@ -1,8 +1,6 @@
 //! Main router implementation
 
 use bytes::Bytes;
-use dashmap::DashMap;
-use parking_lot::RwLock;
 use clasp_core::{
     codec, AckMessage, ErrorMessage, Frame, HelloMessage, Message, SetMessage, SignalType,
     SubscribeMessage, SubscribeOptions, UnsubscribeMessage, PROTOCOL_VERSION,
@@ -10,6 +8,8 @@ use clasp_core::{
 use clasp_transport::{
     TransportEvent, TransportReceiver, TransportSender, TransportServer, WebSocketServer,
 };
+use dashmap::DashMap;
+use parking_lot::RwLock;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -143,12 +143,8 @@ impl Router {
                                             }
                                         }
                                         MessageResult::Broadcast(bytes, exclude) => {
-                                            broadcast_to_subscribers(
-                                                &bytes,
-                                                &sessions,
-                                                &exclude,
-                                            )
-                                            .await;
+                                            broadcast_to_subscribers(&bytes, &sessions, &exclude)
+                                                .await;
                                         }
                                         MessageResult::None => {}
                                     }
@@ -313,7 +309,8 @@ async fn handle_message(
             match state.apply_set(set, &session.id) {
                 Ok(revision) => {
                     // Broadcast to subscribers
-                    let subscribers = subscriptions.find_subscribers(&set.address, Some(SignalType::Param));
+                    let subscribers =
+                        subscriptions.find_subscribers(&set.address, Some(SignalType::Param));
 
                     // Create updated SET message with revision
                     let mut updated_set = set.clone();

@@ -97,14 +97,20 @@ impl BleTransport {
 
     /// Scan for CLASP-compatible BLE devices
     pub async fn scan(&self) -> Result<Vec<BleDevice>> {
-        info!("Starting BLE scan for {} seconds", self.config.scan_duration_secs);
+        info!(
+            "Starting BLE scan for {} seconds",
+            self.config.scan_duration_secs
+        );
 
         self.adapter
             .start_scan(ScanFilter::default())
             .await
             .map_err(|e| TransportError::ConnectionFailed(format!("Scan failed: {}", e)))?;
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(self.config.scan_duration_secs)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            self.config.scan_duration_secs,
+        ))
+        .await;
 
         self.adapter
             .stop_scan()
@@ -162,11 +168,9 @@ impl BleTransport {
             .await
             .map_err(|e| TransportError::ConnectionFailed(format!("Connect failed: {}", e)))?;
 
-        device
-            .peripheral
-            .discover_services()
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(format!("Service discovery failed: {}", e)))?;
+        device.peripheral.discover_services().await.map_err(|e| {
+            TransportError::ConnectionFailed(format!("Service discovery failed: {}", e))
+        })?;
 
         // Find CLASP characteristics
         let chars = device.peripheral.characteristics();
@@ -175,13 +179,17 @@ impl BleTransport {
             .iter()
             .find(|c| c.uuid == CLASP_TX_CHAR_UUID)
             .cloned()
-            .ok_or_else(|| TransportError::ConnectionFailed("TX characteristic not found".into()))?;
+            .ok_or_else(|| {
+                TransportError::ConnectionFailed("TX characteristic not found".into())
+            })?;
 
         let rx_char = chars
             .iter()
             .find(|c| c.uuid == CLASP_RX_CHAR_UUID)
             .cloned()
-            .ok_or_else(|| TransportError::ConnectionFailed("RX characteristic not found".into()))?;
+            .ok_or_else(|| {
+                TransportError::ConnectionFailed("RX characteristic not found".into())
+            })?;
 
         // Subscribe to notifications on RX characteristic
         device

@@ -7,11 +7,11 @@
 //! 4. Convert OSC argument types correctly
 //! 5. Support wildcard address matching
 
+use crate::tests::helpers::{find_available_udp_port, run_test};
 use crate::{TestResult, TestSuite};
-use crate::tests::helpers::{run_test, find_available_udp_port};
-use rosc::{OscMessage, OscPacket, OscType, OscBundle, OscTime};
-use rosc::encoder;
 use rosc::decoder;
+use rosc::encoder;
+use rosc::{OscBundle, OscMessage, OscPacket, OscTime, OscType};
 use std::net::UdpSocket;
 use std::sync::Arc;
 use std::time::Duration;
@@ -43,8 +43,8 @@ async fn test_osc_receive_float() -> TestResult {
                 args: vec![OscType::Float(0.75)],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
 
             // Send it to our CLASP OSC bridge port
             let socket = UdpSocket::bind("127.0.0.1:0")
@@ -79,7 +79,8 @@ async fn test_osc_receive_float() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can receive OSC integer messages
@@ -93,29 +94,28 @@ async fn test_osc_receive_int() -> TestResult {
                 args: vec![OscType::Int(127)],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
 
             let decoded = decoder::decode_udp(&encoded)
                 .map_err(|e| format!("Failed to decode OSC: {:?}", e))?;
 
             match decoded.1 {
-                OscPacket::Message(m) => {
-                    match &m.args[0] {
-                        OscType::Int(v) => {
-                            if *v != 127 {
-                                return Err(format!("Value mismatch: {}", v));
-                            }
+                OscPacket::Message(m) => match &m.args[0] {
+                    OscType::Int(v) => {
+                        if *v != 127 {
+                            return Err(format!("Value mismatch: {}", v));
                         }
-                        _ => return Err("Wrong argument type".to_string()),
                     }
-                }
+                    _ => return Err("Wrong argument type".to_string()),
+                },
                 _ => return Err("Expected message".to_string()),
             }
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can receive OSC string messages
@@ -129,29 +129,28 @@ async fn test_osc_receive_string() -> TestResult {
                 args: vec![OscType::String("Hello CLASP".to_string())],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
 
             let decoded = decoder::decode_udp(&encoded)
                 .map_err(|e| format!("Failed to decode OSC: {:?}", e))?;
 
             match decoded.1 {
-                OscPacket::Message(m) => {
-                    match &m.args[0] {
-                        OscType::String(s) => {
-                            if s != "Hello CLASP" {
-                                return Err(format!("Value mismatch: {}", s));
-                            }
+                OscPacket::Message(m) => match &m.args[0] {
+                    OscType::String(s) => {
+                        if s != "Hello CLASP" {
+                            return Err(format!("Value mismatch: {}", s));
                         }
-                        _ => return Err("Wrong argument type".to_string()),
                     }
-                }
+                    _ => return Err("Wrong argument type".to_string()),
+                },
                 _ => return Err("Expected message".to_string()),
             }
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can receive OSC blob (binary) messages
@@ -166,29 +165,28 @@ async fn test_osc_receive_blob() -> TestResult {
                 args: vec![OscType::Blob(blob_data.clone())],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
 
             let decoded = decoder::decode_udp(&encoded)
                 .map_err(|e| format!("Failed to decode OSC: {:?}", e))?;
 
             match decoded.1 {
-                OscPacket::Message(m) => {
-                    match &m.args[0] {
-                        OscType::Blob(b) => {
-                            if *b != blob_data {
-                                return Err("Blob data mismatch".to_string());
-                            }
+                OscPacket::Message(m) => match &m.args[0] {
+                    OscType::Blob(b) => {
+                        if *b != blob_data {
+                            return Err("Blob data mismatch".to_string());
                         }
-                        _ => return Err("Wrong argument type".to_string()),
                     }
-                }
+                    _ => return Err("Wrong argument type".to_string()),
+                },
                 _ => return Err("Expected message".to_string()),
             }
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can receive OSC messages with multiple arguments
@@ -207,8 +205,8 @@ async fn test_osc_receive_multiple_args() -> TestResult {
                 ],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode OSC: {:?}", e))?;
 
             let decoded = decoder::decode_udp(&encoded)
                 .map_err(|e| format!("Failed to decode OSC: {:?}", e))?;
@@ -220,14 +218,20 @@ async fn test_osc_receive_multiple_args() -> TestResult {
                     }
                     // Verify each argument type
                     match (&m.args[0], &m.args[1], &m.args[2], &m.args[3]) {
-                        (OscType::Float(_), OscType::Int(_), OscType::String(_), OscType::Bool(_)) => Ok(()),
+                        (
+                            OscType::Float(_),
+                            OscType::Int(_),
+                            OscType::String(_),
+                            OscType::Bool(_),
+                        ) => Ok(()),
                         _ => Err("Argument types don't match".to_string()),
                     }
                 }
                 _ => Err("Expected message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can send OSC messages that external libraries can receive
@@ -241,7 +245,8 @@ async fn test_osc_send_to_external() -> TestResult {
             // Set up receiver socket (simulates external OSC app)
             let receiver = UdpSocket::bind(format!("127.0.0.1:{}", port))
                 .map_err(|e| format!("Failed to bind receiver: {}", e))?;
-            receiver.set_read_timeout(Some(Duration::from_secs(2)))
+            receiver
+                .set_read_timeout(Some(Duration::from_secs(2)))
                 .map_err(|e| format!("Failed to set timeout: {}", e))?;
 
             // Create and send OSC message (simulates CLASP sending)
@@ -250,17 +255,19 @@ async fn test_osc_send_to_external() -> TestResult {
                 args: vec![OscType::Float(0.5)],
             };
             let packet = OscPacket::Message(msg);
-            let encoded = encoder::encode(&packet)
-                .map_err(|e| format!("Failed to encode: {:?}", e))?;
+            let encoded =
+                encoder::encode(&packet).map_err(|e| format!("Failed to encode: {:?}", e))?;
 
             let sender = UdpSocket::bind("127.0.0.1:0")
                 .map_err(|e| format!("Failed to bind sender: {}", e))?;
-            sender.send_to(&encoded, format!("127.0.0.1:{}", port))
+            sender
+                .send_to(&encoded, format!("127.0.0.1:{}", port))
                 .map_err(|e| format!("Failed to send: {}", e))?;
 
             // Receive and verify
             let mut buf = [0u8; 1024];
-            let (len, _) = receiver.recv_from(&mut buf)
+            let (len, _) = receiver
+                .recv_from(&mut buf)
                 .map_err(|e| format!("Failed to receive: {}", e))?;
 
             let decoded = decoder::decode_udp(&buf[..len])
@@ -276,7 +283,8 @@ async fn test_osc_send_to_external() -> TestResult {
                 _ => Err("Expected message".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: CLASP can handle OSC bundles with timestamps
@@ -286,7 +294,10 @@ async fn test_osc_bundle_with_timestamp() -> TestResult {
         Duration::from_secs(5),
         || async {
             let bundle = OscBundle {
-                timetag: OscTime { seconds: 1704067200, fractional: 0 },
+                timetag: OscTime {
+                    seconds: 1704067200,
+                    fractional: 0,
+                },
                 content: vec![
                     OscPacket::Message(OscMessage {
                         addr: "/bundle/1".to_string(),
@@ -308,7 +319,10 @@ async fn test_osc_bundle_with_timestamp() -> TestResult {
             match decoded.1 {
                 OscPacket::Bundle(b) => {
                     if b.content.len() != 2 {
-                        return Err(format!("Expected 2 messages in bundle, got {}", b.content.len()));
+                        return Err(format!(
+                            "Expected 2 messages in bundle, got {}",
+                            b.content.len()
+                        ));
                     }
                     if b.timetag.seconds != 1704067200 {
                         return Err("Timestamp not preserved".to_string());
@@ -318,7 +332,8 @@ async fn test_osc_bundle_with_timestamp() -> TestResult {
                 _ => Err("Expected bundle".to_string()),
             }
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: OSC roundtrip through encoding and decoding
@@ -373,7 +388,8 @@ async fn test_osc_roundtrip() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }
 
 /// Test: High-rate OSC message handling
@@ -414,5 +430,6 @@ async fn test_osc_high_rate() -> TestResult {
 
             Ok(())
         },
-    ).await
+    )
+    .await
 }

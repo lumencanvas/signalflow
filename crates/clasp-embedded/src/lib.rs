@@ -37,16 +37,16 @@ pub enum LiteMessageType {
 /// Lite frame header (fixed 4 bytes)
 #[repr(C, packed)]
 pub struct LiteHeader {
-    pub magic: u8,      // 0x53
-    pub msg_type: u8,   // LiteMessageType
-    pub address: u16,   // Numeric address
+    pub magic: u8,    // 0x53
+    pub msg_type: u8, // LiteMessageType
+    pub address: u16, // Numeric address
 }
 
 /// Lite SET message
 #[repr(C, packed)]
 pub struct LiteSetMessage {
     pub header: LiteHeader,
-    pub value: i32,     // Fixed 32-bit value
+    pub value: i32, // Fixed 32-bit value
 }
 
 /// Encode a lite SET message

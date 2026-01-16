@@ -3,8 +3,8 @@
 //! Supports common USB-DMX interfaces like ENTTEC DMX USB Pro
 
 use async_trait::async_trait;
-use parking_lot::Mutex;
 use clasp_core::{Message, SetMessage, Value};
+use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -204,8 +204,7 @@ impl Bridge for DmxBridge {
 
         // Spawn DMX output thread
         let output_thread = std::thread::spawn(move || {
-            let refresh_interval =
-                std::time::Duration::from_secs_f64(1.0 / refresh_rate);
+            let refresh_interval = std::time::Duration::from_secs_f64(1.0 / refresh_rate);
 
             match interface_type {
                 DmxInterfaceType::Virtual => {

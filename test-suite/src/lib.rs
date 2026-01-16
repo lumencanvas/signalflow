@@ -24,7 +24,9 @@ pub struct TestSuite {
 
 impl TestSuite {
     pub fn new() -> Self {
-        Self { results: Vec::new() }
+        Self {
+            results: Vec::new(),
+        }
     }
 
     pub fn add_result(&mut self, result: TestResult) {
@@ -46,7 +48,11 @@ impl TestSuite {
 
         for result in &self.results {
             let status = if result.passed { "PASS" } else { "FAIL" };
-            let status_color = if result.passed { "\x1b[32m" } else { "\x1b[31m" };
+            let status_color = if result.passed {
+                "\x1b[32m"
+            } else {
+                "\x1b[31m"
+            };
             let reset = "\x1b[0m";
 
             println!(

@@ -7,14 +7,14 @@
 //! - Handles subscriptions
 //! - Bridges to other protocols
 
+pub mod error;
 pub mod router;
 pub mod session;
-pub mod subscription;
 pub mod state;
-pub mod error;
+pub mod subscription;
 
+pub use error::{Result, RouterError};
 pub use router::Router;
 pub use session::{Session, SessionId};
-pub use subscription::SubscriptionManager;
 pub use state::RouterState;
-pub use error::{RouterError, Result};
+pub use subscription::SubscriptionManager;

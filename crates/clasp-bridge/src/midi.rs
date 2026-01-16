@@ -1,9 +1,9 @@
 //! MIDI bridge
 
 use async_trait::async_trait;
+use clasp_core::{Message, PublishMessage, SetMessage, SignalType, Value};
 use midir::{MidiInput, MidiInputPort, MidiOutput, MidiOutputPort};
 use parking_lot::Mutex;
-use clasp_core::{Message, PublishMessage, SetMessage, SignalType, Value};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
@@ -179,7 +179,9 @@ impl Bridge for MidiBridge {
                 }
             };
 
-            let port_name = midi_in.port_name(&port).unwrap_or_else(|_| "Unknown".to_string());
+            let port_name = midi_in
+                .port_name(&port)
+                .unwrap_or_else(|_| "Unknown".to_string());
             info!("Opening MIDI input: {}", port_name);
 
             let tx_clone = tx.clone();
@@ -243,7 +245,9 @@ impl Bridge for MidiBridge {
                 }
             };
 
-            let port_name = midi_out.port_name(&port).unwrap_or_else(|_| "Unknown".to_string());
+            let port_name = midi_out
+                .port_name(&port)
+                .unwrap_or_else(|_| "Unknown".to_string());
             info!("Opening MIDI output: {}", port_name);
 
             let mut conn = match midi_out.connect(&port, "clasp-midi") {
@@ -274,12 +278,7 @@ impl Bridge for MidiBridge {
         self.midi_sender = Some(MidiSender { tx: midi_tx });
 
         *self.running.lock() = true;
-        let _ = self
-            .tx
-            .as_ref()
-            .unwrap()
-            .send(BridgeEvent::Connected)
-            .await;
+        let _ = self.tx.as_ref().unwrap().send(BridgeEvent::Connected).await;
 
         Ok(rx)
     }
@@ -487,7 +486,10 @@ fn clasp_to_midi(message: &Message, _config: &MidiBridgeConfig) -> Option<Vec<u8
                 if let Some(Value::Map(map)) = &pub_msg.payload {
                     let note = map.get("note")?.as_i64()?.clamp(0, 127) as u8;
                     let velocity = map.get("velocity")?.as_i64()?.clamp(0, 127) as u8;
-                    let on = map.get("on").and_then(|v| v.as_bool()).unwrap_or(velocity > 0);
+                    let on = map
+                        .get("on")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(velocity > 0);
 
                     let status = if on { 0x90 } else { 0x80 };
                     return Some(vec![status | (channel & 0x0F), note, velocity]);
