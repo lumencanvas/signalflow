@@ -56,6 +56,11 @@ const features = [
       </div>
     </div>
 
+    <div class="macos-note">
+      <b>macOS users:</b> If you see "damaged and can't be opened", run this in Terminal:
+      <code>xattr -cr /Applications/CLASP\ Bridge.app</code>
+    </div>
+
     <div class="download-grid">
       <div class="download-card" v-for="dl in downloads" :key="dl.platform">
         <div class="platform-icon">
@@ -126,6 +131,26 @@ const features = [
 .check-icon {
   color: var(--accent);
   flex-shrink: 0;
+}
+
+.macos-note {
+  max-width: 600px;
+  margin: 0 auto 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 95, 31, 0.1);
+  border: 1px solid rgba(255, 95, 31, 0.3);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.macos-note code {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-card);
+  font-family: monospace;
+  font-size: 0.8rem;
+  user-select: all;
 }
 
 .download-grid {
