@@ -1,8 +1,8 @@
 //! Codec tests for Clasp core
 
 use clasp_core::{
-    codec, HelloMessage, Message, PublishMessage, SetMessage, SignalType, SubscribeMessage,
-    Value, WelcomeMessage,
+    codec, HelloMessage, Message, PublishMessage, SetMessage, SignalType, SubscribeMessage, Value,
+    WelcomeMessage,
 };
 
 #[test]

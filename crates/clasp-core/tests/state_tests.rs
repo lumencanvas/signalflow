@@ -32,8 +32,8 @@ fn test_param_state_update() {
 
 #[test]
 fn test_param_state_lww_strategy() {
-    let state = ParamState::new(Value::Int(42), "initial".to_string())
-        .with_strategy(ConflictStrategy::Lww);
+    let state =
+        ParamState::new(Value::Int(42), "initial".to_string()).with_strategy(ConflictStrategy::Lww);
 
     assert_eq!(state.strategy, ConflictStrategy::Lww);
     assert_eq!(state.value, Value::Int(42));
@@ -41,8 +41,8 @@ fn test_param_state_lww_strategy() {
 
 #[test]
 fn test_param_state_max_strategy() {
-    let mut state = ParamState::new(Value::Int(50), "writer".to_string())
-        .with_strategy(ConflictStrategy::Max);
+    let mut state =
+        ParamState::new(Value::Int(50), "writer".to_string()).with_strategy(ConflictStrategy::Max);
 
     // Higher value should be accepted
     let _ = state.try_update(Value::Int(100), "writer-1", None, false, false);
@@ -60,8 +60,8 @@ fn test_param_state_max_strategy() {
 
 #[test]
 fn test_param_state_min_strategy() {
-    let mut state = ParamState::new(Value::Int(50), "writer".to_string())
-        .with_strategy(ConflictStrategy::Min);
+    let mut state =
+        ParamState::new(Value::Int(50), "writer".to_string()).with_strategy(ConflictStrategy::Min);
 
     // Higher value should be rejected
     let result = state.try_update(Value::Int(100), "writer-1", None, false, false);
@@ -75,8 +75,8 @@ fn test_param_state_min_strategy() {
 
 #[test]
 fn test_param_state_lock() {
-    let mut state = ParamState::new(Value::Int(42), "owner".to_string())
-        .with_strategy(ConflictStrategy::Lock);
+    let mut state =
+        ParamState::new(Value::Int(42), "owner".to_string()).with_strategy(ConflictStrategy::Lock);
 
     // Request a lock
     let result = state.try_update(Value::Int(100), "owner-1", None, true, false);
@@ -120,9 +120,15 @@ fn test_state_store() {
     let mut store = StateStore::new();
 
     // Set values
-    store.set("/test/a", Value::Int(1), "writer", None, false, false).unwrap();
-    store.set("/test/b", Value::Int(2), "writer", None, false, false).unwrap();
-    store.set("/test/c", Value::Int(3), "writer", None, false, false).unwrap();
+    store
+        .set("/test/a", Value::Int(1), "writer", None, false, false)
+        .unwrap();
+    store
+        .set("/test/b", Value::Int(2), "writer", None, false, false)
+        .unwrap();
+    store
+        .set("/test/c", Value::Int(3), "writer", None, false, false)
+        .unwrap();
 
     // Get values using get_value method
     assert_eq!(store.get_value("/test/a"), Some(&Value::Int(1)));
@@ -135,11 +141,49 @@ fn test_state_store() {
 fn test_state_store_pattern_match() {
     let mut store = StateStore::new();
 
-    store.set("/lumen/layer/0/opacity", Value::Float(0.5), "w", None, false, false).unwrap();
-    store.set("/lumen/layer/0/enabled", Value::Bool(true), "w", None, false, false).unwrap();
-    store.set("/lumen/layer/1/opacity", Value::Float(0.8), "w", None, false, false).unwrap();
-    store.set("/lumen/layer/1/enabled", Value::Bool(false), "w", None, false, false).unwrap();
-    store.set("/other/value", Value::Int(42), "w", None, false, false).unwrap();
+    store
+        .set(
+            "/lumen/layer/0/opacity",
+            Value::Float(0.5),
+            "w",
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+    store
+        .set(
+            "/lumen/layer/0/enabled",
+            Value::Bool(true),
+            "w",
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+    store
+        .set(
+            "/lumen/layer/1/opacity",
+            Value::Float(0.8),
+            "w",
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+    store
+        .set(
+            "/lumen/layer/1/enabled",
+            Value::Bool(false),
+            "w",
+            None,
+            false,
+            false,
+        )
+        .unwrap();
+    store
+        .set("/other/value", Value::Int(42), "w", None, false, false)
+        .unwrap();
 
     // Get all layer opacities
     let matches = store.get_matching("/lumen/layer/*/opacity");
@@ -154,7 +198,9 @@ fn test_state_store_pattern_match() {
 fn test_state_store_remove() {
     let mut store = StateStore::new();
 
-    store.set("/test/value", Value::Int(42), "writer", None, false, false).unwrap();
+    store
+        .set("/test/value", Value::Int(42), "writer", None, false, false)
+        .unwrap();
     assert!(store.get_value("/test/value").is_some());
 
     store.remove("/test/value");

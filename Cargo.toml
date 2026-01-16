@@ -11,6 +11,7 @@ members = [
     "crates/clasp-wasm",
     "crates/clasp-cli",
     "tools/clasp-service",
+    "tools/clasp-router",
     "test-suite",
 ]
 

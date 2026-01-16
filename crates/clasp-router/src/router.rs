@@ -55,11 +55,11 @@ impl Default for RouterConfig {
 pub struct Router {
     config: RouterConfig,
     /// Active sessions
-    sessions: DashMap<SessionId, Arc<Session>>,
+    sessions: Arc<DashMap<SessionId, Arc<Session>>>,
     /// Subscription manager
-    subscriptions: SubscriptionManager,
+    subscriptions: Arc<SubscriptionManager>,
     /// Global state
-    state: RouterState,
+    state: Arc<RouterState>,
     /// Running flag
     running: Arc<RwLock<bool>>,
 }
@@ -68,9 +68,9 @@ impl Router {
     pub fn new(config: RouterConfig) -> Self {
         Self {
             config,
-            sessions: DashMap::new(),
-            subscriptions: SubscriptionManager::new(),
-            state: RouterState::new(),
+            sessions: Arc::new(DashMap::new()),
+            subscriptions: Arc::new(SubscriptionManager::new()),
+            state: Arc::new(RouterState::new()),
             running: Arc::new(RwLock::new(false)),
         }
     }
@@ -104,11 +104,11 @@ impl Router {
         mut receiver: impl TransportReceiver + 'static,
         addr: SocketAddr,
     ) {
-        let sessions = self.sessions.clone();
-        let subscriptions = self.subscriptions.clone();
-        let state = self.state.clone();
+        let sessions = Arc::clone(&self.sessions);
+        let subscriptions = Arc::clone(&self.subscriptions);
+        let state = Arc::clone(&self.state);
         let config = self.config.clone();
-        let running = self.running.clone();
+        let running = Arc::clone(&self.running);
 
         tokio::spawn(async move {
             let mut session: Option<Arc<Session>> = None;
@@ -220,9 +220,9 @@ async fn handle_message(
     frame: &Frame,
     session: &Option<Arc<Session>>,
     sender: &Arc<dyn TransportSender>,
-    sessions: &DashMap<SessionId, Arc<Session>>,
-    subscriptions: &SubscriptionManager,
-    state: &RouterState,
+    sessions: &Arc<DashMap<SessionId, Arc<Session>>>,
+    subscriptions: &Arc<SubscriptionManager>,
+    state: &Arc<RouterState>,
     config: &RouterConfig,
 ) -> Option<MessageResult> {
     match msg {
@@ -411,24 +411,12 @@ async fn handle_message(
 /// Broadcast to all sessions except one
 async fn broadcast_to_subscribers(
     data: &Bytes,
-    sessions: &DashMap<SessionId, Arc<Session>>,
+    sessions: &Arc<DashMap<SessionId, Arc<Session>>>,
     exclude: &SessionId,
 ) {
     for entry in sessions.iter() {
         if entry.key() != exclude {
             let _ = entry.value().send(data.clone()).await;
         }
-    }
-}
-
-impl Clone for RouterState {
-    fn clone(&self) -> Self {
-        Self::new() // Fresh state - actual cloning would need proper implementation
-    }
-}
-
-impl Clone for SubscriptionManager {
-    fn clone(&self) -> Self {
-        Self::new() // Fresh manager - actual cloning would need proper implementation
     }
 }

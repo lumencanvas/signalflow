@@ -5,10 +5,12 @@
 
 use anyhow::Result;
 use clap::Parser;
-use clasp_discovery::Discovery;
-use clasp_router::Router;
+use clasp_router::{router::RouterConfig, Router};
 use std::net::SocketAddr;
 use tracing_subscriber::EnvFilter;
+
+#[cfg(feature = "bridges")]
+use clasp_discovery::mdns::ServiceAdvertiser;
 
 #[derive(Parser)]
 #[command(name = "clasp-router")]
@@ -51,23 +53,31 @@ async fn main() -> Result<()> {
     tracing::info!("Starting CLASP Router");
     tracing::info!("Listening on: {}", cli.listen);
 
-    // Start discovery if enabled
-    let _discovery = if cli.announce {
+    // Start mDNS announcement if enabled
+    #[cfg(feature = "bridges")]
+    let _advertiser = if cli.announce {
         tracing::info!("Enabling mDNS discovery announcement");
-        let discovery = Discovery::new().await?;
-        discovery.announce(&cli.name, cli.listen.port()).await?;
-        Some(discovery)
+        let mut advertiser = ServiceAdvertiser::new()?;
+        advertiser.advertise(&cli.name, cli.listen.port(), &["param", "event", "stream"])?;
+        Some(advertiser)
     } else {
         None
     };
 
+    // Create router config
+    let config = RouterConfig {
+        name: cli.name.clone(),
+        ..Default::default()
+    };
+
     // Create and start router
-    let router = Router::new(&cli.name);
+    let router = Router::new(config);
 
     tracing::info!("Router ready, accepting connections...");
 
     // Run until interrupted
-    router.serve(cli.listen).await?;
+    let addr_str = cli.listen.to_string();
+    router.serve(&addr_str).await?;
 
     Ok(())
 }

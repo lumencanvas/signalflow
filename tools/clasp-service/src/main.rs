@@ -7,13 +7,35 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use clasp_bridge::{Bridge, BridgeEvent, OscBridge, OscBridgeConfig};
+use clasp_bridge::{Bridge, BridgeEvent};
 use clasp_core::{Message, SetMessage, Value};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info};
 use uuid::Uuid;
+
+// Import all bridge types
+#[cfg(feature = "osc")]
+use clasp_bridge::{OscBridge, OscBridgeConfig};
+
+#[cfg(feature = "midi")]
+use clasp_bridge::{MidiBridge, MidiBridgeConfig};
+
+#[cfg(feature = "artnet")]
+use clasp_bridge::{ArtNetBridge, ArtNetBridgeConfig};
+
+#[cfg(feature = "dmx")]
+use clasp_bridge::{DmxBridge, DmxBridgeConfig, DmxInterfaceType};
+
+#[cfg(feature = "mqtt")]
+use clasp_bridge::{MqttBridge, MqttBridgeConfig};
+
+#[cfg(feature = "websocket")]
+use clasp_bridge::{WebSocketBridge, WebSocketBridgeConfig, WsMode};
+
+#[cfg(feature = "http")]
+use clasp_bridge::{HttpBridge, HttpBridgeConfig, HttpMode};
 
 /// Request from Electron
 #[derive(Debug, Deserialize)]
@@ -26,6 +48,8 @@ enum Request {
         source_addr: String,
         target: String,
         target_addr: String,
+        #[serde(default)]
+        config: Option<serde_json::Value>,
     },
     #[serde(rename = "delete_bridge")]
     DeleteBridge { id: String },
@@ -105,11 +129,13 @@ impl BridgeService {
         source_addr: String,
         target: String,
         target_addr: String,
+        extra_config: Option<serde_json::Value>,
     ) -> Result<BridgeInfo> {
         let id = id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
         // Create the appropriate bridge based on source protocol
-        let mut bridge: Box<dyn Bridge> = match source.as_str() {
+        let bridge: Box<dyn Bridge> = match source.as_str() {
+            #[cfg(feature = "osc")]
             "osc" => {
                 let config = OscBridgeConfig {
                     bind_addr: source_addr.clone(),
@@ -122,7 +148,165 @@ impl BridgeService {
                 };
                 Box::new(OscBridge::new(config))
             }
-            // Other protocols would be added here
+
+            #[cfg(feature = "midi")]
+            "midi" => {
+                let config = MidiBridgeConfig {
+                    input_port: if source_addr == "default" {
+                        None
+                    } else {
+                        Some(source_addr.clone())
+                    },
+                    output_port: if target == "midi" && target_addr != "default" {
+                        Some(target_addr.clone())
+                    } else {
+                        None
+                    },
+                    namespace: "/midi".to_string(),
+                    device_name: "default".to_string(),
+                };
+                Box::new(MidiBridge::new(config))
+            }
+
+            #[cfg(feature = "artnet")]
+            "artnet" => {
+                let universes = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("universe"))
+                    .and_then(|v| v.as_u64())
+                    .map(|u| vec![u as u16])
+                    .unwrap_or_default();
+
+                let config = ArtNetBridgeConfig {
+                    bind_addr: source_addr.clone(),
+                    remote_addr: if target == "artnet" {
+                        Some(target_addr.clone())
+                    } else {
+                        None
+                    },
+                    universes,
+                    namespace: "/artnet".to_string(),
+                };
+                Box::new(ArtNetBridge::new(config))
+            }
+
+            #[cfg(feature = "dmx")]
+            "dmx" => {
+                let universe = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("universe"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as u16;
+
+                let config = DmxBridgeConfig {
+                    port: Some(source_addr.clone()),
+                    interface_type: DmxInterfaceType::Virtual,
+                    universe,
+                    namespace: "/dmx".to_string(),
+                    refresh_rate: 44.0,
+                };
+                Box::new(DmxBridge::new(config))
+            }
+
+            #[cfg(feature = "mqtt")]
+            "mqtt" => {
+                let subscribe_topics = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("topics"))
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|t| t.as_str().map(String::from))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_else(|| vec!["#".to_string()]);
+
+                // Parse host:port from source_addr
+                let (broker_host, broker_port) = if let Some(idx) = source_addr.rfind(':') {
+                    let host = source_addr[..idx].to_string();
+                    let port = source_addr[idx + 1..].parse().unwrap_or(1883);
+                    (host, port)
+                } else {
+                    (source_addr.clone(), 1883)
+                };
+
+                let config = MqttBridgeConfig {
+                    broker_host,
+                    broker_port,
+                    client_id: format!("clasp-bridge-{}", id),
+                    username: None,
+                    password: None,
+                    subscribe_topics,
+                    qos: 0,
+                    keep_alive_secs: 60,
+                    namespace: "/mqtt".to_string(),
+                };
+                Box::new(MqttBridge::new(config))
+            }
+
+            #[cfg(feature = "websocket")]
+            "websocket" => {
+                let mode_str = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("mode"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("server");
+
+                let (mode, url) = if mode_str == "client" {
+                    // Client mode: source_addr is the WebSocket URL
+                    let url = if source_addr.starts_with("ws://") || source_addr.starts_with("wss://") {
+                        source_addr.clone()
+                    } else {
+                        format!("ws://{}", source_addr)
+                    };
+                    (WsMode::Client, url)
+                } else {
+                    // Server mode: source_addr is bind address
+                    (WsMode::Server, source_addr.clone())
+                };
+
+                let config = WebSocketBridgeConfig {
+                    mode,
+                    url,
+                    path: None,
+                    format: clasp_bridge::WsMessageFormat::Json,
+                    ping_interval_secs: 30,
+                    auto_reconnect: true,
+                    reconnect_delay_secs: 5,
+                    headers: std::collections::HashMap::new(),
+                    namespace: "/ws".to_string(),
+                };
+                Box::new(WebSocketBridge::new(config))
+            }
+
+            #[cfg(feature = "http")]
+            "http" => {
+                let base_path = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("base_path"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("/api")
+                    .to_string();
+
+                let cors = extra_config
+                    .as_ref()
+                    .and_then(|c| c.get("cors"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                let config = HttpBridgeConfig {
+                    mode: HttpMode::Server,
+                    url: source_addr.clone(),
+                    endpoints: vec![],
+                    cors_enabled: cors,
+                    cors_origins: vec![],
+                    base_path,
+                    timeout_secs: 30,
+                    namespace: "/http".to_string(),
+                };
+                Box::new(HttpBridge::new(config))
+            }
+
             _ => {
                 return Err(anyhow!("Unsupported source protocol: {}", source));
             }
@@ -131,6 +315,7 @@ impl BridgeService {
         // Start the bridge
         let signal_tx = self.signal_tx.clone();
         let bridge_id = id.clone();
+        let mut bridge = bridge;
 
         match bridge.start().await {
             Ok(mut event_rx) => {
@@ -455,8 +640,9 @@ async fn handle_request(service: &Arc<BridgeService>, request: Request) -> Respo
             source_addr,
             target,
             target_addr,
+            config,
         } => match service
-            .create_bridge(id, source, source_addr, target, target_addr)
+            .create_bridge(id, source, source_addr, target, target_addr, config)
             .await
         {
             Ok(info) => Response::Ok {

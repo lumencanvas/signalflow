@@ -10,6 +10,7 @@ const state = {
   bridges: [],
   mappings: [],
   signals: [],
+  serverLogs: new Map(), // Server ID -> log entries
   signalRate: 0,
   paused: false,
   scanning: false,
@@ -17,6 +18,7 @@ const state = {
   learnMode: false,
   learnTarget: null, // 'source' or 'target'
   editingMapping: null,
+  editingServer: null, // Server being edited
   monitorFilter: '',
 };
 
@@ -56,7 +58,7 @@ const defaultAddresses = {
   midi: 'default',
   artnet: '0.0.0.0:6454',
   dmx: '/dev/ttyUSB0',
-  clasp: 'localhost:7331',
+  clasp: 'localhost:7330',
   mqtt: 'localhost:1883',
   websocket: '0.0.0.0:8080',
   http: '0.0.0.0:3000',
@@ -178,6 +180,8 @@ function saveServersToStorage() {
       universe: s.universe,
       // DMX specific
       serialPort: s.serialPort,
+      // Security
+      token: s.token,
     }));
     localStorage.setItem('clasp-servers', JSON.stringify(serversToSave));
   } catch (e) {
@@ -749,11 +753,25 @@ function setupEventListeners() {
 
   // Add server button
   $('add-server-btn')?.addEventListener('click', () => {
+    state.editingServer = null;
+    const modalTitle = document.querySelector('#server-modal .modal-title');
+    if (modalTitle) modalTitle.textContent = 'ADD SERVER';
+    $('server-form')?.reset();
     $('server-modal')?.showModal();
   });
 
   // Server form
   $('server-form')?.addEventListener('submit', handleAddServer);
+
+  // Server list actions (edit/delete)
+  $('server-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    if (action === 'edit-server') editServer(id);
+    if (action === 'delete-server') deleteServer(id);
+  });
 
   // Add bridge button
   $('add-bridge-btn')?.addEventListener('click', () => {
@@ -821,6 +839,54 @@ function setupEventListeners() {
       updateScanButton();
       loadDevices().then(renderDevices);
     });
+
+    // Server status updates
+    window.clasp.onServerStatus?.((status) => {
+      const server = state.servers.find(s => s.id === status.id);
+      if (server) {
+        server.status = status.status;
+        if (status.error) {
+          server.error = status.error;
+          showNotification(`Server error: ${status.error}`, 'error');
+        }
+        if (status.status === 'running') {
+          showNotification(`Server started successfully`, 'success');
+        }
+        renderServers();
+        updateStatus();
+      }
+    });
+
+    // Server log updates
+    window.clasp.onServerLog?.((data) => {
+      if (!state.serverLogs.has(data.serverId)) {
+        state.serverLogs.set(data.serverId, []);
+      }
+      const logs = state.serverLogs.get(data.serverId);
+      logs.push(data.log);
+      if (logs.length > 500) {
+        logs.shift();
+      }
+    });
+
+    // Bridge events
+    window.clasp.onBridgeEvent?.((data) => {
+      const bridge = state.bridges.find(b => b.id === data.bridgeId);
+      if (bridge) {
+        if (data.event === 'connected') {
+          bridge.active = true;
+          showNotification(`Bridge connected`, 'success');
+        } else if (data.event === 'disconnected') {
+          bridge.active = false;
+          if (data.data) {
+            showNotification(`Bridge disconnected: ${data.data}`, 'warning');
+          }
+        } else if (data.event === 'error') {
+          showNotification(`Bridge error: ${data.data}`, 'error');
+        }
+        renderBridges();
+      }
+    });
   }
 }
 
@@ -875,9 +941,10 @@ async function handleAddServer(e) {
   const form = e.target;
   const data = new FormData(form);
   const serverType = data.get('serverType') || 'clasp';
+  const isEditing = state.editingServer !== null;
 
   let serverConfig = {
-    id: Date.now().toString(),
+    id: isEditing ? state.editingServer.id : Date.now().toString(),
     type: serverType,
     protocol: serverType,
     status: 'starting',
@@ -886,7 +953,8 @@ async function handleAddServer(e) {
   // Build config based on server type
   switch (serverType) {
     case 'clasp':
-      serverConfig.address = data.get('claspAddress') || 'localhost:7331';
+      serverConfig.address = data.get('claspAddress') || 'localhost:7330';
+      serverConfig.token = data.get('claspToken') || '';
       serverConfig.name = `CLASP Server @ ${serverConfig.address}`;
       break;
 
@@ -950,7 +1018,19 @@ async function handleAddServer(e) {
       serverConfig.status = 'connected';
     }
 
-    state.servers.push(serverConfig);
+    // Update existing or add new
+    if (isEditing) {
+      const idx = state.servers.findIndex(s => s.id === serverConfig.id);
+      if (idx !== -1) {
+        state.servers[idx] = serverConfig;
+      } else {
+        state.servers.push(serverConfig);
+      }
+    } else {
+      state.servers.push(serverConfig);
+    }
+
+    state.editingServer = null;
     saveServersToStorage();
     renderServers();
     updateStatus();
@@ -961,7 +1041,19 @@ async function handleAddServer(e) {
     console.error('Failed to start server:', err);
     serverConfig.status = 'error';
     serverConfig.error = err.message;
-    state.servers.push(serverConfig);
+
+    if (isEditing) {
+      const idx = state.servers.findIndex(s => s.id === serverConfig.id);
+      if (idx !== -1) {
+        state.servers[idx] = serverConfig;
+      } else {
+        state.servers.push(serverConfig);
+      }
+    } else {
+      state.servers.push(serverConfig);
+    }
+
+    state.editingServer = null;
     saveServersToStorage();
     renderServers();
   }
@@ -979,6 +1071,64 @@ async function deleteServer(id) {
   } catch (err) {
     console.error('Failed to delete server:', err);
   }
+}
+
+function editServer(id) {
+  const server = state.servers.find(s => s.id === id);
+  if (!server) return;
+
+  state.editingServer = server;
+
+  // Update modal title
+  const modalTitle = document.querySelector('#server-modal .modal-title');
+  if (modalTitle) modalTitle.textContent = 'EDIT SERVER';
+
+  // Set server type
+  const typeSelect = $('server-type');
+  if (typeSelect) {
+    typeSelect.value = server.protocol || server.type || 'clasp';
+    typeSelect.dispatchEvent(new Event('change')); // Trigger field switching
+  }
+
+  // Populate fields based on server type
+  const form = $('server-form');
+  if (!form) return;
+
+  switch (server.protocol || server.type) {
+    case 'clasp':
+      form.elements.claspAddress.value = server.address || 'localhost:7330';
+      if (form.elements.claspToken) form.elements.claspToken.value = server.token || '';
+      break;
+    case 'osc':
+      form.elements.oscBind.value = server.bind || '0.0.0.0';
+      form.elements.oscPort.value = server.port || 9000;
+      break;
+    case 'mqtt':
+      form.elements.mqttHost.value = server.host || 'localhost';
+      form.elements.mqttPort.value = server.port || 1883;
+      form.elements.mqttTopics.value = (server.topics || ['#']).join(', ');
+      break;
+    case 'websocket':
+      form.elements.wsMode.value = server.mode || 'server';
+      form.elements.wsAddress.value = server.address || '0.0.0.0:8080';
+      break;
+    case 'http':
+      form.elements.httpBind.value = server.bind || '0.0.0.0:3000';
+      form.elements.httpBasePath.value = server.basePath || '/api';
+      form.elements.httpCors.checked = server.cors !== false;
+      break;
+    case 'artnet':
+      form.elements.artnetBind.value = server.bind || '0.0.0.0:6454';
+      form.elements.artnetSubnet.value = server.subnet || 0;
+      form.elements.artnetUniverse.value = server.universe || 0;
+      break;
+    case 'dmx':
+      form.elements.dmxPort.value = server.serialPort || '/dev/ttyUSB0';
+      form.elements.dmxUniverse.value = server.universe || 0;
+      break;
+  }
+
+  $('server-modal')?.showModal();
 }
 
 async function handleCreateBridge(e) {
@@ -1173,9 +1323,50 @@ function applyMappings(signal) {
     // Apply transform
     value = applyTransform(value, mapping.transform);
 
-    // Send to target (would need IPC support)
-    // For now just log it
-    console.log(`Mapping ${mapping.id}: ${value} -> ${mapping.target.protocol}`);
+    // Build target address
+    const targetAddress = buildTargetAddress(mapping.target, signal);
+
+    // Send to target via appropriate bridge
+    sendToTarget(mapping.target, targetAddress, value);
+  }
+}
+
+function buildTargetAddress(target, sourceSignal) {
+  switch (target.protocol) {
+    case 'clasp':
+    case 'osc':
+      return target.address || sourceSignal.address || '/*';
+    case 'midi':
+      // MIDI doesn't use addresses
+      return null;
+    case 'dmx':
+    case 'artnet':
+      return null;
+    default:
+      return target.address;
+  }
+}
+
+async function sendToTarget(target, address, value) {
+  if (!window.clasp?.sendSignal) {
+    console.log(`Would send: ${address} = ${value} (${target.protocol})`);
+    return;
+  }
+
+  // Find an appropriate bridge for this target protocol
+  const bridge = state.bridges.find(b =>
+    b.target === target.protocol || b.source === target.protocol
+  );
+
+  if (!bridge) {
+    console.warn(`No bridge found for ${target.protocol}`);
+    return;
+  }
+
+  try {
+    await window.clasp.sendSignal(bridge.id, address, value);
+  } catch (err) {
+    console.error('Failed to send signal:', err);
   }
 }
 
@@ -1321,9 +1512,14 @@ function renderServers() {
         <span class="status-dot ${server.status || 'available'}"></span>
         <span class="device-protocol-badge ${server.protocol || 'clasp'}">${protocolNames[server.protocol] || server.protocol || 'CLASP'}</span>
         <span class="device-name">${server.name}</span>
-        <button class="btn-device-delete" data-action="delete-server" data-id="${server.id}" title="Stop server">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="device-actions">
+          <button class="btn-device-edit" data-action="edit-server" data-id="${server.id}" title="Edit server">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-device-delete" data-action="delete-server" data-id="${server.id}" title="Stop server">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
     `).join('');
   }
@@ -1549,6 +1745,55 @@ function updateSignalRate() {
 
   const rateStat = $('rate-stat');
   if (rateStat) rateStat.textContent = `${state.signalRate}/s`;
+}
+
+// ============================================
+// Notifications
+// ============================================
+
+function showNotification(message, type = 'info') {
+  // Create notification container if not exists
+  let container = $('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.className = 'notification-container';
+    document.body.appendChild(container);
+  }
+
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '!' : 'ℹ';
+
+  notification.innerHTML = `
+    <span class="notification-icon">${icon}</span>
+    <span class="notification-message">${escapeHtml(message)}</span>
+    <button class="notification-close">×</button>
+  `;
+
+  // Add click handler for close button
+  notification.querySelector('.notification-close').addEventListener('click', () => {
+    notification.classList.add('fade-out');
+    setTimeout(() => notification.remove(), 300);
+  });
+
+  container.appendChild(notification);
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.classList.add('fade-out');
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 5000);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // ============================================

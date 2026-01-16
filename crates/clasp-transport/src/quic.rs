@@ -152,8 +152,10 @@ impl QuicTransport {
             .with_custom_certificate_verifier(Arc::new(SkipServerVerification))
             .with_no_client_auth();
 
-        let quic_crypto = quinn::crypto::rustls::QuicClientConfig::try_from(crypto)
-            .map_err(|e| TransportError::ConnectionFailed(format!("Crypto config failed: {}", e)))?;
+        let quic_crypto =
+            quinn::crypto::rustls::QuicClientConfig::try_from(crypto).map_err(|e| {
+                TransportError::ConnectionFailed(format!("Crypto config failed: {}", e))
+            })?;
         let mut client_config = ClientConfig::new(Arc::new(quic_crypto));
 
         let mut transport = TransportConfig::default();
@@ -188,7 +190,9 @@ impl QuicTransport {
         server_crypto.alpn_protocols = vec![CLASP_ALPN.to_vec()];
 
         let quic_server_crypto = quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto)
-            .map_err(|e| TransportError::ConnectionFailed(format!("Crypto config failed: {}", e)))?;
+            .map_err(|e| {
+            TransportError::ConnectionFailed(format!("Crypto config failed: {}", e))
+        })?;
         let mut server_config = ServerConfig::with_crypto(Arc::new(quic_server_crypto));
 
         let mut transport = TransportConfig::default();

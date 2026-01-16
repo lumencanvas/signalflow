@@ -7,17 +7,17 @@
 //! 4. Stress testing to find limits
 
 use crate::{TestResult, TestSuite};
-use clasp_core::{codec, Frame, Message, Value, QoS};
-use clasp_core::types::{SetMessage, PublishMessage, SignalType};
+use bytes::BytesMut;
+use clasp_core::types::{PublishMessage, SetMessage, SignalType};
+use clasp_core::{codec, Frame, Message, QoS, Value};
 use hdrhistogram::Histogram;
-use rosc::{OscMessage, OscPacket, OscType, encoder, decoder};
+use mqttbytes::v4::read as mqtt_read;
 use mqttbytes::v4::Publish;
 use mqttbytes::QoS as MqttQoS;
-use mqttbytes::v4::read as mqtt_read;
-use bytes::BytesMut;
-use std::time::{Duration, Instant};
+use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 // ============================================================================
 // PART 1: HEAD-TO-HEAD PERFORMANCE COMPARISONS (CLASP vs OSC vs MQTT)
@@ -25,7 +25,10 @@ use std::sync::Arc;
 
 /// Three-way encoding speed comparison: CLASP vs OSC vs MQTT
 pub fn benchmark_three_way_encoding(iterations: usize) -> TestResult {
-    let name = format!("PERF: CLASP vs OSC vs MQTT encoding ({} iterations)", iterations);
+    let name = format!(
+        "PERF: CLASP vs OSC vs MQTT encoding ({} iterations)",
+        iterations
+    );
 
     let topic = "test/sensor/value";
     let float_value: f64 = 0.75;
@@ -84,9 +87,27 @@ pub fn benchmark_three_way_encoding(iterations: usize) -> TestResult {
         ║  MQTT      │  {:>15.2?}   │  {:>13.0}   │  {}            ║\n\
         ╚═══════════════════════════════════════════════════════════════════════╝",
         iterations,
-        clasp_duration, clasp_rate, if (clasp_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
-        osc_duration, osc_rate, if (osc_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
-        mqtt_duration, mqtt_rate, if (mqtt_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
+        clasp_duration,
+        clasp_rate,
+        if (clasp_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
+        osc_duration,
+        osc_rate,
+        if (osc_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
+        mqtt_duration,
+        mqtt_rate,
+        if (mqtt_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
     );
 
     TestResult {
@@ -99,7 +120,10 @@ pub fn benchmark_three_way_encoding(iterations: usize) -> TestResult {
 
 /// Three-way decoding speed comparison: CLASP vs OSC vs MQTT
 pub fn benchmark_three_way_decoding(iterations: usize) -> TestResult {
-    let name = format!("PERF: CLASP vs OSC vs MQTT decoding ({} iterations)", iterations);
+    let name = format!(
+        "PERF: CLASP vs OSC vs MQTT decoding ({} iterations)",
+        iterations
+    );
 
     let topic = "test/sensor/value";
     let float_value: f64 = 0.75;
@@ -166,9 +190,27 @@ pub fn benchmark_three_way_decoding(iterations: usize) -> TestResult {
         ║  MQTT      │  {:>15.2?}   │  {:>13.0}   │  {}            ║\n\
         ╚═══════════════════════════════════════════════════════════════════════╝",
         iterations,
-        clasp_duration, clasp_rate, if (clasp_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
-        osc_duration, osc_rate, if (osc_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
-        mqtt_duration, mqtt_rate, if (mqtt_rate - max_rate).abs() < 1.0 { "<<<" } else { "   " },
+        clasp_duration,
+        clasp_rate,
+        if (clasp_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
+        osc_duration,
+        osc_rate,
+        if (osc_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
+        mqtt_duration,
+        mqtt_rate,
+        if (mqtt_rate - max_rate).abs() < 1.0 {
+            "<<<"
+        } else {
+            "   "
+        },
     );
 
     TestResult {
@@ -213,17 +255,42 @@ pub fn benchmark_three_way_sizes() -> TestResult {
     let min_size = clasp_size.min(osc_size).min(mqtt_size);
 
     let mut output = String::new();
-    output.push_str("\n╔═══════════════════════════════════════════════════════════════════════╗\n");
+    output
+        .push_str("\n╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║              THREE-WAY MESSAGE SIZE COMPARISON                        ║\n");
     output.push_str("╠═══════════════════════════════════════════════════════════════════════╣\n");
-    output.push_str(&format!("║  Test: Float value ({}) to topic '{}'                       ║\n", float_value, topic));
+    output.push_str(&format!(
+        "║  Test: Float value ({}) to topic '{}'                       ║\n",
+        float_value, topic
+    ));
     output.push_str("╠═══════════════════════════════════════════════════════════════════════╣\n");
-    output.push_str(&format!("║  CLASP:  {:>3} bytes  {}                                            ║\n",
-        clasp_size, if clasp_size == min_size { "(smallest)" } else { "          " }));
-    output.push_str(&format!("║  OSC:    {:>3} bytes  {}                                            ║\n",
-        osc_size, if osc_size == min_size { "(smallest)" } else { "          " }));
-    output.push_str(&format!("║  MQTT:   {:>3} bytes  {}                                            ║\n",
-        mqtt_size, if mqtt_size == min_size { "(smallest)" } else { "          " }));
+    output.push_str(&format!(
+        "║  CLASP:  {:>3} bytes  {}                                            ║\n",
+        clasp_size,
+        if clasp_size == min_size {
+            "(smallest)"
+        } else {
+            "          "
+        }
+    ));
+    output.push_str(&format!(
+        "║  OSC:    {:>3} bytes  {}                                            ║\n",
+        osc_size,
+        if osc_size == min_size {
+            "(smallest)"
+        } else {
+            "          "
+        }
+    ));
+    output.push_str(&format!(
+        "║  MQTT:   {:>3} bytes  {}                                            ║\n",
+        mqtt_size,
+        if mqtt_size == min_size {
+            "(smallest)"
+        } else {
+            "          "
+        }
+    ));
     output.push_str("╠═══════════════════════════════════════════════════════════════════════╣\n");
     output.push_str("║  Notes:                                                               ║\n");
     output.push_str("║  - CLASP includes frame header + MessagePack + metadata               ║\n");
@@ -290,10 +357,22 @@ pub fn benchmark_clasp_vs_osc_encoding(iterations: usize) -> TestResult {
         ║  Speedup: {:.2}x {}                                          ║\n\
         ╚══════════════════════════════════════════════════════════════╝",
         iterations,
-        clasp_duration, clasp_rate, if clasp_rate > osc_rate { "<<<" } else { "   " },
-        osc_duration, osc_rate, if osc_rate > clasp_rate { "<<<" } else { "   " },
-        if speedup > 1.0 { speedup } else { 1.0 / speedup },
-        if speedup > 1.0 { "(CLASP faster)" } else { "(OSC faster)" }
+        clasp_duration,
+        clasp_rate,
+        if clasp_rate > osc_rate { "<<<" } else { "   " },
+        osc_duration,
+        osc_rate,
+        if osc_rate > clasp_rate { "<<<" } else { "   " },
+        if speedup > 1.0 {
+            speedup
+        } else {
+            1.0 / speedup
+        },
+        if speedup > 1.0 {
+            "(CLASP faster)"
+        } else {
+            "(OSC faster)"
+        }
     );
 
     TestResult {
@@ -358,10 +437,22 @@ pub fn benchmark_clasp_vs_osc_decoding(iterations: usize) -> TestResult {
         ║  Speedup: {:.2}x {}                                          ║\n\
         ╚══════════════════════════════════════════════════════════════╝",
         iterations,
-        clasp_duration, clasp_rate, if clasp_rate > osc_rate { "<<<" } else { "   " },
-        osc_duration, osc_rate, if osc_rate > clasp_rate { "<<<" } else { "   " },
-        if speedup > 1.0 { speedup } else { 1.0 / speedup },
-        if speedup > 1.0 { "(CLASP faster)" } else { "(OSC faster)" }
+        clasp_duration,
+        clasp_rate,
+        if clasp_rate > osc_rate { "<<<" } else { "   " },
+        osc_duration,
+        osc_rate,
+        if osc_rate > clasp_rate { "<<<" } else { "   " },
+        if speedup > 1.0 {
+            speedup
+        } else {
+            1.0 / speedup
+        },
+        if speedup > 1.0 {
+            "(CLASP faster)"
+        } else {
+            "(OSC faster)"
+        }
     );
 
     TestResult {
@@ -377,18 +468,45 @@ pub fn benchmark_message_sizes() -> TestResult {
     let name = "PERF: Message size comparison (CLASP vs OSC)".to_string();
 
     let test_cases: Vec<(&str, &str, Vec<Value>, Vec<OscType>)> = vec![
-        ("Simple float", "/sensor/temp", vec![Value::Float(23.5)], vec![OscType::Float(23.5)]),
-        ("Integer", "/counter", vec![Value::Int(42)], vec![OscType::Int(42)]),
-        ("String", "/label", vec![Value::String("Hello World".into())], vec![OscType::String("Hello World".into())]),
-        ("Multiple args", "/rgb",
+        (
+            "Simple float",
+            "/sensor/temp",
+            vec![Value::Float(23.5)],
+            vec![OscType::Float(23.5)],
+        ),
+        (
+            "Integer",
+            "/counter",
+            vec![Value::Int(42)],
+            vec![OscType::Int(42)],
+        ),
+        (
+            "String",
+            "/label",
+            vec![Value::String("Hello World".into())],
+            vec![OscType::String("Hello World".into())],
+        ),
+        (
+            "Multiple args",
+            "/rgb",
             vec![Value::Float(1.0), Value::Float(0.5), Value::Float(0.0)],
-            vec![OscType::Float(1.0), OscType::Float(0.5), OscType::Float(0.0)]),
-        ("Long address", "/this/is/a/very/long/address/path/for/testing",
-            vec![Value::Float(1.0)], vec![OscType::Float(1.0)]),
+            vec![
+                OscType::Float(1.0),
+                OscType::Float(0.5),
+                OscType::Float(0.0),
+            ],
+        ),
+        (
+            "Long address",
+            "/this/is/a/very/long/address/path/for/testing",
+            vec![Value::Float(1.0)],
+            vec![OscType::Float(1.0)],
+        ),
     ];
 
     let mut results = String::new();
-    results.push_str("\n╔═══════════════════════════════════════════════════════════════════════╗\n");
+    results
+        .push_str("\n╔═══════════════════════════════════════════════════════════════════════╗\n");
     results.push_str("║                    MESSAGE SIZE COMPARISON                            ║\n");
     results.push_str("╠═══════════════════════════════════════════════════════════════════════╣\n");
     results.push_str("║  Test Case        │  CLASP (bytes)  │  OSC (bytes)  │  Difference    ║\n");
@@ -439,7 +557,8 @@ pub fn benchmark_message_sizes() -> TestResult {
     }
 
     results.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n");
-    results.push_str("\nNote: CLASP includes 4-byte frame header. OSC uses 4-byte aligned padding.\n");
+    results
+        .push_str("\nNote: CLASP includes 4-byte frame header. OSC uses 4-byte aligned padding.\n");
 
     TestResult {
         name,
@@ -534,22 +653,46 @@ pub fn benchmark_latency_distribution(samples: usize) -> TestResult {
         ╚═══════════════════════════════════════════════════════════════════════╝",
         format_nanos(clasp_hist.value_at_percentile(50.0)),
         format_nanos(osc_hist.value_at_percentile(50.0)),
-        if clasp_hist.value_at_percentile(50.0) < osc_hist.value_at_percentile(50.0) { "CLASP" } else { "OSC" },
+        if clasp_hist.value_at_percentile(50.0) < osc_hist.value_at_percentile(50.0) {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.value_at_percentile(90.0)),
         format_nanos(osc_hist.value_at_percentile(90.0)),
-        if clasp_hist.value_at_percentile(90.0) < osc_hist.value_at_percentile(90.0) { "CLASP" } else { "OSC" },
+        if clasp_hist.value_at_percentile(90.0) < osc_hist.value_at_percentile(90.0) {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.value_at_percentile(95.0)),
         format_nanos(osc_hist.value_at_percentile(95.0)),
-        if clasp_hist.value_at_percentile(95.0) < osc_hist.value_at_percentile(95.0) { "CLASP" } else { "OSC" },
+        if clasp_hist.value_at_percentile(95.0) < osc_hist.value_at_percentile(95.0) {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.value_at_percentile(99.0)),
         format_nanos(osc_hist.value_at_percentile(99.0)),
-        if clasp_hist.value_at_percentile(99.0) < osc_hist.value_at_percentile(99.0) { "CLASP" } else { "OSC" },
+        if clasp_hist.value_at_percentile(99.0) < osc_hist.value_at_percentile(99.0) {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.value_at_percentile(99.9)),
         format_nanos(osc_hist.value_at_percentile(99.9)),
-        if clasp_hist.value_at_percentile(99.9) < osc_hist.value_at_percentile(99.9) { "CLASP" } else { "OSC" },
+        if clasp_hist.value_at_percentile(99.9) < osc_hist.value_at_percentile(99.9) {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.max()),
         format_nanos(osc_hist.max()),
-        if clasp_hist.max() < osc_hist.max() { "CLASP" } else { "OSC" },
+        if clasp_hist.max() < osc_hist.max() {
+            "CLASP"
+        } else {
+            "OSC"
+        },
         format_nanos(clasp_hist.mean() as u64),
         format_nanos(osc_hist.mean() as u64),
         format_nanos(clasp_hist.stdev() as u64),
@@ -576,7 +719,8 @@ pub fn visualize_osc_to_clasp_bridge() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║           OSC -> CLASP BRIDGE DATA TRANSFORMATION                     ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     // Example 1: Simple float
     output.push_str("━━━ Example 1: Float value /fader/1 = 0.75 ━━━\n\n");
@@ -605,11 +749,20 @@ pub fn visualize_osc_to_clasp_bridge() -> TestResult {
     output.push_str(&format_hex_dump(&clasp_bytes, "  "));
     output.push_str(&format!("  Total: {} bytes\n", clasp_bytes.len()));
     output.push_str("  Header breakdown:\n");
-    output.push_str(&format!("    Byte 0: 0x{:02X} = Magic 'S'\n", clasp_bytes[0]));
-    output.push_str(&format!("    Byte 1: 0x{:02X} = Flags (QoS=Confirm)\n", clasp_bytes[1]));
-    output.push_str(&format!("    Bytes 2-3: 0x{:02X}{:02X} = Payload length ({})\n",
-        clasp_bytes[2], clasp_bytes[3],
-        ((clasp_bytes[2] as u16) << 8) | clasp_bytes[3] as u16));
+    output.push_str(&format!(
+        "    Byte 0: 0x{:02X} = Magic 'S'\n",
+        clasp_bytes[0]
+    ));
+    output.push_str(&format!(
+        "    Byte 1: 0x{:02X} = Flags (QoS=Confirm)\n",
+        clasp_bytes[1]
+    ));
+    output.push_str(&format!(
+        "    Bytes 2-3: 0x{:02X}{:02X} = Payload length ({})\n",
+        clasp_bytes[2],
+        clasp_bytes[3],
+        ((clasp_bytes[2] as u16) << 8) | clasp_bytes[3] as u16
+    ));
     output.push_str("\n");
 
     // Example 2: Multiple values (RGB)
@@ -617,7 +770,11 @@ pub fn visualize_osc_to_clasp_bridge() -> TestResult {
 
     let osc_rgb = OscMessage {
         addr: "/light/color".to_string(),
-        args: vec![OscType::Float(1.0), OscType::Float(0.5), OscType::Float(0.0)],
+        args: vec![
+            OscType::Float(1.0),
+            OscType::Float(0.5),
+            OscType::Float(0.0),
+        ],
     };
     let osc_rgb_bytes = encoder::encode(&OscPacket::Message(osc_rgb)).unwrap();
 
@@ -627,7 +784,11 @@ pub fn visualize_osc_to_clasp_bridge() -> TestResult {
 
     let clasp_rgb = Message::Set(SetMessage {
         address: "/light/color".to_string(),
-        value: Value::Array(vec![Value::Float(1.0), Value::Float(0.5), Value::Float(0.0)]),
+        value: Value::Array(vec![
+            Value::Float(1.0),
+            Value::Float(0.5),
+            Value::Float(0.0),
+        ]),
         revision: None,
         lock: false,
         unlock: false,
@@ -680,7 +841,8 @@ pub fn visualize_midi_to_clasp_bridge() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║           MIDI -> CLASP BRIDGE DATA TRANSFORMATION                    ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     // MIDI CC message
     output.push_str("━━━ Example 1: MIDI CC (Channel 1, CC 7, Value 100) ━━━\n\n");
@@ -706,7 +868,10 @@ pub fn visualize_midi_to_clasp_bridge() -> TestResult {
 
     output.push_str("CLASP representation:\n");
     output.push_str(&format!("  Address: /midi/device/cc/1/7\n"));
-    output.push_str(&format!("  Value: {} (normalized from 100/127)\n\n", normalized_value));
+    output.push_str(&format!(
+        "  Value: {} (normalized from 100/127)\n\n",
+        normalized_value
+    ));
     output.push_str(&format_hex_dump(&clasp_cc_bytes, "  "));
     output.push_str(&format!("  Total: {} bytes\n\n", clasp_cc_bytes.len()));
 
@@ -762,7 +927,7 @@ pub fn visualize_midi_to_clasp_bridge() -> TestResult {
 
 /// Test JWT token validation
 pub fn test_security_jwt_validation() -> TestResult {
-    use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+    use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -783,7 +948,8 @@ pub fn test_security_jwt_validation() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║                    JWT SECURITY VALIDATION TESTS                      ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     let secret = b"test-secret-key-32-bytes-long!!!";
     let mut all_passed = true;
@@ -795,21 +961,38 @@ pub fn test_security_jwt_validation() -> TestResult {
         exp: (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs()) + 3600,
+            .as_secs())
+            + 3600,
         clasp: ClaspPermissions {
             read: vec!["/lights/**".to_string()],
             write: vec!["/lights/*/brightness".to_string()],
         },
     };
-    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret)).unwrap();
-    output.push_str(&format!("  Token: {}...{}\n", &token[..20], &token[token.len()-10..]));
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret),
+    )
+    .unwrap();
+    output.push_str(&format!(
+        "  Token: {}...{}\n",
+        &token[..20],
+        &token[token.len() - 10..]
+    ));
 
-    match decode::<ClaspClaims>(&token, &DecodingKey::from_secret(secret), &Validation::default()) {
+    match decode::<ClaspClaims>(
+        &token,
+        &DecodingKey::from_secret(secret),
+        &Validation::default(),
+    ) {
         Ok(data) => {
             output.push_str(&format!("  [PASS] Decoded successfully\n"));
             output.push_str(&format!("    Subject: {}\n", data.claims.sub));
             output.push_str(&format!("    Read scopes: {:?}\n", data.claims.clasp.read));
-            output.push_str(&format!("    Write scopes: {:?}\n", data.claims.clasp.write));
+            output.push_str(&format!(
+                "    Write scopes: {:?}\n",
+                data.claims.clasp.write
+            ));
         }
         Err(e) => {
             output.push_str(&format!("  [FAIL] Decode error: {}\n", e));
@@ -828,9 +1011,18 @@ pub fn test_security_jwt_validation() -> TestResult {
             write: vec![],
         },
     };
-    let expired_token = encode(&Header::default(), &expired_claims, &EncodingKey::from_secret(secret)).unwrap();
+    let expired_token = encode(
+        &Header::default(),
+        &expired_claims,
+        &EncodingKey::from_secret(secret),
+    )
+    .unwrap();
 
-    match decode::<ClaspClaims>(&expired_token, &DecodingKey::from_secret(secret), &Validation::default()) {
+    match decode::<ClaspClaims>(
+        &expired_token,
+        &DecodingKey::from_secret(secret),
+        &Validation::default(),
+    ) {
         Ok(_) => {
             output.push_str("  [FAIL] Expired token was accepted!\n");
             all_passed = false;
@@ -845,7 +1037,11 @@ pub fn test_security_jwt_validation() -> TestResult {
     output.push_str("Test 3: Invalid signature rejection\n");
     let wrong_secret = b"wrong-secret-key-32-bytes-long!!";
 
-    match decode::<ClaspClaims>(&token, &DecodingKey::from_secret(wrong_secret), &Validation::default()) {
+    match decode::<ClaspClaims>(
+        &token,
+        &DecodingKey::from_secret(wrong_secret),
+        &Validation::default(),
+    ) {
         Ok(_) => {
             output.push_str("  [FAIL] Invalid signature was accepted!\n");
             all_passed = false;
@@ -865,7 +1061,11 @@ pub fn test_security_jwt_validation() -> TestResult {
         bytes[50] = if bytes[50] == b'A' { b'B' } else { b'A' };
     }
 
-    match decode::<ClaspClaims>(&tampered, &DecodingKey::from_secret(secret), &Validation::default()) {
+    match decode::<ClaspClaims>(
+        &tampered,
+        &DecodingKey::from_secret(secret),
+        &Validation::default(),
+    ) {
         Ok(_) => {
             output.push_str("  [FAIL] Tampered token was accepted!\n");
             all_passed = false;
@@ -914,7 +1114,8 @@ pub fn test_security_scope_enforcement() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║                   ADDRESS SCOPE ENFORCEMENT TESTS                     ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     // Simulate scope checking
     fn matches_scope(address: &str, scope: &str) -> bool {
@@ -952,15 +1153,55 @@ pub fn test_security_scope_enforcement() -> TestResult {
 
     let test_cases = vec![
         // (address, scope, should_match, description)
-        ("/lights/kitchen/brightness", "/lights/**", true, "Wildcard ** matches deep path"),
-        ("/lights/kitchen", "/lights/**", true, "Wildcard ** matches shallow path"),
+        (
+            "/lights/kitchen/brightness",
+            "/lights/**",
+            true,
+            "Wildcard ** matches deep path",
+        ),
+        (
+            "/lights/kitchen",
+            "/lights/**",
+            true,
+            "Wildcard ** matches shallow path",
+        ),
         ("/lights", "/lights/**", true, "Wildcard ** matches exact"),
-        ("/audio/master", "/lights/**", false, "Wildcard ** doesn't match different root"),
-        ("/lights/kitchen/brightness", "/lights/*/brightness", true, "Single * matches one segment"),
-        ("/lights/a/b/brightness", "/lights/*/brightness", false, "Single * doesn't match multiple"),
-        ("/lights/kitchen/color", "/lights/*/brightness", false, "Single * with wrong suffix"),
-        ("/midi/device/cc/1/7", "/midi/**/cc/**", true, "Multiple ** wildcards"),
-        ("/admin/config", "/lights/**", false, "Scope doesn't grant admin access"),
+        (
+            "/audio/master",
+            "/lights/**",
+            false,
+            "Wildcard ** doesn't match different root",
+        ),
+        (
+            "/lights/kitchen/brightness",
+            "/lights/*/brightness",
+            true,
+            "Single * matches one segment",
+        ),
+        (
+            "/lights/a/b/brightness",
+            "/lights/*/brightness",
+            false,
+            "Single * doesn't match multiple",
+        ),
+        (
+            "/lights/kitchen/color",
+            "/lights/*/brightness",
+            false,
+            "Single * with wrong suffix",
+        ),
+        (
+            "/midi/device/cc/1/7",
+            "/midi/**/cc/**",
+            true,
+            "Multiple ** wildcards",
+        ),
+        (
+            "/admin/config",
+            "/lights/**",
+            false,
+            "Scope doesn't grant admin access",
+        ),
     ];
 
     let mut all_passed = true;
@@ -1006,7 +1247,8 @@ pub fn stress_test_throughput_limit() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║                    THROUGHPUT LIMIT STRESS TEST                       ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     let msg = Message::Set(SetMessage {
         address: "/test/stress".to_string(),
@@ -1041,8 +1283,14 @@ pub fn stress_test_throughput_limit() -> TestResult {
         ));
     }
 
-    output.push_str(&format!("\n  Peak throughput: {:.0} messages/second\n", max_rate));
-    output.push_str(&format!("  That's {:.2} million messages per second!\n", max_rate / 1_000_000.0));
+    output.push_str(&format!(
+        "\n  Peak throughput: {:.0} messages/second\n",
+        max_rate
+    ));
+    output.push_str(&format!(
+        "  That's {:.2} million messages per second!\n",
+        max_rate / 1_000_000.0
+    ));
 
     TestResult {
         name,
@@ -1061,7 +1309,8 @@ pub fn stress_test_concurrent_access() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║                 CONCURRENT ACCESS STRESS TEST                         ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     let thread_counts = [1, 2, 4, 8, 16];
     let messages_per_thread = 100_000;
@@ -1122,12 +1371,16 @@ pub fn stress_test_memory_stability() -> TestResult {
     output.push_str("\n");
     output.push_str("╔═══════════════════════════════════════════════════════════════════════╗\n");
     output.push_str("║                  MEMORY STABILITY STRESS TEST                         ║\n");
-    output.push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
+    output
+        .push_str("╚═══════════════════════════════════════════════════════════════════════╝\n\n");
 
     let iterations = 1_000_000;
     let check_interval = 100_000;
 
-    output.push_str(&format!("Running {} encode/decode cycles...\n\n", iterations));
+    output.push_str(&format!(
+        "Running {} encode/decode cycles...\n\n",
+        iterations
+    ));
 
     let start = Instant::now();
 
@@ -1149,7 +1402,9 @@ pub fn stress_test_memory_stability() -> TestResult {
             let rate = (i + 1) as f64 / elapsed.as_secs_f64();
             output.push_str(&format!(
                 "  {:>10} messages: {:>10.2?} elapsed, {:>12.0} msg/s\n",
-                i + 1, elapsed, rate
+                i + 1,
+                elapsed,
+                rate
             ));
         }
     }
@@ -1157,7 +1412,10 @@ pub fn stress_test_memory_stability() -> TestResult {
     let total_duration = start.elapsed();
     let final_rate = iterations as f64 / total_duration.as_secs_f64();
 
-    output.push_str(&format!("\n  Completed {} messages in {:?}\n", iterations, total_duration));
+    output.push_str(&format!(
+        "\n  Completed {} messages in {:?}\n",
+        iterations, total_duration
+    ));
     output.push_str(&format!("  Average rate: {:.0} msg/s\n", final_rate));
     output.push_str("  No memory errors or OOM detected\n");
 

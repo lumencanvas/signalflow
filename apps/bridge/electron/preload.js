@@ -14,24 +14,50 @@ const api = {
   createBridge: (config) => ipcRenderer.invoke('create-bridge', config),
   deleteBridge: (id) => ipcRenderer.invoke('delete-bridge', id),
 
+  // Server logs and diagnostics
+  getServerLogs: (id) => ipcRenderer.invoke('get-server-logs', id),
+  testConnection: (address) => ipcRenderer.invoke('test-connection', address),
+
+  // Signal routing
+  sendSignal: (bridgeId, address, value) =>
+    ipcRenderer.invoke('send-signal', { bridgeId, address, value }),
+
   // Events
   onDeviceFound: (callback) => {
     ipcRenderer.on('device-found', (event, device) => callback(device));
+    return () => ipcRenderer.removeAllListeners('device-found');
   },
   onDeviceUpdated: (callback) => {
     ipcRenderer.on('device-updated', (event, device) => callback(device));
+    return () => ipcRenderer.removeAllListeners('device-updated');
   },
   onDeviceLost: (callback) => {
     ipcRenderer.on('device-lost', (event, deviceId) => callback(deviceId));
+    return () => ipcRenderer.removeAllListeners('device-lost');
   },
   onSignal: (callback) => {
     ipcRenderer.on('signal', (event, signal) => callback(signal));
+    return () => ipcRenderer.removeAllListeners('signal');
   },
   onScanStarted: (callback) => {
     ipcRenderer.on('scan-started', () => callback());
+    return () => ipcRenderer.removeAllListeners('scan-started');
   },
   onScanComplete: (callback) => {
     ipcRenderer.on('scan-complete', () => callback());
+    return () => ipcRenderer.removeAllListeners('scan-complete');
+  },
+  onServerStatus: (callback) => {
+    ipcRenderer.on('server-status', (event, status) => callback(status));
+    return () => ipcRenderer.removeAllListeners('server-status');
+  },
+  onServerLog: (callback) => {
+    ipcRenderer.on('server-log', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('server-log');
+  },
+  onBridgeEvent: (callback) => {
+    ipcRenderer.on('bridge-event', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('bridge-event');
   },
 };
 

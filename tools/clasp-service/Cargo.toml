@@ -9,9 +9,21 @@ description = "CLASP Bridge Service for Electron IPC"
 name = "clasp-service"
 path = "src/main.rs"
 
+[features]
+default = ["osc", "midi", "artnet", "mqtt", "websocket", "http"]
+osc = ["clasp-bridge/osc"]
+midi = ["clasp-bridge/midi"]
+artnet = ["clasp-bridge/artnet"]
+dmx = ["clasp-bridge/dmx"]
+mqtt = ["clasp-bridge/mqtt"]
+websocket = ["clasp-bridge/websocket"]
+socketio = ["clasp-bridge/socketio"]
+http = ["clasp-bridge/http"]
+full = ["osc", "midi", "artnet", "dmx", "mqtt", "websocket", "socketio", "http"]
+
 [dependencies]
 clasp-core = { workspace = true }
-clasp-bridge = { workspace = true }
+clasp-bridge = { workspace = true, default-features = false }
 
 # Async
 tokio = { workspace = true, features = ["full", "io-std"] }

@@ -9,7 +9,11 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{http::Request, protocol::Message as WsMessage},
+    tungstenite::{
+        handshake::server::{Request as HsRequest, Response as HsResponse},
+        http::Request,
+        protocol::Message as WsMessage,
+    },
     MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, info, warn};
@@ -279,10 +283,27 @@ impl TransportServer for WebSocketServer {
 
         debug!("Accepted TCP connection from {}", addr);
 
-        // Upgrade to WebSocket
-        let ws_stream = tokio_tungstenite::accept_async(stream)
-            .await
-            .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
+        // Upgrade to WebSocket with subprotocol negotiation
+        let subprotocol = self.config.subprotocol.clone();
+        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, |req: &HsRequest, mut response: HsResponse| {
+            // Check if client requested our subprotocol
+            if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
+                if let Ok(protocols_str) = protocols.to_str() {
+                    // Client may request multiple protocols, comma-separated
+                    let requested: Vec<&str> = protocols_str.split(',').map(|s| s.trim()).collect();
+                    if requested.contains(&subprotocol.as_str()) {
+                        // Add our subprotocol to the response
+                        response.headers_mut().insert(
+                            "Sec-WebSocket-Protocol",
+                            subprotocol.parse().unwrap(),
+                        );
+                    }
+                }
+            }
+            Ok(response)
+        })
+        .await
+        .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 
         info!("WebSocket client connected from {}", addr);
 

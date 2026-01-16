@@ -11,7 +11,9 @@
     "lint": "eslint src electron"
   },
   "dependencies": {
-    "@clasp-to/core": "file:../../bindings/js/packages/clasp-core"
+    "@clasp-to/core": "file:../../bindings/js/packages/clasp-core",
+    "@msgpack/msgpack": "^3.1.3",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",

@@ -165,8 +165,16 @@ html, body {
   box-shadow: 1px 1px 0 var(--stone-900);
 }
 
-.device-item:hover .btn-device-delete {
+.device-item:hover .btn-device-delete,
+.device-item:hover .btn-device-edit {
   opacity: 1;
+}
+
+.device-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
 .device-name {
@@ -194,6 +202,25 @@ html, body {
 
 .btn-device-delete:hover {
   color: var(--color-error);
+}
+
+.btn-device-edit {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--stone-400);
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.btn-device-edit:hover {
+  color: var(--color-accent);
 }
 
 .status-dot {
@@ -1024,4 +1051,249 @@ html, body {
 .learn-notification.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================
+   Notifications
+   ============================================ */
+
+.notification-container {
+  position: fixed;
+  top: 50px;
+  right: var(--space-lg);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: 360px;
+}
+
+.notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-dark);
+  box-shadow: var(--shadow-md);
+  animation: slide-in 0.3s ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.notification.fade-out {
+  animation: slide-out 0.3s ease-out forwards;
+}
+
+@keyframes slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.notification-success .notification-icon {
+  background: var(--color-success);
+  color: white;
+}
+
+.notification-error .notification-icon {
+  background: var(--color-error);
+  color: white;
+}
+
+.notification-warning .notification-icon {
+  background: var(--color-warning);
+  color: white;
+}
+
+.notification-info .notification-icon {
+  background: var(--teal-500);
+  color: white;
+}
+
+.notification-message {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.notification-close {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--stone-400);
+  cursor: pointer;
+  padding: 0;
+}
+
+.notification-close:hover {
+  color: var(--stone-700);
+}
+
+/* ============================================
+   Server Status Indicators
+   ============================================ */
+
+.status-dot.starting {
+  background: var(--color-warning);
+  animation: pulse 1s infinite;
+}
+
+.status-dot.running {
+  background: var(--color-success);
+  box-shadow: 0 0 4px var(--color-success);
+}
+
+.status-dot.stopped {
+  background: var(--stone-400);
+}
+
+.status-dot.error {
+  background: var(--color-error);
+  box-shadow: 0 0 4px var(--color-error);
+}
+
+/* Server item with error state */
+.device-item[data-status="error"] {
+  border-color: var(--color-error);
+  background: #fef2f2;
+}
+
+.device-item[data-status="error"] .device-name {
+  color: var(--color-error);
+}
+
+/* Bridge active status */
+.bridge-card[data-active="false"] {
+  opacity: 0.6;
+}
+
+.bridge-card[data-active="false"]::after {
+  content: 'INACTIVE';
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 4px;
+  background: var(--stone-400);
+  color: white;
+}
+
+/* ============================================
+   Server Logs Panel (optional)
+   ============================================ */
+
+.logs-panel {
+  background: var(--stone-900);
+  color: var(--stone-300);
+  font-size: 11px;
+  padding: var(--space-md);
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.log-entry {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--stone-800);
+}
+
+.log-time {
+  color: var(--stone-500);
+  flex-shrink: 0;
+}
+
+.log-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+.log-entry.error .log-message {
+  color: var(--color-error);
+}
+
+.log-entry.warning .log-message {
+  color: var(--color-warning);
+}
+
+/* ============================================
+   Test Connection Button
+   ============================================ */
+
+.btn-test {
+  background: var(--stone-200);
+  color: var(--stone-700);
+  border-color: var(--stone-400);
+}
+
+.btn-test:hover {
+  background: var(--stone-300);
+}
+
+.btn-test.testing {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* ============================================
+   Connection Status Badge
+   ============================================ */
+
+.connection-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.connection-status-badge.connected {
+  background: var(--color-success);
+  color: white;
+}
+
+.connection-status-badge.disconnected {
+  background: var(--stone-400);
+  color: white;
+}
+
+.connection-status-badge.error {
+  background: var(--color-error);
+  color: white;
 }
