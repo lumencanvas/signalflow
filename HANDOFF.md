@@ -1,7 +1,7 @@
 # CLASP Project Handoff
 
 **Last Updated:** 2026-01-16
-**Current Version:** v0.1.0 (release in progress)
+**Current Version:** v0.1.1 (released)
 
 ---
 
@@ -106,18 +106,18 @@ These were removed from the website after audit:
 
 ## Release Status
 
-### v0.1.0 Release
-**Status:** In progress (workflow running)
+### v0.1.1 Release
+**Status:** Released (2026-01-16)
 
-**Monitor:** `gh run watch --repo lumencanvas/clasp`
+**View:** https://github.com/lumencanvas/clasp/releases/tag/v0.1.1
 
 ### Build Targets
 | Platform | Target | Status |
 |----------|--------|--------|
-| Linux x64 | x86_64-unknown-linux-gnu | Building |
-| macOS Intel | x86_64-apple-darwin | Building |
-| macOS ARM | aarch64-apple-darwin | Building |
-| Windows | x86_64-pc-windows-msvc | Building |
+| Linux x64 | x86_64-unknown-linux-gnu | Success |
+| macOS Intel | x86_64-apple-darwin | Success |
+| macOS ARM | aarch64-apple-darwin | Success |
+| Windows | x86_64-pc-windows-msvc | Success |
 | Linux ARM | aarch64-unknown-linux-gnu | **Disabled** (OpenSSL cross-compile issues) |
 
 ### Desktop App Artifacts
@@ -135,7 +135,7 @@ CLASP.Bridge.AppImage      # Linux AppImage
 clasp-bridge.deb           # Linux Debian
 ```
 
-**Note:** v0.1.0 used default electron-builder names with versions (e.g., `CLASP.Bridge-0.1.0-arm64.dmg`). The electron-builder config has been updated to produce version-less filenames. These will take effect in v0.1.1+.
+**Note:** v0.1.1+ uses version-less filenames for stable download URLs.
 
 ---
 
@@ -222,8 +222,8 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 ## TODO / Next Steps
 
 ### Immediate
-1. **Release v0.1.1** - Trigger a new release to get proper artifact filenames (fixed in electron-builder config)
-2. **Test downloads** - Download and run on each platform after v0.1.1
+1. ~~**Release v0.1.1**~~ - Done (2026-01-16)
+2. **Test downloads** - Download and run on each platform
 
 ### Short Term
 3. **Add aarch64-linux builds** - Create Cross.toml with OpenSSL or use vendored OpenSSL
@@ -262,11 +262,12 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 10. **Fixed electron-builder artifact naming** - Configured consistent filenames without version numbers
 11. **Added macOS dual-architecture builds** - Both ARM and Intel DMGs will now be built
 12. **Updated download URLs** - Windows portable now `.exe` instead of `.zip`
+13. **v0.1.1 released successfully** - All artifacts now have version-less filenames
 
 ### Release History
 - v0.1.0 attempt 1: Failed (OpenSSL cross-compile for aarch64-linux)
 - v0.1.0 attempt 2: **Success** (aarch64-linux disabled)
-- v0.1.1: Pending (needed for correct artifact filenames)
+- v0.1.1: **Success** (correct version-less artifact filenames)
 
 ---
 

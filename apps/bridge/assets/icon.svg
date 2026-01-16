@@ -1,14 +1,99 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Simplified favicon - no filter for clarity at small sizes -->
-  <!-- Left bracket -->
-  <path d="M 4 16 L 4 6 Q 4 2, 8 2 L 13 2 L 13 5 L 9 5 Q 7 5, 7 8 L 7 16 L 7 24 Q 7 27, 9 27 L 13 27 L 13 30 L 8 30 Q 4 30, 4 26 Z" fill="#1a1a1a"/>
-  <!-- Right bracket -->
-  <path d="M 28 16 L 28 6 Q 28 2, 24 2 L 19 2 L 19 5 L 23 5 Q 25 5, 25 8 L 25 16 L 25 24 Q 25 27, 23 27 L 19 27 L 19 30 L 24 30 Q 28 30, 28 26 Z" fill="#1a1a1a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <!-- Noise texture for grain effect -->
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+
+    <!-- Rough edges filter -->
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5"/>
+    </filter>
+
+    <!-- Photocopy/risograph effect -->
+    <filter id="risograph">
+      <feGaussianBlur stdDeviation="0.5"/>
+      <feComponentTransfer>
+        <feFuncR type="discrete" tableValues="0 0.2 0.4 0.6 0.8 1"/>
+        <feFuncG type="discrete" tableValues="0 0.2 0.4 0.6 0.8 1"/>
+        <feFuncB type="discrete" tableValues="0 0.2 0.4 0.6 0.8 1"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+
+  <!-- Background - off-white paper texture -->
+  <rect width="400" height="400" fill="#F5F0E6"/>
+
+  <!-- Paper texture overlay -->
+  <rect width="400" height="400" fill="#000" opacity="0.02" filter="url(#noise)"/>
+
+  <!-- Main logo with rough edges -->
+  <g filter="url(#rough)">
+    <!-- Left bracket -->
+    <path d="M 70 200
+             L 70 100
+             Q 70 60, 110 60
+             L 165 60
+             L 165 90
+             L 125 90
+             Q 100 90, 100 115
+             L 100 200
+             L 100 285
+             Q 100 310, 125 310
+             L 165 310
+             L 165 340
+             L 110 340
+             Q 70 340, 70 300
+             Z"
+          fill="#1a1a1a"/>
+
+    <!-- Right bracket -->
+    <path d="M 330 200
+             L 330 100
+             Q 330 60, 290 60
+             L 235 60
+             L 235 90
+             L 275 90
+             Q 300 90, 300 115
+             L 300 200
+             L 300 285
+             Q 300 310, 275 310
+             L 235 310
+             L 235 340
+             L 290 340
+             Q 330 340, 330 300
+             Z"
+          fill="#1a1a1a"/>
+  </g>
+
   <!-- Connection lines -->
-  <line x1="7" y1="11" x2="25" y2="11" stroke="#1a1a1a" stroke-width="2"/>
-  <line x1="7" y1="16" x2="25" y2="16" stroke="#1a1a1a" stroke-width="2"/>
-  <line x1="7" y1="21" x2="25" y2="21" stroke="#1a1a1a" stroke-width="2"/>
+  <g stroke="#1a1a1a" stroke-width="6" stroke-linecap="round" filter="url(#rough)">
+    <line x1="100" y1="150" x2="300" y2="152"/>
+    <line x1="100" y1="200" x2="300" y2="198"/>
+    <line x1="100" y1="250" x2="300" y2="251"/>
+  </g>
+
   <!-- Center node -->
-  <circle cx="16" cy="16" r="4" fill="#FFFFFF" stroke="#1a1a1a" stroke-width="2"/>
-  <circle cx="16" cy="16" r="1.5" fill="#FF5F1F"/>
+  <g filter="url(#rough)">
+    <circle cx="200" cy="200" r="28" fill="#F5F0E6" stroke="#1a1a1a" stroke-width="8"/>
+    <circle cx="200" cy="200" r="10" fill="#1a1a1a"/>
+  </g>
+
+  <!-- Accent color -->
+  <g opacity="0.85">
+    <circle cx="200" cy="200" r="10" fill="#FF5F1F"/>
+    <rect x="95" y="196" width="20" height="8" fill="#FF5F1F" filter="url(#rough)"/>
+    <rect x="285" y="196" width="20" height="8" fill="#FF5F1F" filter="url(#rough)"/>
+  </g>
+
+  <!-- CLASP text -->
+  <text x="200" y="390"
+        font-family="'Impact', 'Arial Black', sans-serif"
+        font-size="24"
+        fill="#1a1a1a"
+        text-anchor="middle"
+        letter-spacing="12"
+        filter="url(#rough)">CLASP</text>
 </svg>

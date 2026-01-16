@@ -1,6 +1,6 @@
 {
   "name": "clasp-bridge",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "CLASP Bridge - Universal Creative Protocol Bridge",
   "homepage": "https://clasp.to",
   "main": "electron/main.js",
@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.lumencanvas.clasp-bridge",
     "productName": "CLASP Bridge",
+    "icon": "assets/icon.png",
     "directories": {
       "output": "release"
     },
