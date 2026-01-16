@@ -100,7 +100,7 @@ const features = [
 
 .section-desc {
   max-width: 600px;
-  margin: 0 auto 2rem;
+  margin: 0 auto 1.5rem;
   text-align: center;
   color: var(--text-muted);
 }
@@ -109,8 +109,8 @@ const features = [
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 1rem;
-  margin-bottom: 3rem;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
 }
 
 .feature {
@@ -130,10 +130,10 @@ const features = [
 
 .download-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
   max-width: 900px;
-  margin: 0 auto 3rem;
+  margin: 0 auto 2rem;
 }
 
 .download-card {

@@ -20,9 +20,9 @@ function scrollToSpec() {
   <NavBar />
   <HeroSection @scroll-to-spec="scrollToSpec" />
   <LayersSection />
-  <SpecSection ref="specRef" />
-  <ApiSection />
-  <CapabilitiesSection />
   <DownloadsSection />
+  <ApiSection />
+  <SpecSection ref="specRef" />
+  <CapabilitiesSection />
   <FooterSection />
 </template>
