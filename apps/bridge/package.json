@@ -2,6 +2,7 @@
   "name": "clasp-bridge",
   "version": "0.1.0",
   "description": "CLASP Bridge - Universal Creative Protocol Bridge",
+  "homepage": "https://clasp.to",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
@@ -45,6 +46,9 @@
       "target": ["AppImage", "deb"]
     }
   },
-  "author": "LumenCanvas",
+  "author": {
+    "name": "LumenCanvas",
+    "email": "hello@lumencanvas.studio"
+  },
   "license": "MIT"
 }
