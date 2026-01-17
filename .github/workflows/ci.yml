@@ -108,8 +108,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-release-
 
-      - name: Build Rust service
-        run: cargo build --release -p clasp-service
+      - name: Build Rust binaries
+        run: cargo build --release -p clasp-service -p clasp-router-server
 
       - name: Install dependencies
         working-directory: apps/bridge

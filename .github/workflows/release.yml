@@ -113,7 +113,7 @@ jobs:
       - name: Build Rust binaries
         run: |
           cargo build --release -p clasp-service
-          cargo build --release -p clasp-router
+          cargo build --release -p clasp-router-server
 
       - name: Install dependencies
         working-directory: apps/bridge

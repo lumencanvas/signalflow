@@ -15,8 +15,11 @@ const os = require('os');
 const projectRoot = path.join(__dirname, '..', '..', '..');
 const targetDir = path.join(projectRoot, 'target', 'release');
 
-// Binaries to build
-const binaries = ['clasp-service', 'clasp-router'];
+// Binaries to build (maps binary name to package name)
+const binaries = [
+  { name: 'clasp-service', package: 'clasp-service' },
+  { name: 'clasp-router', package: 'clasp-router-server' },
+];
 
 // Get current platform and architecture
 const platform = process.platform;
@@ -47,13 +50,13 @@ function binaryExists(name) {
 }
 
 // Build a single binary
-function buildBinary(name) {
-  console.log(`Building ${name}...`);
+function buildBinary(binaryName, packageName) {
+  console.log(`Building ${binaryName} (package: ${packageName})...`);
 
   const startTime = Date.now();
 
   try {
-    execSync(`cargo build --release -p ${name}`, {
+    execSync(`cargo build --release -p ${packageName}`, {
       cwd: projectRoot,
       stdio: 'inherit',
       env: {
@@ -63,9 +66,9 @@ function buildBinary(name) {
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`Built ${name} in ${elapsed}s`);
+    console.log(`Built ${binaryName} in ${elapsed}s`);
   } catch (error) {
-    console.error(`Failed to build ${name}:`, error.message);
+    console.error(`Failed to build ${binaryName}:`, error.message);
     process.exit(1);
   }
 }
@@ -85,7 +88,7 @@ function main() {
 
   // Check if binaries already exist (for faster dev iteration)
   const ext = getBinaryExtension();
-  const allExist = binaries.every(name => {
+  const allExist = binaries.every(({ name }) => {
     const exists = binaryExists(name);
     if (exists) {
       console.log(`Found existing binary: ${name}${ext}`);
@@ -102,15 +105,15 @@ function main() {
   console.log('\nBuilding Rust binaries...\n');
 
   // Build each binary
-  for (const name of binaries) {
-    buildBinary(name);
+  for (const { name, package: pkg } of binaries) {
+    buildBinary(name, pkg);
   }
 
   console.log('\nRust binaries built successfully!');
 
   // Verify binaries exist
   console.log('\nVerifying binaries:');
-  for (const name of binaries) {
+  for (const { name } of binaries) {
     const binaryPath = path.join(targetDir, `${name}${ext}`);
     if (fs.existsSync(binaryPath)) {
       const stats = fs.statSync(binaryPath);
