@@ -11,7 +11,7 @@ readme = "README.md"
 [features]
 default = ["websocket", "udp", "quic"]
 full = ["websocket", "udp", "quic", "serial", "ble", "webrtc"]
-websocket = ["tokio-tungstenite", "futures-util"]
+websocket = ["tokio-tungstenite", "futures-util", "url"]
 udp = []
 quic = ["quinn", "rustls"]
 serial = ["tokio-serial"]
@@ -40,6 +40,7 @@ parking_lot = { workspace = true }
 # WebSocket (optional)
 tokio-tungstenite = { workspace = true, optional = true }
 futures-util = { version = "0.3", optional = true }
+url = { version = "2.5", optional = true }
 
 # QUIC (optional)
 quinn = { workspace = true, optional = true }

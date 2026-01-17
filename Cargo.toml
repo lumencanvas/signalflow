@@ -82,6 +82,7 @@ clasp-discovery = { version = "0.1", path = "crates/clasp-discovery" }
 clasp-bridge = { version = "0.1", path = "crates/clasp-bridge" }
 clasp-router = { version = "0.1", path = "crates/clasp-router" }
 clasp-client = { version = "0.1", path = "crates/clasp-client" }
+clasp-embedded = { version = "0.1", path = "crates/clasp-embedded" }
 clasp-cli = { version = "0.1", path = "crates/clasp-cli" }
 
 [profile.release]

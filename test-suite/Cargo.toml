@@ -12,6 +12,7 @@ clasp-bridge.workspace = true
 clasp-router.workspace = true
 clasp-client.workspace = true
 clasp-discovery.workspace = true
+clasp-embedded.workspace = true
 
 # Real protocol libraries for integration testing
 rosc.workspace = true
@@ -45,6 +46,9 @@ rand = "0.8"
 
 # JWT for security tests
 jsonwebtoken = "9.2"
+
+# Certificate generation for QUIC tests
+rcgen = "0.13"
 
 [dev-dependencies]
 tempfile = "3.10"
@@ -80,6 +84,54 @@ path = "src/bin/load_tests.rs"
 [[bin]]
 name = "proof-tests"
 path = "src/bin/proof_tests.rs"
+
+[[bin]]
+name = "relay-e2e"
+path = "src/bin/relay_e2e.rs"
+
+[[bin]]
+name = "transport-tests"
+path = "src/bin/transport_tests.rs"
+
+[[bin]]
+name = "subscription-tests"
+path = "src/bin/subscription_tests.rs"
+
+[[bin]]
+name = "error-handling-tests"
+path = "src/bin/error_handling_tests.rs"
+
+[[bin]]
+name = "client-tests"
+path = "src/bin/client_tests.rs"
+
+[[bin]]
+name = "discovery-tests"
+path = "src/bin/discovery_tests.rs"
+
+[[bin]]
+name = "quic-tests"
+path = "src/bin/quic_tests.rs"
+
+[[bin]]
+name = "bridge-tests"
+path = "src/bin/bridge_tests.rs"
+
+[[bin]]
+name = "embedded-tests"
+path = "src/bin/embedded_tests.rs"
+
+[[bin]]
+name = "udp-tests"
+path = "src/bin/udp_tests.rs"
+
+[[bin]]
+name = "session-tests"
+path = "src/bin/session_tests.rs"
+
+[[bin]]
+name = "e2e-protocol-tests"
+path = "src/bin/e2e_protocol_tests.rs"
 
 [[bench]]
 name = "throughput"

@@ -18,6 +18,9 @@ pub enum RouterError {
     #[error("state error: {0}")]
     State(String),
 
+    #[error("configuration error: {0}")]
+    Config(String),
+
     #[error("transport error: {0}")]
     Transport(#[from] clasp_transport::TransportError),
 

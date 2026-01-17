@@ -39,6 +39,9 @@
         <section class="sidebar-section">
           <div class="section-header">
             <h2 class="section-title">MY SERVERS</h2>
+            <button class="help-btn" title="Servers listen for incoming connections. Start a CLASP server to let other apps connect, or start protocol servers (OSC, MIDI, etc.) to receive data from those protocols.">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
             <span class="section-badge" id="server-badge">0</span>
           </div>
           <div id="server-list" class="device-list"></div>
@@ -53,6 +56,9 @@
         <section class="sidebar-section">
           <div class="section-header">
             <h2 class="section-title">DISCOVERED</h2>
+            <button class="help-btn" title="Auto-discovered CLASP servers on your local network. Click SCAN to search for servers via mDNS and WebSocket probing.">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
             <span class="section-badge" id="device-badge">0</span>
           </div>
           <div id="device-list" class="device-list"></div>
@@ -91,6 +97,9 @@
           <div class="tab-panel active" id="panel-bridges">
             <div class="panel-toolbar">
               <h2 class="panel-title">Protocol Bridges</h2>
+              <button class="help-btn" title="Bridges translate between different protocols. For example, OSC→CLASP converts incoming OSC messages to CLASP format, allowing any OSC app to communicate with CLASP clients.">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </button>
               <button class="btn btn-primary" id="add-bridge-btn">
                 <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 NEW BRIDGE
@@ -105,6 +114,9 @@
           <div class="tab-panel" id="panel-mappings">
             <div class="panel-toolbar">
               <h2 class="panel-title">Signal Mappings</h2>
+              <button class="help-btn" title="Mappings route signals between addresses with optional transforms. Use LEARN mode to capture incoming signals automatically. Transforms include: scale, invert, clamp, threshold, and custom JavaScript.">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </button>
               <div class="toolbar-group">
                 <button class="btn btn-secondary" id="learn-btn">
                   <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
@@ -578,25 +590,54 @@ function transform(input) {
             <label class="form-label">Server Type</label>
             <select name="serverType" class="select" id="server-type">
               <option value="clasp">CLASP (Native Protocol)</option>
-              <option value="osc">OSC Server</option>
-              <option value="mqtt">MQTT Broker</option>
-              <option value="websocket">WebSocket Server</option>
+              <option value="osc">OSC (Open Sound Control)</option>
+              <option value="midi">MIDI (Musical Instruments)</option>
+              <option value="mqtt">MQTT (IoT Messaging)</option>
+              <option value="websocket">WebSocket (JSON Bridge)</option>
+              <option value="socketio">Socket.IO (Real-time Events)</option>
               <option value="http">HTTP REST API</option>
               <option value="artnet">Art-Net (DMX over Ethernet)</option>
-              <option value="dmx">DMX (USB Serial)</option>
+              <option value="dmx">DMX (USB Serial Interface)</option>
             </select>
+            <span class="form-hint" id="server-type-hint">Full CLASP protocol server - other apps can connect and exchange signals</span>
           </div>
 
           <!-- CLASP Server Fields -->
           <div id="server-clasp-fields" class="server-fields">
             <div class="form-group">
-              <label class="form-label">Address</label>
+              <label class="form-label">Server Name</label>
+              <input type="text" name="claspName" class="input" placeholder="My CLASP Server" value="CLASP Bridge Server">
+              <span class="form-hint">Friendly name shown to other clients during discovery</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Listen Address</label>
               <input type="text" name="claspAddress" class="input" placeholder="localhost:7330" value="localhost:7330">
+              <span class="form-hint">Use 0.0.0.0:7330 to accept connections from other machines</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" name="claspAnnounce" checked> Enable mDNS Discovery
+              </label>
+              <span class="form-hint">Broadcast server on local network so clients can find it automatically</span>
             </div>
             <div class="form-group">
               <label class="form-label">Authentication Token (optional)</label>
               <input type="password" name="claspToken" class="input" placeholder="JWT token or shared secret">
-              <span class="form-hint">Used for secure server-to-server communication</span>
+              <span class="form-hint">Require clients to authenticate with this token</span>
+            </div>
+          </div>
+
+          <!-- MIDI Server Fields -->
+          <div id="server-midi-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">MIDI Input Port</label>
+              <input type="text" name="midiInput" class="input" placeholder="default" value="default">
+              <span class="form-hint">Use "default" for system default, or specify port name</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">MIDI Output Port (optional)</label>
+              <input type="text" name="midiOutput" class="input" placeholder="default">
+              <span class="form-hint">Leave empty for input-only mode</span>
             </div>
           </div>
 
@@ -686,6 +727,27 @@ function transform(input) {
             <div class="form-group">
               <label class="form-label">Universe</label>
               <input type="number" name="dmxUniverse" class="input" placeholder="0" value="0" min="0" max="15">
+            </div>
+          </div>
+
+          <!-- Socket.IO Server Fields -->
+          <div id="server-socketio-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Mode</label>
+              <select name="socketioMode" class="select">
+                <option value="server">Server (accept connections)</option>
+                <option value="client">Client (connect to server)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Address/URL</label>
+              <input type="text" name="socketioAddress" class="input" placeholder="0.0.0.0:3001" value="0.0.0.0:3001">
+              <span class="form-hint">For client mode, use full URL like http://server:3000</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Namespace (optional)</label>
+              <input type="text" name="socketioNamespace" class="input" placeholder="/" value="/">
+              <span class="form-hint">Socket.IO namespace to use, defaults to /</span>
             </div>
           </div>
 

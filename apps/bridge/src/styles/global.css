@@ -139,6 +139,34 @@ html, body {
   color: white;
 }
 
+/* Help Button */
+.help-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-btn:hover {
+  opacity: 1;
+  color: var(--color-accent);
+}
+
+.section-header .help-btn {
+  margin-left: auto;
+  margin-right: var(--space-sm);
+}
+
+.panel-toolbar .help-btn {
+  margin-right: var(--space-sm);
+}
+
 /* Device List */
 .device-list {
   display: flex;

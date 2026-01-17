@@ -10,7 +10,10 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
-        handshake::server::{Request as HsRequest, Response as HsResponse},
+        handshake::{
+            client::generate_key,
+            server::{Request as HsRequest, Response as HsResponse},
+        },
         http::Request,
         protocol::Message as WsMessage,
     },
@@ -119,9 +122,29 @@ impl Transport for WebSocketTransport {
     async fn connect(url: &str) -> Result<(Self::Sender, Self::Receiver)> {
         info!("Connecting to WebSocket: {}", url);
 
-        // Build request with subprotocol
+        // Parse the URL to extract host for the Host header
+        let parsed_url = url::Url::parse(url)
+            .map_err(|e| TransportError::InvalidUrl(e.to_string()))?;
+
+        let host = parsed_url.host_str()
+            .ok_or_else(|| TransportError::InvalidUrl("Missing host in URL".to_string()))?;
+
+        let host_header = if let Some(port) = parsed_url.port() {
+            format!("{}:{}", host, port)
+        } else {
+            host.to_string()
+        };
+
+        // Build a complete WebSocket upgrade request with all required headers
+        let ws_key = generate_key();
         let request = Request::builder()
+            .method("GET")
             .uri(url)
+            .header("Host", &host_header)
+            .header("Upgrade", "websocket")
+            .header("Connection", "Upgrade")
+            .header("Sec-WebSocket-Key", &ws_key)
+            .header("Sec-WebSocket-Version", "13")
             .header("Sec-WebSocket-Protocol", WS_SUBPROTOCOL)
             .body(())
             .map_err(|e| TransportError::InvalidUrl(e.to_string()))?;

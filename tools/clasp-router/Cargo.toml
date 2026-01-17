@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 clasp-core.workspace = true
 clasp-router.workspace = true
+clasp-transport.workspace = true
 clasp-discovery.workspace = true
 clasp-bridge = { workspace = true, optional = true }
 
@@ -24,7 +25,14 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 anyhow.workspace = true
 toml = "0.8"
+rcgen = "0.13"
 
 [features]
-default = ["bridges"]
+default = ["bridges", "websocket"]
 bridges = ["clasp-bridge"]
+# WebSocket - works everywhere including DO App Platform
+websocket = ["clasp-router/websocket"]
+# QUIC - high-performance, requires UDP (NOT supported on DO App Platform)
+quic = ["clasp-router/quic", "clasp-transport/quic"]
+# Full transport support - for VPS/Droplet deployments
+full = ["websocket", "quic"]

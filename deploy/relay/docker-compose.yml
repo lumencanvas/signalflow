@@ -1,0 +1,100 @@
+# CLASP Relay Server - Docker Compose
+#
+# DEPLOYMENT SCENARIOS:
+#
+# 1. Local Development / DO App Platform (WebSocket only):
+#    docker compose up router-websocket
+#
+# 2. VPS/Droplet with full transport support:
+#    docker compose --profile full up
+#
+# 3. Multi-transport (WebSocket + QUIC, requires VPS):
+#    docker compose --profile multi up
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # WebSocket Router (DEFAULT - works everywhere)
+  # ==========================================================================
+  # Use this for:
+  # - Local development
+  # - DigitalOcean App Platform
+  # - Any environment where you only need browser/universal access
+  router-websocket:
+    build:
+      context: ../..
+      dockerfile: deploy/relay/Dockerfile
+      args:
+        FEATURES: websocket
+    ports:
+      - "7330:7330"
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "timeout", "1", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/7330"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ==========================================================================
+  # QUIC Router (VPS/Droplet only - requires UDP)
+  # ==========================================================================
+  # WARNING: NOT supported on DigitalOcean App Platform
+  # Use a Droplet or VPS that allows UDP traffic
+  router-quic:
+    profiles: ["full", "quic", "multi"]
+    build:
+      context: ../..
+      dockerfile: deploy/relay/Dockerfile
+      args:
+        FEATURES: full
+    ports:
+      - "7331:7331/udp"
+    command: ["--listen", "0.0.0.0:7331", "--transport", "quic", "--name", "relay.clasp.to (QUIC)"]
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Multi-Transport Setup (VPS/Droplet only)
+  # ==========================================================================
+  # Runs both WebSocket and QUIC sharing the same state
+  # Browser clients use WebSocket (7330), native apps can use QUIC (7331)
+  #
+  # NOTE: This uses separate containers. For true multi-transport in one process,
+  # use the Router::serve_multi() API in your own binary.
+  router-multi-ws:
+    profiles: ["multi"]
+    build:
+      context: ../..
+      dockerfile: deploy/relay/Dockerfile
+      args:
+        FEATURES: full
+    ports:
+      - "7330:7330"
+    command: ["--listen", "0.0.0.0:7330", "--transport", "websocket", "--name", "relay.clasp.to"]
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+
+# ==========================================================================
+# Networks and Volumes
+# ==========================================================================
+# For production, consider adding:
+# - Redis for shared state between multiple router instances
+# - Prometheus metrics endpoint
+# - Grafana dashboards
+
+# Optional: Add nginx reverse proxy for TLS termination (WebSocket)
+#  nginx:
+#    image: nginx:alpine
+#    ports:
+#      - "443:443"
+#    volumes:
+#      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+#      - ./certs:/etc/nginx/certs:ro
+#    depends_on:
+#      - router-websocket

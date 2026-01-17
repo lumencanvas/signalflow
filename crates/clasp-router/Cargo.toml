@@ -8,6 +8,18 @@ homepage.workspace = true
 description = "CLASP message router and server"
 readme = "README.md"
 
+[features]
+default = ["websocket"]
+# Full transport support - use for native deployments (Droplet, VPS)
+full = ["websocket", "quic", "tcp"]
+# WebSocket only - works on all platforms including DO App Platform
+websocket = ["clasp-transport/websocket"]
+# QUIC requires UDP - works on Droplets/VPS, NOT on DO App Platform
+# DO App Platform only supports HTTP/HTTPS/TCP, not raw UDP
+quic = ["clasp-transport/quic"]
+# Raw TCP - simple fallback, works everywhere
+tcp = []
+
 [dependencies]
 clasp-core = { workspace = true }
 clasp-transport = { workspace = true }

@@ -380,7 +380,7 @@ function setupServerTypeFieldSwitching() {
 
 function updateServerTypeFields(serverType) {
   // Hide all server fields
-  const allFields = ['clasp', 'osc', 'mqtt', 'websocket', 'http', 'artnet', 'dmx'];
+  const allFields = ['clasp', 'osc', 'midi', 'mqtt', 'websocket', 'socketio', 'http', 'artnet', 'dmx'];
   allFields.forEach(type => {
     const fields = $(`server-${type}-fields`);
     if (fields) {
@@ -392,6 +392,23 @@ function updateServerTypeFields(serverType) {
   const targetFields = $(`server-${serverType}-fields`);
   if (targetFields) {
     targetFields.classList.remove('hidden');
+  }
+
+  // Update hint text
+  const hints = {
+    clasp: 'Full CLASP protocol server - other apps can connect and exchange signals',
+    osc: 'Open Sound Control server - receive OSC messages from controllers and apps',
+    midi: 'MIDI bridge - connect to MIDI devices and translate to/from CLASP signals',
+    mqtt: 'MQTT client - connect to an MQTT broker for IoT device communication',
+    websocket: 'WebSocket bridge - accept JSON messages from web apps',
+    socketio: 'Socket.IO bridge - real-time bidirectional event-based communication',
+    http: 'HTTP REST API - expose signals as HTTP endpoints for webhooks and integrations',
+    artnet: 'Art-Net receiver - receive DMX512 data over Ethernet from lighting consoles',
+    dmx: 'DMX interface - connect directly to DMX fixtures via USB adapter',
+  };
+  const hintEl = $('server-type-hint');
+  if (hintEl) {
+    hintEl.textContent = hints[serverType] || '';
   }
 }
 
@@ -955,7 +972,9 @@ async function handleAddServer(e) {
     case 'clasp':
       serverConfig.address = data.get('claspAddress') || 'localhost:7330';
       serverConfig.token = data.get('claspToken') || '';
-      serverConfig.name = `CLASP Server @ ${serverConfig.address}`;
+      serverConfig.serverName = data.get('claspName') || 'CLASP Bridge Server';
+      serverConfig.announce = data.get('claspAnnounce') === 'on';
+      serverConfig.name = data.get('claspName') || `CLASP Server @ ${serverConfig.address}`;
       break;
 
     case 'osc':
@@ -1000,6 +1019,20 @@ async function handleAddServer(e) {
       serverConfig.universe = parseInt(data.get('dmxUniverse')) || 0;
       serverConfig.address = serverConfig.serialPort;
       serverConfig.name = `DMX @ ${serverConfig.serialPort} (U${serverConfig.universe})`;
+      break;
+
+    case 'midi':
+      serverConfig.inputPort = data.get('midiInput') || '';
+      serverConfig.outputPort = data.get('midiOutput') || '';
+      serverConfig.address = serverConfig.inputPort || serverConfig.outputPort || 'MIDI Device';
+      serverConfig.name = `MIDI Bridge (${serverConfig.inputPort || 'no input'} / ${serverConfig.outputPort || 'no output'})`;
+      break;
+
+    case 'socketio':
+      serverConfig.mode = data.get('socketioMode') || 'server';
+      serverConfig.address = data.get('socketioAddress') || '0.0.0.0:3001';
+      serverConfig.namespace = data.get('socketioNamespace') || '/';
+      serverConfig.name = `Socket.IO ${serverConfig.mode === 'server' ? 'Server' : 'Client'} @ ${serverConfig.address}${serverConfig.namespace}`;
       break;
 
     default:

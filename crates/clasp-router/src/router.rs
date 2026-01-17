@@ -1,13 +1,37 @@
 //! Main router implementation
+//!
+//! The router is transport-agnostic - it can accept connections from any transport
+//! that implements the `TransportServer` trait (WebSocket, QUIC, TCP, etc.).
+//!
+//! # Transport Support
+//!
+//! - **WebSocket** (default): Works everywhere, including browsers and DO App Platform
+//! - **QUIC**: High-performance for native apps. Requires UDP - NOT supported on DO App Platform
+//! - **TCP**: Simple fallback, works everywhere
+//!
+//! # Example
+//!
+//! ```no_run
+//! use clasp_router::{Router, RouterConfig};
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let router = Router::new(RouterConfig::default());
+//!
+//!     // WebSocket (most common)
+//!     router.serve_websocket("0.0.0.0:7330").await.unwrap();
+//!
+//!     // Or use any TransportServer implementation
+//!     // router.serve_on(my_custom_server).await.unwrap();
+//! }
+//! ```
 
 use bytes::Bytes;
 use clasp_core::{
     codec, AckMessage, ErrorMessage, Frame, HelloMessage, Message, SetMessage, SignalType,
     SubscribeMessage, SubscribeOptions, UnsubscribeMessage, PROTOCOL_VERSION,
 };
-use clasp_transport::{
-    TransportEvent, TransportReceiver, TransportSender, TransportServer, WebSocketServer,
-};
+use clasp_transport::{TransportEvent, TransportReceiver, TransportSender, TransportServer};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::net::SocketAddr;
@@ -15,12 +39,45 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+#[cfg(feature = "websocket")]
+use clasp_transport::WebSocketServer;
+
+#[cfg(feature = "quic")]
+use clasp_transport::{QuicConfig, QuicTransport};
+
 use crate::{
     error::{Result, RouterError},
     session::{Session, SessionId},
     state::RouterState,
     subscription::{Subscription, SubscriptionManager},
 };
+
+/// Transport configuration for multi-transport serving.
+///
+/// Use with `Router::serve_multi()` to run multiple transports simultaneously.
+#[derive(Debug, Clone)]
+pub enum TransportConfig {
+    /// WebSocket transport (default, works everywhere)
+    #[cfg(feature = "websocket")]
+    WebSocket {
+        /// Listen address, e.g., "0.0.0.0:7330"
+        addr: String,
+    },
+
+    /// QUIC transport (high-performance, requires UDP)
+    ///
+    /// **WARNING**: Not supported on DigitalOcean App Platform or most PaaS.
+    /// Use a VPS/Droplet for QUIC support.
+    #[cfg(feature = "quic")]
+    Quic {
+        /// Listen address
+        addr: SocketAddr,
+        /// TLS certificate (DER format)
+        cert: Vec<u8>,
+        /// TLS private key (DER format)
+        key: Vec<u8>,
+    },
+}
 
 /// Router configuration
 #[derive(Debug, Clone)]
@@ -75,11 +132,35 @@ impl Router {
         }
     }
 
-    /// Start the router on WebSocket
-    pub async fn serve(&self, addr: &str) -> Result<()> {
-        let mut server = WebSocketServer::bind(addr).await?;
+    // =========================================================================
+    // Transport-Agnostic Methods
+    // =========================================================================
 
-        info!("Router started on {}", addr);
+    /// Serve using any TransportServer implementation.
+    ///
+    /// This is the core method that all transport-specific methods use internally.
+    /// Use this when you have a custom transport or want full control.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use clasp_router::Router;
+    /// use clasp_transport::WebSocketServer;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let router = Router::default();
+    /// let server = WebSocketServer::bind("0.0.0.0:7330").await?;
+    /// router.serve_on(server).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn serve_on<S>(&self, mut server: S) -> Result<()>
+    where
+        S: TransportServer + 'static,
+        S::Sender: 'static,
+        S::Receiver: 'static,
+    {
+        info!("Router accepting connections");
         *self.running.write() = true;
 
         while *self.running.read() {
@@ -95,6 +176,173 @@ impl Router {
         }
 
         Ok(())
+    }
+
+    // =========================================================================
+    // WebSocket Transport
+    // =========================================================================
+
+    /// Start the router on WebSocket (default, recommended).
+    ///
+    /// WebSocket is the universal baseline transport:
+    /// - Works in browsers
+    /// - Works on all hosting platforms (including DO App Platform)
+    /// - Easy firewall/proxy traversal
+    ///
+    /// Default port: 7330
+    #[cfg(feature = "websocket")]
+    pub async fn serve_websocket(&self, addr: &str) -> Result<()> {
+        let server = WebSocketServer::bind(addr).await?;
+        info!("WebSocket server listening on {}", addr);
+        self.serve_on(server).await
+    }
+
+    /// Backward-compatible alias for `serve_websocket`.
+    #[cfg(feature = "websocket")]
+    pub async fn serve(&self, addr: &str) -> Result<()> {
+        self.serve_websocket(addr).await
+    }
+
+    // =========================================================================
+    // QUIC Transport (feature-gated)
+    // =========================================================================
+
+    /// Start the router on QUIC.
+    ///
+    /// QUIC is ideal for native applications:
+    /// - 0-RTT connection establishment
+    /// - Connection migration (mobile networks)
+    /// - Built-in encryption (TLS 1.3)
+    /// - Lower latency than WebSocket
+    ///
+    /// **WARNING**: QUIC requires UDP, which is NOT supported on:
+    /// - DigitalOcean App Platform
+    /// - Many PaaS providers
+    /// - Some corporate firewalls
+    ///
+    /// Use a VPS/Droplet for QUIC support.
+    ///
+    /// Default port: 7331 (to avoid conflict with WebSocket on 7330)
+    #[cfg(feature = "quic")]
+    pub async fn serve_quic(
+        &self,
+        addr: SocketAddr,
+        cert_der: Vec<u8>,
+        key_der: Vec<u8>,
+    ) -> Result<()> {
+        let server = QuicTransport::new_server(addr, cert_der, key_der)
+            .map_err(|e| RouterError::Transport(e))?;
+        info!("QUIC server listening on {}", addr);
+        self.serve_quic_transport(server).await
+    }
+
+    /// Internal: Serve using a QuicTransport server.
+    ///
+    /// QUIC has a different accept pattern (connection then stream),
+    /// so we need special handling.
+    #[cfg(feature = "quic")]
+    async fn serve_quic_transport(&self, server: QuicTransport) -> Result<()> {
+        *self.running.write() = true;
+
+        while *self.running.read() {
+            match server.accept().await {
+                Ok(connection) => {
+                    let addr = connection.remote_address();
+                    info!("QUIC connection from {}", addr);
+
+                    // Accept bidirectional stream for CLASP protocol
+                    match connection.accept_bi().await {
+                        Ok((sender, receiver)) => {
+                            self.handle_connection(Arc::new(sender), receiver, addr);
+                        }
+                        Err(e) => {
+                            error!("QUIC stream accept error: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("QUIC accept error: {}", e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Multi-Transport Support
+    // =========================================================================
+
+    /// Serve on multiple transports simultaneously.
+    ///
+    /// All transports share the same router state, so a client connected via
+    /// WebSocket can communicate with a client connected via QUIC.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use clasp_router::{Router, TransportConfig};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let router = Router::default();
+    /// router.serve_multi(vec![
+    ///     TransportConfig::WebSocket { addr: "0.0.0.0:7330".into() },
+    ///     // QUIC requires feature and UDP support
+    ///     // TransportConfig::Quic { addr: "0.0.0.0:7331".parse()?, cert, key },
+    /// ]).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn serve_multi(&self, transports: Vec<TransportConfig>) -> Result<()> {
+        use futures::future::try_join_all;
+
+        if transports.is_empty() {
+            return Err(RouterError::Config("No transports configured".into()));
+        }
+
+        let mut handles = vec![];
+
+        for config in transports {
+            let router = self.clone_internal();
+            let handle = tokio::spawn(async move {
+                match config {
+                    #[cfg(feature = "websocket")]
+                    TransportConfig::WebSocket { addr } => {
+                        router.serve_websocket(&addr).await
+                    }
+                    #[cfg(feature = "quic")]
+                    TransportConfig::Quic { addr, cert, key } => {
+                        router.serve_quic(addr, cert, key).await
+                    }
+                    #[allow(unreachable_patterns)]
+                    _ => Err(RouterError::Config("Transport not enabled at compile time".into())),
+                }
+            });
+            handles.push(handle);
+        }
+
+        // Wait for all transports (or first error)
+        let results = try_join_all(handles).await
+            .map_err(|e| RouterError::Config(format!("Transport task failed: {}", e)))?;
+
+        // Check for errors from any transport
+        for result in results {
+            result?;
+        }
+
+        Ok(())
+    }
+
+    /// Internal clone for spawning transport tasks.
+    /// Shares all Arc state with the original.
+    fn clone_internal(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            sessions: Arc::clone(&self.sessions),
+            subscriptions: Arc::clone(&self.subscriptions),
+            state: Arc::clone(&self.state),
+            running: Arc::clone(&self.running),
+        }
     }
 
     /// Handle a new connection

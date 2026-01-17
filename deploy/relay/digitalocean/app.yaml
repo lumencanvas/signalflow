@@ -1,0 +1,45 @@
+# DigitalOcean App Platform Specification
+# Deploy with: doctl apps create --spec deploy/relay/digitalocean/app.yaml
+#
+# Note: WebSocket support requires a paid plan with custom domains
+# The basic-xxs tier is $5/month
+
+name: clasp-relay
+
+services:
+  - name: router
+    dockerfile_path: deploy/relay/Dockerfile
+    source_dir: /
+    github:
+      repo: lumencanvas/clasp
+      branch: main
+      deploy_on_push: true
+
+    # WebSocket requires HTTP port
+    http_port: 7330
+
+    instance_count: 1
+    instance_size_slug: basic-xxs  # $5/month, 512MB RAM
+
+    # Route all traffic to this service
+    routes:
+      - path: /
+
+    # Environment variables
+    envs:
+      - key: RUST_LOG
+        value: info
+
+    # Health check
+    health_check:
+      http_path: /
+      initial_delay_seconds: 10
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+
+# Domain configuration (requires DNS setup)
+# domains:
+#   - domain: relay.clasp.to
+#     type: PRIMARY
