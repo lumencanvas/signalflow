@@ -3,29 +3,34 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 const screenshots = [
   {
-    src: '/screenshots/mainapp.png',
-    alt: 'CLASP Bridge main interface',
-    caption: 'Main interface with bridges, mappings, and real-time monitor'
+    src: '/screenshots/bridges.png',
+    alt: 'CLASP Bridge main interface with bridges',
+    caption: 'Configure protocol bridges to connect OSC, MIDI, DMX, MQTT and more'
   },
   {
-    src: '/screenshots/add-server.png',
-    alt: 'Add server dialog',
-    caption: 'Support for CLASP, OSC, MQTT, WebSocket, HTTP, Art-Net, and DMX'
-  },
-  {
-    src: '/screenshots/create-bridge.png',
-    alt: 'Create bridge dialog',
-    caption: 'Connect any protocol to any other with visual bridge configuration'
+    src: '/screenshots/mapping.png',
+    alt: 'Signal mapping configuration',
+    caption: 'Route signals between protocols with flexible address mapping'
   },
   {
     src: '/screenshots/create-mapping.png',
     alt: 'Create mapping dialog',
-    caption: 'Route signals with source, transform, and target configuration'
+    caption: 'Define source, transform, and target with visual configuration'
   },
   {
-    src: '/screenshots/transform.png',
-    alt: 'Transform options',
-    caption: 'Built-in transforms: scale, invert, clamp, threshold, expressions, and more'
+    src: '/screenshots/flow.png',
+    alt: 'Visual flow diagram',
+    caption: 'See your signal routing at a glance with the visual flow diagram'
+  },
+  {
+    src: '/screenshots/monitor.png',
+    alt: 'Real-time signal monitor',
+    caption: 'Monitor signals in real-time with protocol filtering and search'
+  },
+  {
+    src: '/screenshots/run-tests.png',
+    alt: 'Test panel and diagnostics',
+    caption: 'Test connections and run diagnostics from the built-in test panel'
   }
 ]
 

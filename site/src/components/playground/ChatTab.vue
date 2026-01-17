@@ -51,6 +51,9 @@ function joinRoom(roomName = null) {
   const msgPattern = `/chat/${room.value}/messages`
   unsubMessages = subscribe(msgPattern, (payload, address) => {
     if (payload && typeof payload === 'object') {
+      // Skip messages from ourselves (we already added them locally)
+      if (payload.fromId === sessionId.value) return
+
       messages.value.push({
         id: Date.now() + Math.random(),
         type: 'message',
@@ -160,12 +163,24 @@ function leaveRoom() {
 function sendMessage() {
   if (!connected.value || !message.value.trim()) return
 
-  emit(`/chat/${room.value}/messages`, {
+  const msgData = {
     from: nickname.value,
     fromId: sessionId.value,
     text: message.value,
     timestamp: Date.now(),
+  }
+
+  // Add message to local list immediately so user sees their own message
+  messages.value.push({
+    id: Date.now() + Math.random(),
+    type: 'message',
+    ...msgData,
+    received: new Date().toLocaleTimeString(),
   })
+  scrollToBottom()
+
+  // Emit to server for other participants
+  emit(`/chat/${room.value}/messages`, msgData)
 
   // Clear typing indicator
   set(`/chat/${room.value}/typing/${sessionId.value}`, null)

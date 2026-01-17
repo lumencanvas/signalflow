@@ -1,17 +1,37 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const fs = require('fs');
+const { spawn, execSync } = require('child_process');
 const readline = require('readline');
 const WebSocket = require('ws');
 const os = require('os');
+const { SerialPort } = require('serialport');
 
 let mainWindow;
 let bridgeService = null;
 let bridgeReady = false;
 
 // Track running server processes
-const runningServers = new Map(); // id -> { process, config, status, logs }
+const runningServers = new Map(); // id -> { process, config, status, logs, stats }
 const MAX_LOG_LINES = 500;
+
+// Stats tracking interval
+let statsInterval = null;
+
+// Initialize stats for a server
+function createServerStats() {
+  return {
+    startTime: Date.now(),
+    messagesIn: 0,
+    messagesOut: 0,
+    bytesIn: 0,
+    bytesOut: 0,
+    errors: 0,
+    connections: 0,
+    lastActivity: null,
+    lastError: null,
+  };
+}
 
 // Path to binaries
 const getBinaryPath = (name) => {
@@ -32,7 +52,6 @@ const getBinaryPath = (name) => {
 // Start the bridge service (for protocol bridges)
 function startBridgeService() {
   const servicePath = getBinaryPath('clasp-service');
-  console.log('Starting bridge service:', servicePath);
 
   try {
     bridgeService = spawn(servicePath, [], {
@@ -49,16 +68,15 @@ function startBridgeService() {
         const message = JSON.parse(line);
         handleBridgeMessage(message);
       } catch (e) {
-        console.log('[bridge-service stdout]', line);
+        // Non-JSON output from bridge service (logs)
       }
     });
 
     bridgeService.stderr.on('data', (data) => {
-      console.log('[bridge-service]', data.toString().trim());
+      // Bridge service stderr output
     });
 
     bridgeService.on('close', (code) => {
-      console.log('Bridge service exited with code:', code);
       bridgeService = null;
       bridgeReady = false;
     });
@@ -99,22 +117,59 @@ function sendToBridge(message) {
 function handleBridgeMessage(message) {
   switch (message.type) {
     case 'ready':
-      console.log('Bridge service ready');
       bridgeReady = true;
       break;
 
     case 'signal':
-      // Forward signal to renderer
+      // Update stats for the source server and get server metadata
+      let serverMeta = null;
+      if (message.bridge_id) {
+        const server = runningServers.get(message.bridge_id);
+        if (server) {
+          if (server.stats) {
+            server.stats.messagesIn++;
+            server.stats.lastActivity = Date.now();
+          }
+          // Extract metadata for the signal
+          serverMeta = {
+            protocol: server.config?.type || 'unknown',
+            serverName: server.config?.name || server.config?.claspName || server.config?.type?.toUpperCase() || 'Unknown',
+            port: server.port || server.config?.port || null,
+            address: server.config?.address || server.config?.claspAddress || null,
+          };
+        }
+      }
+
+      // Forward signal to renderer with enriched metadata
       if (mainWindow) {
         mainWindow.webContents.send('signal', {
           bridgeId: message.bridge_id,
           address: message.address,
           value: message.value,
+          // Enriched metadata
+          protocol: serverMeta?.protocol || message.protocol || 'unknown',
+          serverName: serverMeta?.serverName || null,
+          serverPort: serverMeta?.port || null,
+          serverAddress: serverMeta?.address || null,
         });
       }
       break;
 
     case 'bridge_event':
+      // Update stats based on event type
+      if (message.bridge_id) {
+        const server = runningServers.get(message.bridge_id);
+        if (server && server.stats) {
+          if (message.event === 'connected') {
+            server.stats.connections++;
+          } else if (message.event === 'error') {
+            server.stats.errors++;
+            server.stats.lastError = Date.now();
+          }
+          server.stats.lastActivity = Date.now();
+        }
+      }
+
       // Forward bridge event to renderer
       if (mainWindow) {
         mainWindow.webContents.send('bridge-event', {
@@ -131,8 +186,6 @@ function handleBridgeMessage(message) {
 async function startClaspServer(config) {
   const routerPath = getBinaryPath('clasp-router');
   const [host, port] = (config.address || 'localhost:7330').split(':');
-
-  console.log(`Starting CLASP router on ${host}:${port}`);
 
   const args = [
     '--listen', `${host === 'localhost' ? '0.0.0.0' : host}:${port}`,
@@ -155,6 +208,7 @@ async function startClaspServer(config) {
         status: 'starting',
         logs: [],
         port: parseInt(port),
+        stats: createServerStats(),
       };
 
       const addLog = (message, type = 'info') => {
@@ -229,7 +283,7 @@ async function startClaspServer(config) {
       runningServers.set(config.id, serverState);
 
       // Wait briefly to check if process started successfully
-      setTimeout(() => {
+      setTimeout(async () => {
         if (serverState.status === 'starting' && proc.exitCode === null) {
           serverState.status = 'running';
           mainWindow?.webContents.send('server-status', {
@@ -237,12 +291,199 @@ async function startClaspServer(config) {
             status: 'running',
           });
         }
+
+        // Create a monitor connection to observe CLASP traffic
+        try {
+          await createClaspMonitor(config.id, `ws://127.0.0.1:${port}`);
+        } catch (err) {
+          // CLASP monitor connection failed - non-critical
+        }
+
         resolve({ id: config.id, status: serverState.status });
       }, 500);
 
     } catch (err) {
       reject(err);
     }
+  });
+}
+
+// CLASP monitor connections
+const claspMonitors = new Map();
+
+// CLASP message type strings (matching Rust serde tags)
+const MSG = {
+  HELLO: 'HELLO',
+  WELCOME: 'WELCOME',
+  SUBSCRIBE: 'SUBSCRIBE',
+  UNSUBSCRIBE: 'UNSUBSCRIBE',
+  SET: 'SET',
+  PUBLISH: 'PUBLISH',
+  SNAPSHOT: 'SNAPSHOT',
+  PING: 'PING',
+  PONG: 'PONG',
+  ACK: 'ACK',
+  ERROR: 'ERROR',
+};
+
+// Encode a CLASP frame
+function encodeClaspFrame(message) {
+  const { encode } = require('@msgpack/msgpack');
+  const payload = Buffer.from(encode(message));
+
+  const frame = Buffer.alloc(4 + payload.length);
+  frame[0] = 0x53;  // Magic 'S' (for Streaming)
+  frame[1] = 0x00;  // Flags (QoS=0, no timestamp)
+  frame.writeUInt16BE(payload.length, 2);
+  payload.copy(frame, 4);
+
+  return frame;
+}
+
+// Decode a CLASP frame
+function decodeClaspFrame(buffer) {
+  const { decode } = require('@msgpack/msgpack');
+
+  if (buffer[0] !== 0x53) {
+    throw new Error(`Invalid magic byte: expected 0x53, got 0x${buffer[0].toString(16)}`);
+  }
+
+  const flags = buffer[1];
+  const hasTimestamp = (flags & 0x20) !== 0;
+  const payloadLength = buffer.readUInt16BE(2);
+
+  let payloadOffset = hasTimestamp ? 12 : 4;
+  const payload = buffer.slice(payloadOffset, payloadOffset + payloadLength);
+  const message = decode(payload);
+
+  return message;
+}
+
+// Create a WebSocket monitor connection to observe CLASP traffic
+async function createClaspMonitor(serverId, wsUrl) {
+  // Close existing monitor if any
+  if (claspMonitors.has(serverId)) {
+    try {
+      claspMonitors.get(serverId).close();
+    } catch (e) {}
+  }
+
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl, 'clasp.v2');
+    ws.binaryType = 'nodebuffer';
+    let connected = false;
+    let welcomed = false;
+
+    ws.on('open', () => {
+      connected = true;
+      claspMonitors.set(serverId, ws);
+
+      // Send HELLO message
+      const hello = encodeClaspFrame({
+        type: MSG.HELLO,
+        version: 2,
+        name: 'CLASP Bridge Monitor',
+        features: ['param', 'event', 'stream'],
+      });
+      ws.send(hello);
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const buffer = Buffer.from(data);
+        const msg = decodeClaspFrame(buffer);
+
+        // Handle WELCOME - send subscribe for all addresses
+        if (msg.type === MSG.WELCOME) {
+          welcomed = true;
+
+          // Subscribe to all signals
+          const subscribe = encodeClaspFrame({
+            type: MSG.SUBSCRIBE,
+            id: 1,
+            pattern: '/**',  // Subscribe to all addresses
+            types: ['param', 'event', 'stream'],
+          });
+          ws.send(subscribe);
+          resolve(ws);
+          return;
+        }
+
+        // Handle PING
+        if (msg.type === MSG.PING) {
+          ws.send(encodeClaspFrame({ type: MSG.PONG }));
+          return;
+        }
+
+        // Handle SET, PUBLISH, and SNAPSHOT messages
+        if (msg.type === MSG.SET || msg.type === MSG.PUBLISH) {
+          const serverInfo = runningServers.get(serverId);
+          if (serverInfo && serverInfo.stats) {
+            serverInfo.stats.messagesIn++;
+            serverInfo.stats.lastActivity = Date.now();
+          }
+
+          const signal = {
+            bridgeId: serverId,
+            address: msg.address || '/',
+            value: msg.value !== undefined ? msg.value : msg.payload,
+            protocol: 'clasp',
+            serverName: serverInfo?.config?.name || 'CLASP Server',
+            serverPort: serverInfo?.port,
+          };
+
+          // Forward to renderer as a signal
+          mainWindow?.webContents.send('signal', signal);
+
+          // If learn mode is active, also send as learned signal
+          if (learnModeActive && learnModeTarget) {
+            mainWindow?.webContents.send('learned-signal', {
+              ...signal,
+              target: learnModeTarget,
+            });
+          }
+        }
+
+        // Handle SNAPSHOT (initial state dump)
+        if (msg.type === MSG.SNAPSHOT && msg.params) {
+          const serverInfo = runningServers.get(serverId);
+          for (const param of msg.params) {
+            mainWindow?.webContents.send('signal', {
+              bridgeId: serverId,
+              address: param.address,
+              value: param.value,
+              protocol: 'clasp',
+              serverName: serverInfo?.config?.name || 'CLASP Server',
+              serverPort: serverInfo?.port,
+            });
+          }
+        }
+      } catch (e) {
+        // Decode error - silently ignore malformed messages
+      }
+    });
+
+    ws.on('error', (err) => {
+      if (!connected) {
+        reject(err);
+      }
+    });
+
+    ws.on('close', (code, reason) => {
+      claspMonitors.delete(serverId);
+    });
+
+    ws.on('unexpected-response', (req, res) => {
+      // Unexpected HTTP response - connection will fail
+    });
+
+    // Timeout for initial connection
+    setTimeout(() => {
+      if (!connected) {
+        ws.terminate();
+        reject(new Error('Connection timeout'));
+      }
+    }, 5000);
   });
 }
 
@@ -270,6 +511,7 @@ async function startOscServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `OSC listening on ${addr}`, type: 'info' }],
     port: config.port || 9000,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -303,6 +545,7 @@ async function startMqttServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `MQTT connecting to ${addr}`, type: 'info' }],
     port: config.port || 1883,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -336,6 +579,7 @@ async function startWebSocketServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `WebSocket ${config.mode || 'server'} on ${addr}`, type: 'info' }],
     port: parseInt(addr.split(':')[1]) || 8080,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -370,6 +614,7 @@ async function startHttpServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `HTTP API on ${addr}${config.basePath || '/api'}`, type: 'info' }],
     port: parseInt(addr.split(':')[1]) || 3000,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -404,6 +649,7 @@ async function startArtNetServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `Art-Net on ${addr} (${config.subnet}:${config.universe})`, type: 'info' }],
     port: 6454,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -437,6 +683,7 @@ async function startDmxServer(config) {
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `DMX on ${serialPort} (U${config.universe || 0})`, type: 'info' }],
     port: null,
+    stats: createServerStats(),
   };
 
   runningServers.set(config.id, serverState);
@@ -449,6 +696,16 @@ async function stopServer(id) {
   const server = runningServers.get(id);
   if (!server) {
     return false;
+  }
+
+  // Close CLASP monitor if exists
+  if (claspMonitors.has(id)) {
+    try {
+      claspMonitors.get(id).close();
+      claspMonitors.delete(id);
+    } catch (e) {
+      // ignore
+    }
   }
 
   if (server.process) {
@@ -516,10 +773,12 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    startStatsBroadcast();
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    stopStatsBroadcast();
   });
 }
 
@@ -542,9 +801,33 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', async () => {
-  await stopAllServers();
+// Use will-quit for synchronous cleanup since before-quit doesn't properly await
+app.on('will-quit', (event) => {
+  // Stop stats broadcast immediately
+  stopStatsBroadcast();
+
+  // Close all CLASP monitors
+  for (const [id, ws] of claspMonitors) {
+    try {
+      ws.close();
+    } catch (e) { /* ignore */ }
+  }
+  claspMonitors.clear();
+
+  // Stop bridge service synchronously
   stopBridgeService();
+});
+
+// Also handle before-quit for async cleanup with a short timeout
+app.on('before-quit', async (event) => {
+  event.preventDefault();
+  try {
+    await Promise.race([
+      stopAllServers(),
+      new Promise(resolve => setTimeout(resolve, 2000)), // 2s timeout
+    ]);
+  } catch (e) { /* ignore cleanup errors */ }
+  app.exit(0);
 });
 
 // State for devices/bridges
@@ -571,8 +854,6 @@ ipcMain.handle('get-bridges', async () => {
 });
 
 ipcMain.handle('create-bridge', async (event, config) => {
-  console.log('Creating bridge:', config);
-
   if (bridgeReady) {
     try {
       sendToBridge({
@@ -607,8 +888,6 @@ ipcMain.handle('create-bridge', async (event, config) => {
 });
 
 ipcMain.handle('delete-bridge', async (event, id) => {
-  console.log('Deleting bridge:', id);
-
   if (bridgeReady) {
     sendToBridge({
       type: 'delete_bridge',
@@ -641,7 +920,7 @@ ipcMain.handle('scan-network', async () => {
       }
     }
   } catch (e) {
-    console.log('Could not enumerate network interfaces:', e);
+    // Network interface enumeration failed - continue with defaults
   }
 
   const discoveredDevices = [];
@@ -683,12 +962,13 @@ ipcMain.handle('scan-network', async () => {
 async function probeServer(host, port) {
   return new Promise((resolve) => {
     const wsUrl = `ws://${host}:${port}`;
+    let ws;
+
     const timeout = setTimeout(() => {
-      ws.terminate();
+      if (ws) ws.terminate();
       resolve(null);
     }, 2000);
 
-    let ws;
     try {
       ws = new WebSocket(wsUrl, 'clasp.v2');
 
@@ -736,8 +1016,6 @@ ipcMain.handle('add-server', async (event, address) => {
 
 // Start a server
 ipcMain.handle('start-server', async (event, config) => {
-  console.log('Starting server:', config);
-
   const serverType = config.type || config.protocol || 'clasp';
   const serverId = config.id || Date.now().toString();
   config.id = serverId;
@@ -789,8 +1067,6 @@ ipcMain.handle('start-server', async (event, config) => {
 
 // Stop a server
 ipcMain.handle('stop-server', async (event, id) => {
-  console.log('Stopping server:', id);
-
   try {
     const stopped = await stopServer(id);
 
@@ -825,14 +1101,16 @@ ipcMain.handle('get-server-logs', async (event, id) => {
 ipcMain.handle('test-connection', async (event, address) => {
   return new Promise((resolve) => {
     const wsUrl = address.startsWith('ws://') ? address : `ws://${address}`;
-    const timeout = setTimeout(() => {
-      ws.terminate();
-      resolve({ success: false, error: 'Connection timeout' });
-    }, 5000);
-
     let ws;
+    let timeout;
+
     try {
       ws = new WebSocket(wsUrl, 'clasp.v2');
+
+      timeout = setTimeout(() => {
+        if (ws) ws.terminate();
+        resolve({ success: false, error: 'Connection timeout' });
+      }, 5000);
 
       ws.on('open', () => {
         clearTimeout(timeout);
@@ -845,7 +1123,7 @@ ipcMain.handle('test-connection', async (event, address) => {
         resolve({ success: false, error: err.message });
       });
     } catch (e) {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       resolve({ success: false, error: e.message });
     }
   });
@@ -864,3 +1142,625 @@ ipcMain.handle('send-signal', async (event, { bridgeId, address, value }) => {
   }
   return false;
 });
+
+// ============================================
+// Learn Mode
+// ============================================
+
+let learnModeActive = false;
+let learnModeTarget = null;
+
+ipcMain.handle('start-learn-mode', async (event, target) => {
+  learnModeActive = true;
+  learnModeTarget = target;
+  return true;
+});
+
+ipcMain.handle('stop-learn-mode', async () => {
+  learnModeActive = false;
+  learnModeTarget = null;
+  return true;
+});
+
+// ============================================
+// Configuration & App Info
+// ============================================
+
+const configPath = path.join(app.getPath('userData'), 'clasp-config.json');
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('is-first-run', () => {
+  try {
+    if (!fs.existsSync(configPath)) {
+      return true;
+    }
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    return !config.firstRunComplete;
+  } catch (e) {
+    return true;
+  }
+});
+
+ipcMain.handle('set-first-run-complete', () => {
+  try {
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+    config.firstRunComplete = true;
+    config.firstRunDate = new Date().toISOString();
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Failed to save first run state:', e);
+    return false;
+  }
+});
+
+// ============================================
+// File Dialogs (for config import/export)
+// ============================================
+
+ipcMain.handle('show-save-dialog', async (event, options) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: options.title || 'Save Configuration',
+    defaultPath: options.defaultPath || 'clasp-config.json',
+    filters: options.filters || [
+      { name: 'JSON Files', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  return result;
+});
+
+ipcMain.handle('show-open-dialog', async (event, options) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: options.title || 'Load Configuration',
+    filters: options.filters || [
+      { name: 'JSON Files', extensions: ['json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  });
+  return result;
+});
+
+// Validate file path is within allowed directories
+function isPathAllowed(filePath) {
+  const resolvedPath = path.resolve(filePath);
+  const allowedDirs = [
+    app.getPath('userData'),
+    app.getPath('documents'),
+    app.getPath('downloads'),
+    app.getPath('home'),
+  ];
+  // Allow if path is within any allowed directory
+  return allowedDirs.some(dir => resolvedPath.startsWith(dir));
+}
+
+ipcMain.handle('write-file', async (event, { path: filePath, content }) => {
+  try {
+    if (!isPathAllowed(filePath)) {
+      return { success: false, error: 'Access denied: path not in allowed directories' };
+    }
+    fs.writeFileSync(filePath, content, 'utf8');
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    if (!isPathAllowed(filePath)) {
+      return { success: false, error: 'Access denied: path not in allowed directories' };
+    }
+    const content = fs.readFileSync(filePath, 'utf8');
+    return { success: true, content };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ============================================
+// Hardware Discovery
+// ============================================
+
+// List serial ports (for DMX interfaces)
+ipcMain.handle('list-serial-ports', async () => {
+  try {
+    const ports = await SerialPort.list();
+    // Filter to likely DMX devices (USB serial adapters)
+    return ports.map((port) => ({
+      path: port.path,
+      manufacturer: port.manufacturer || 'Unknown',
+      serialNumber: port.serialNumber,
+      vendorId: port.vendorId,
+      productId: port.productId,
+      // Friendly name for UI
+      name: port.manufacturer
+        ? `${port.manufacturer} (${port.path})`
+        : port.path,
+    }));
+  } catch (e) {
+    console.error('Failed to list serial ports:', e);
+    return [];
+  }
+});
+
+// List MIDI ports (via system command)
+ipcMain.handle('list-midi-ports', async () => {
+  const ports = { inputs: [], outputs: [] };
+
+  try {
+    if (process.platform === 'darwin') {
+      // macOS: Use system_profiler or ioreg
+      try {
+        // Try to get MIDI devices via Audio MIDI Setup info
+        const output = execSync(
+          'system_profiler SPMIDIDataType -json 2>/dev/null || echo "{}"',
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const data = JSON.parse(output);
+        if (data.SPMIDIDataType) {
+          for (const device of data.SPMIDIDataType) {
+            if (device._name) {
+              // Add as both input and output (we can't distinguish easily)
+              ports.inputs.push({
+                id: device._name,
+                name: device._name,
+                manufacturer: device.manufacturer || 'Unknown',
+              });
+              ports.outputs.push({
+                id: device._name,
+                name: device._name,
+                manufacturer: device.manufacturer || 'Unknown',
+              });
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback: Check common MIDI locations
+        const commonPorts = [
+          'IAC Driver Bus 1',
+          'Network Session 1',
+        ];
+        for (const name of commonPorts) {
+          ports.inputs.push({ id: name, name, manufacturer: 'System' });
+          ports.outputs.push({ id: name, name, manufacturer: 'System' });
+        }
+      }
+    } else if (process.platform === 'linux') {
+      // Linux: Parse /proc/asound/seq/clients or use aconnect
+      try {
+        const output = execSync('aconnect -l 2>/dev/null || echo ""', {
+          encoding: 'utf8',
+          timeout: 5000,
+        });
+        const lines = output.split('\n');
+        for (const line of lines) {
+          const match = line.match(/client (\d+): '([^']+)'/);
+          if (match) {
+            const [, id, name] = match;
+            if (name !== 'System' && name !== 'Midi Through') {
+              ports.inputs.push({ id, name, manufacturer: 'ALSA' });
+              ports.outputs.push({ id, name, manufacturer: 'ALSA' });
+            }
+          }
+        }
+      } catch (e) {
+        // MIDI enumeration not available
+      }
+    } else if (process.platform === 'win32') {
+      // Windows: Use powershell or midiInGetNumDevs via ffi
+      // For now, just return common names
+      ports.inputs.push({
+        id: 'default',
+        name: 'Default MIDI Input',
+        manufacturer: 'System',
+      });
+      ports.outputs.push({
+        id: 'default',
+        name: 'Default MIDI Output',
+        manufacturer: 'System',
+      });
+    }
+  } catch (e) {
+    console.error('Failed to enumerate MIDI ports:', e);
+  }
+
+  // Always include "default" option
+  if (!ports.inputs.find((p) => p.id === 'default')) {
+    ports.inputs.unshift({
+      id: 'default',
+      name: 'System Default',
+      manufacturer: 'System',
+    });
+  }
+  if (!ports.outputs.find((p) => p.id === 'default')) {
+    ports.outputs.unshift({
+      id: 'default',
+      name: 'System Default',
+      manufacturer: 'System',
+    });
+  }
+
+  return ports;
+});
+
+// List network interfaces (for binding servers)
+ipcMain.handle('list-network-interfaces', async () => {
+  const interfaces = [];
+
+  try {
+    const netInterfaces = os.networkInterfaces();
+    for (const [name, addrs] of Object.entries(netInterfaces)) {
+      for (const addr of addrs) {
+        if (addr.family === 'IPv4') {
+          interfaces.push({
+            name,
+            address: addr.address,
+            internal: addr.internal,
+            label: addr.internal
+              ? `${addr.address} (${name} - loopback)`
+              : `${addr.address} (${name})`,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to list network interfaces:', e);
+  }
+
+  // Always include 0.0.0.0 (all interfaces)
+  interfaces.unshift({
+    name: 'all',
+    address: '0.0.0.0',
+    internal: false,
+    label: '0.0.0.0 (All Interfaces)',
+  });
+
+  return interfaces;
+});
+
+// Test a serial port connection
+ipcMain.handle('test-serial-port', async (event, portPath) => {
+  return new Promise((resolve) => {
+    try {
+      const port = new SerialPort({
+        path: portPath,
+        baudRate: 250000, // DMX baud rate
+        autoOpen: false,
+      });
+
+      port.open((err) => {
+        if (err) {
+          resolve({ success: false, error: err.message });
+        } else {
+          port.close();
+          resolve({ success: true });
+        }
+      });
+
+      // Timeout after 3 seconds
+      setTimeout(() => {
+        try {
+          port.close();
+        } catch (e) {
+          // ignore
+        }
+        resolve({ success: false, error: 'Connection timeout' });
+      }, 3000);
+    } catch (e) {
+      resolve({ success: false, error: e.message });
+    }
+  });
+});
+
+// Test OSC port availability
+ipcMain.handle('test-port-available', async (event, { host, port }) => {
+  return new Promise((resolve) => {
+    const dgram = require('dgram');
+    const socket = dgram.createSocket('udp4');
+
+    socket.on('error', (err) => {
+      socket.close();
+      resolve({ success: false, error: err.message });
+    });
+
+    socket.bind(port, host, () => {
+      socket.close();
+      resolve({ success: true });
+    });
+
+    // Timeout
+    setTimeout(() => {
+      try {
+        socket.close();
+      } catch (e) {
+        // ignore
+      }
+      resolve({ success: false, error: 'Timeout' });
+    }, 2000);
+  });
+});
+
+// ============================================
+// Server Stats & Diagnostics
+// ============================================
+
+// Get detailed stats for a server
+ipcMain.handle('get-server-stats', async (event, id) => {
+  const server = runningServers.get(id);
+  if (!server) {
+    return null;
+  }
+
+  const stats = server.stats || {};
+  const uptime = stats.startTime ? Date.now() - stats.startTime : 0;
+
+  return {
+    id,
+    status: server.status,
+    uptime,
+    uptimeFormatted: formatUptime(uptime),
+    messagesIn: stats.messagesIn || 0,
+    messagesOut: stats.messagesOut || 0,
+    bytesIn: stats.bytesIn || 0,
+    bytesOut: stats.bytesOut || 0,
+    errors: stats.errors || 0,
+    connections: stats.connections || 0,
+    lastActivity: stats.lastActivity,
+    lastError: stats.lastError,
+    config: server.config,
+    port: server.port,
+  };
+});
+
+// Get stats for all running servers
+ipcMain.handle('get-all-server-stats', async () => {
+  const allStats = [];
+  for (const [id, server] of runningServers) {
+    const stats = server.stats || {};
+    const uptime = stats.startTime ? Date.now() - stats.startTime : 0;
+    allStats.push({
+      id,
+      status: server.status,
+      uptime,
+      uptimeFormatted: formatUptime(uptime),
+      messagesIn: stats.messagesIn || 0,
+      messagesOut: stats.messagesOut || 0,
+      errors: stats.errors || 0,
+      connections: stats.connections || 0,
+      lastActivity: stats.lastActivity,
+      protocol: server.config?.protocol || server.config?.type,
+      name: server.config?.name,
+    });
+  }
+  return allStats;
+});
+
+// Format uptime as human-readable string
+function formatUptime(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+// ============================================
+// Test Signal Generator
+// ============================================
+
+// Send a test signal through the bridge
+ipcMain.handle('send-test-signal', async (event, { protocol, address, signalAddress, value }) => {
+  if (!bridgeReady) {
+    return { success: false, error: 'Bridge service not ready' };
+  }
+
+  try {
+    // Send test signal via bridge service
+    sendToBridge({
+      type: 'send_signal',
+      protocol,
+      target_addr: address,
+      signal: {
+        address: signalAddress,
+        value,
+      },
+    });
+
+    // Update stats
+    for (const [id, server] of runningServers) {
+      if (server.config?.address === address || server.config?.bind === address) {
+        if (server.stats) {
+          server.stats.messagesOut++;
+          server.stats.lastActivity = Date.now();
+        }
+      }
+    }
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Send a batch of test signals
+ipcMain.handle('send-test-signal-batch', async (event, { signals }) => {
+  if (!bridgeReady) {
+    return { success: false, error: 'Bridge service not ready' };
+  }
+
+  let sent = 0;
+  for (const signal of signals) {
+    try {
+      sendToBridge({
+        type: 'send_signal',
+        protocol: signal.protocol,
+        target_addr: signal.address,
+        signal: {
+          address: signal.signalAddress,
+          value: signal.value,
+        },
+      });
+      sent++;
+    } catch (e) {
+      console.error('Failed to send test signal:', e);
+    }
+  }
+
+  return { success: true, sent };
+});
+
+// ============================================
+// Health Check & Diagnostics
+// ============================================
+
+// Run health check on a server
+ipcMain.handle('health-check', async (event, id) => {
+  const server = runningServers.get(id);
+  if (!server) {
+    return { healthy: false, error: 'Server not found' };
+  }
+
+  const checks = {
+    processRunning: false,
+    portOpen: false,
+    lastActivityRecent: false,
+    noRecentErrors: true,
+  };
+
+  // Check if process is running (for CLASP router)
+  if (server.process) {
+    checks.processRunning = server.process.exitCode === null;
+  } else {
+    // Bridge-based servers are considered running if status is 'running'
+    checks.processRunning = server.status === 'running';
+  }
+
+  // Check if port is accepting connections (for TCP-based protocols)
+  if (server.port && server.config?.type !== 'dmx') {
+    try {
+      const net = require('net');
+      checks.portOpen = await new Promise((resolve) => {
+        const socket = new net.Socket();
+        socket.setTimeout(2000);
+        socket.on('connect', () => {
+          socket.destroy();
+          resolve(true);
+        });
+        socket.on('error', () => resolve(false));
+        socket.on('timeout', () => {
+          socket.destroy();
+          resolve(false);
+        });
+        socket.connect(server.port, '127.0.0.1');
+      });
+    } catch (e) {
+      checks.portOpen = false;
+    }
+  } else {
+    checks.portOpen = true; // Skip for DMX/non-port servers
+  }
+
+  // Check last activity
+  const stats = server.stats || {};
+  if (stats.lastActivity) {
+    const timeSinceActivity = Date.now() - stats.lastActivity;
+    checks.lastActivityRecent = timeSinceActivity < 60000; // Within last minute
+  }
+
+  // Check recent errors
+  checks.noRecentErrors = !stats.lastError || (Date.now() - stats.lastError > 60000);
+
+  const healthy = checks.processRunning && checks.portOpen;
+
+  return {
+    healthy,
+    checks,
+    status: server.status,
+    uptime: stats.startTime ? Date.now() - stats.startTime : 0,
+  };
+});
+
+// Run diagnostics on the entire system
+ipcMain.handle('run-diagnostics', async () => {
+  const diagnostics = {
+    bridgeService: {
+      running: bridgeService !== null && bridgeReady,
+      pid: bridgeService?.pid,
+    },
+    servers: [],
+    system: {
+      platform: process.platform,
+      nodeVersion: process.version,
+      electronVersion: process.versions.electron,
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime(),
+    },
+  };
+
+  // Check each server
+  for (const [id, server] of runningServers) {
+    const stats = server.stats || {};
+    diagnostics.servers.push({
+      id,
+      name: server.config?.name,
+      type: server.config?.type || server.config?.protocol,
+      status: server.status,
+      processRunning: server.process ? server.process.exitCode === null : true,
+      port: server.port,
+      uptime: stats.startTime ? Date.now() - stats.startTime : 0,
+      messagesIn: stats.messagesIn || 0,
+      messagesOut: stats.messagesOut || 0,
+      errors: stats.errors || 0,
+      lastActivity: stats.lastActivity,
+      lastError: stats.lastError,
+    });
+  }
+
+  return diagnostics;
+});
+
+// Start periodic stats broadcast (call when window is ready)
+function startStatsBroadcast() {
+  if (statsInterval) {
+    clearInterval(statsInterval);
+  }
+
+  statsInterval = setInterval(() => {
+    if (!mainWindow) return;
+
+    const allStats = [];
+    for (const [id, server] of runningServers) {
+      const stats = server.stats || {};
+      allStats.push({
+        id,
+        status: server.status,
+        messagesIn: stats.messagesIn || 0,
+        messagesOut: stats.messagesOut || 0,
+        errors: stats.errors || 0,
+        connections: stats.connections || 0,
+        lastActivity: stats.lastActivity,
+      });
+    }
+
+    mainWindow.webContents.send('server-stats-update', allStats);
+  }, 1000); // Update every second
+}
+
+function stopStatsBroadcast() {
+  if (statsInterval) {
+    clearInterval(statsInterval);
+    statsInterval = null;
+  }
+}

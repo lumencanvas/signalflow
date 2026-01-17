@@ -110,8 +110,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Build Rust service
-        run: cargo build --release -p clasp-service
+      - name: Build Rust binaries
+        run: |
+          cargo build --release -p clasp-service
+          cargo build --release -p clasp-router
 
       - name: Install dependencies
         working-directory: apps/bridge
