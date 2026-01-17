@@ -254,11 +254,12 @@ impl BridgeService {
 
                 let (mode, url) = if mode_str == "client" {
                     // Client mode: source_addr is the WebSocket URL
-                    let url = if source_addr.starts_with("ws://") || source_addr.starts_with("wss://") {
-                        source_addr.clone()
-                    } else {
-                        format!("ws://{}", source_addr)
-                    };
+                    let url =
+                        if source_addr.starts_with("ws://") || source_addr.starts_with("wss://") {
+                            source_addr.clone()
+                        } else {
+                            format!("ws://{}", source_addr)
+                        };
                     (WsMode::Client, url)
                 } else {
                     // Server mode: source_addr is bind address

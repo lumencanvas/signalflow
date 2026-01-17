@@ -150,17 +150,16 @@ async fn main() -> Result<()> {
         #[cfg(feature = "quic")]
         Transport::Quic => {
             // Load or generate TLS certificate
-            let (cert_der, key_der) = if let (Some(cert_path), Some(key_path)) =
-                (&cli.cert, &cli.key)
-            {
-                tracing::info!("Loading TLS certificate from files");
-                let cert = std::fs::read(cert_path)?;
-                let key = std::fs::read(key_path)?;
-                (cert, key)
-            } else {
-                tracing::info!("Generating self-signed certificate for QUIC");
-                generate_self_signed_cert()?
-            };
+            let (cert_der, key_der) =
+                if let (Some(cert_path), Some(key_path)) = (&cli.cert, &cli.key) {
+                    tracing::info!("Loading TLS certificate from files");
+                    let cert = std::fs::read(cert_path)?;
+                    let key = std::fs::read(key_path)?;
+                    (cert, key)
+                } else {
+                    tracing::info!("Generating self-signed certificate for QUIC");
+                    generate_self_signed_cert()?
+                };
 
             router.serve_quic(cli.listen, cert_der, key_der).await?;
         }
@@ -172,7 +171,7 @@ async fn main() -> Result<()> {
 /// Generate a self-signed certificate for QUIC
 #[cfg(feature = "quic")]
 fn generate_self_signed_cert() -> Result<(Vec<u8>, Vec<u8>)> {
-    use rcgen::{CertifiedKey, generate_simple_self_signed};
+    use rcgen::{generate_simple_self_signed, CertifiedKey};
 
     let subject_alt_names = vec!["localhost".to_string(), "127.0.0.1".to_string()];
     let CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)?;
@@ -180,6 +179,9 @@ fn generate_self_signed_cert() -> Result<(Vec<u8>, Vec<u8>)> {
     let cert_der = cert.der().to_vec();
     let key_der = key_pair.serialize_der();
 
-    tracing::debug!("Generated self-signed certificate ({} bytes)", cert_der.len());
+    tracing::debug!(
+        "Generated self-signed certificate ({} bytes)",
+        cert_der.len()
+    );
     Ok((cert_der, key_der))
 }

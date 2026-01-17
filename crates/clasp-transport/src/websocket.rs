@@ -123,10 +123,11 @@ impl Transport for WebSocketTransport {
         info!("Connecting to WebSocket: {}", url);
 
         // Parse the URL to extract host for the Host header
-        let parsed_url = url::Url::parse(url)
-            .map_err(|e| TransportError::InvalidUrl(e.to_string()))?;
+        let parsed_url =
+            url::Url::parse(url).map_err(|e| TransportError::InvalidUrl(e.to_string()))?;
 
-        let host = parsed_url.host_str()
+        let host = parsed_url
+            .host_str()
             .ok_or_else(|| TransportError::InvalidUrl("Missing host in URL".to_string()))?;
 
         let host_header = if let Some(port) = parsed_url.port() {
@@ -308,23 +309,26 @@ impl TransportServer for WebSocketServer {
 
         // Upgrade to WebSocket with subprotocol negotiation
         let subprotocol = self.config.subprotocol.clone();
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, |req: &HsRequest, mut response: HsResponse| {
-            // Check if client requested our subprotocol
-            if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
-                if let Ok(protocols_str) = protocols.to_str() {
-                    // Client may request multiple protocols, comma-separated
-                    let requested: Vec<&str> = protocols_str.split(',').map(|s| s.trim()).collect();
-                    if requested.contains(&subprotocol.as_str()) {
-                        // Add our subprotocol to the response
-                        response.headers_mut().insert(
-                            "Sec-WebSocket-Protocol",
-                            subprotocol.parse().unwrap(),
-                        );
+        let ws_stream = tokio_tungstenite::accept_hdr_async(
+            stream,
+            |req: &HsRequest, mut response: HsResponse| {
+                // Check if client requested our subprotocol
+                if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
+                    if let Ok(protocols_str) = protocols.to_str() {
+                        // Client may request multiple protocols, comma-separated
+                        let requested: Vec<&str> =
+                            protocols_str.split(',').map(|s| s.trim()).collect();
+                        if requested.contains(&subprotocol.as_str()) {
+                            // Add our subprotocol to the response
+                            response
+                                .headers_mut()
+                                .insert("Sec-WebSocket-Protocol", subprotocol.parse().unwrap());
+                        }
                     }
                 }
-            }
-            Ok(response)
-        })
+                Ok(response)
+            },
+        )
         .await
         .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 

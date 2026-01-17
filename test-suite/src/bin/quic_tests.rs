@@ -57,7 +57,7 @@ impl TestResult {
 
 #[cfg(feature = "quic")]
 fn generate_self_signed_cert() -> Result<(Vec<u8>, Vec<u8>), String> {
-    use rcgen::{CertifiedKey, generate_simple_self_signed};
+    use rcgen::{generate_simple_self_signed, CertifiedKey};
 
     let subject_alt_names = vec!["localhost".to_string(), "127.0.0.1".to_string()];
     let CertifiedKey { cert, key_pair } = generate_simple_self_signed(subject_alt_names)
@@ -93,11 +93,19 @@ fn test_quic_config_default() -> TestResult {
         {
             return TestResult::pass(name, start.elapsed().as_millis());
         }
-        return TestResult::fail(name, "Default config incorrect", start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            "Default config incorrect",
+            start.elapsed().as_millis(),
+        );
     }
 
     #[cfg(not(feature = "quic"))]
-    TestResult::skip(name, "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        name,
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 fn test_quic_config_custom() -> TestResult {
@@ -122,11 +130,19 @@ fn test_quic_config_custom() -> TestResult {
         {
             return TestResult::pass(name, start.elapsed().as_millis());
         }
-        return TestResult::fail(name, "Custom config not set correctly", start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            "Custom config not set correctly",
+            start.elapsed().as_millis(),
+        );
     }
 
     #[cfg(not(feature = "quic"))]
-    TestResult::skip(name, "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        name,
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -142,14 +158,22 @@ async fn test_quic_client_creation() -> TestResult {
 
     match QuicTransport::new_client() {
         Ok(_client) => TestResult::pass(name, start.elapsed().as_millis()),
-        Err(e) => TestResult::fail(name, format!("Client creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Client creation failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
 #[cfg(not(feature = "quic"))]
 async fn test_quic_client_creation() -> TestResult {
     let start = std::time::Instant::now();
-    TestResult::skip("quic_client_creation", "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        "quic_client_creation",
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 #[cfg(feature = "quic")]
@@ -168,14 +192,22 @@ async fn test_quic_client_with_config() -> TestResult {
 
     match QuicTransport::new_client_with_config(config) {
         Ok(_client) => TestResult::pass(name, start.elapsed().as_millis()),
-        Err(e) => TestResult::fail(name, format!("Client creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Client creation failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
 #[cfg(not(feature = "quic"))]
 async fn test_quic_client_with_config() -> TestResult {
     let start = std::time::Instant::now();
-    TestResult::skip("quic_client_with_config", "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        "quic_client_with_config",
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -195,7 +227,13 @@ async fn test_quic_server_creation() -> TestResult {
 
     let (cert, key) = match generate_self_signed_cert() {
         Ok((c, k)) => (c, k),
-        Err(e) => return TestResult::fail(name, format!("Cert generation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Cert generation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     match QuicTransport::new_server(addr, cert, key) {
@@ -206,20 +244,36 @@ async fn test_quic_server_creation() -> TestResult {
                     if local.port() == port {
                         TestResult::pass(name, start.elapsed().as_millis())
                     } else {
-                        TestResult::fail(name, format!("Wrong port: {} vs {}", local.port(), port), start.elapsed().as_millis())
+                        TestResult::fail(
+                            name,
+                            format!("Wrong port: {} vs {}", local.port(), port),
+                            start.elapsed().as_millis(),
+                        )
                     }
                 }
-                Err(e) => TestResult::fail(name, format!("Failed to get local addr: {}", e), start.elapsed().as_millis()),
+                Err(e) => TestResult::fail(
+                    name,
+                    format!("Failed to get local addr: {}", e),
+                    start.elapsed().as_millis(),
+                ),
             }
         }
-        Err(e) => TestResult::fail(name, format!("Server creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Server creation failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
 #[cfg(not(feature = "quic"))]
 async fn test_quic_server_creation() -> TestResult {
     let start = std::time::Instant::now();
-    TestResult::skip("quic_server_creation", "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        "quic_server_creation",
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -239,19 +293,37 @@ async fn test_quic_client_server_connect() -> TestResult {
 
     let (cert, key) = match generate_self_signed_cert() {
         Ok((c, k)) => (c, k),
-        Err(e) => return TestResult::fail(name, format!("Cert generation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Cert generation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     // Create server
     let server = match QuicTransport::new_server(addr, cert, key) {
         Ok(s) => s,
-        Err(e) => return TestResult::fail(name, format!("Server creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Server creation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     // Create client
     let client = match QuicTransport::new_client() {
         Ok(c) => c,
-        Err(e) => return TestResult::fail(name, format!("Client creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Client creation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     // Spawn server accept task
@@ -285,19 +357,39 @@ async fn test_quic_client_server_connect() -> TestResult {
             if client_remote.port() == port {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Client connected to wrong port: {}", client_remote.port()), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Client connected to wrong port: {}", client_remote.port()),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        (Err(e), _) => TestResult::fail(name, format!("Client connect failed: {}", e), start.elapsed().as_millis()),
-        (_, Ok(Err(e))) => TestResult::fail(name, format!("Server accept failed: {}", e), start.elapsed().as_millis()),
-        (_, Err(e)) => TestResult::fail(name, format!("Server task failed: {}", e), start.elapsed().as_millis()),
+        (Err(e), _) => TestResult::fail(
+            name,
+            format!("Client connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
+        (_, Ok(Err(e))) => TestResult::fail(
+            name,
+            format!("Server accept failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
+        (_, Err(e)) => TestResult::fail(
+            name,
+            format!("Server task failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
 #[cfg(not(feature = "quic"))]
 async fn test_quic_client_server_connect() -> TestResult {
     let start = std::time::Instant::now();
-    TestResult::skip("quic_client_server_connect", "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        "quic_client_server_connect",
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -319,17 +411,35 @@ async fn test_quic_bidirectional_stream() -> TestResult {
 
     let (cert, key) = match generate_self_signed_cert() {
         Ok((c, k)) => (c, k),
-        Err(e) => return TestResult::fail(name, format!("Cert generation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Cert generation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     let server = match QuicTransport::new_server(addr, cert, key) {
         Ok(s) => s,
-        Err(e) => return TestResult::fail(name, format!("Server creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Server creation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     let client = match QuicTransport::new_client() {
         Ok(c) => c,
-        Err(e) => return TestResult::fail(name, format!("Client creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Client creation failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     // Server task
@@ -345,7 +455,10 @@ async fn test_quic_bidirectional_stream() -> TestResult {
                 sender.send(data).await?;
                 Ok::<_, clasp_transport::TransportError>(())
             }
-            other => Err(clasp_transport::TransportError::ConnectionFailed(format!("Unexpected: {:?}", other))),
+            other => Err(clasp_transport::TransportError::ConnectionFailed(format!(
+                "Unexpected: {:?}",
+                other
+            ))),
         }
     });
 
@@ -353,13 +466,19 @@ async fn test_quic_bidirectional_stream() -> TestResult {
 
     // Client connects and sends
     let result: Result<(), String> = async {
-        let conn = client.connect(addr, "localhost").await.map_err(|e| e.to_string())?;
+        let conn = client
+            .connect(addr, "localhost")
+            .await
+            .map_err(|e| e.to_string())?;
 
         let (sender, mut receiver) = conn.open_bi().await.map_err(|e| e.to_string())?;
 
         // Send test message
         let test_data = Bytes::from_static(b"Hello QUIC!");
-        sender.send(test_data.clone()).await.map_err(|e| e.to_string())?;
+        sender
+            .send(test_data.clone())
+            .await
+            .map_err(|e| e.to_string())?;
 
         // Wait for echo
         use clasp_transport::TransportReceiver;
@@ -389,7 +508,11 @@ async fn test_quic_bidirectional_stream() -> TestResult {
 #[cfg(not(feature = "quic"))]
 async fn test_quic_bidirectional_stream() -> TestResult {
     let start = std::time::Instant::now();
-    TestResult::skip("quic_bidirectional_stream", "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        "quic_bidirectional_stream",
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -407,11 +530,19 @@ fn test_quic_alpn_protocol() -> TestResult {
         if CLASP_ALPN == b"clasp/2" {
             return TestResult::pass(name, start.elapsed().as_millis());
         }
-        return TestResult::fail(name, format!("Wrong ALPN: {:?}", CLASP_ALPN), start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            format!("Wrong ALPN: {:?}", CLASP_ALPN),
+            start.elapsed().as_millis(),
+        );
     }
 
     #[cfg(not(feature = "quic"))]
-    TestResult::skip(name, "QUIC feature not enabled", start.elapsed().as_millis())
+    TestResult::skip(
+        name,
+        "QUIC feature not enabled",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -420,9 +551,7 @@ fn test_quic_alpn_protocol() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP QUIC Transport Tests                          ║");
@@ -436,17 +565,13 @@ async fn main() {
         test_quic_config_default(),
         test_quic_config_custom(),
         test_quic_alpn_protocol(),
-
         // Client creation tests
         test_quic_client_creation().await,
         test_quic_client_with_config().await,
-
         // Server creation tests
         test_quic_server_creation().await,
-
         // Connection tests
         test_quic_client_server_connect().await,
-
         // Stream tests
         test_quic_bidirectional_stream().await,
     ];
@@ -477,12 +602,18 @@ async fn main() {
         );
 
         if !test.passed && !test.message.starts_with("SKIP") {
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 
     println!("└──────────────────────────────────────┴────────┴──────────┘");
-    println!("\nResults: {} passed, {} failed, {} skipped", passed, failed, skipped);
+    println!(
+        "\nResults: {} passed, {} failed, {} skipped",
+        passed, failed, skipped
+    );
 
     if failed > 0 {
         std::process::exit(1);

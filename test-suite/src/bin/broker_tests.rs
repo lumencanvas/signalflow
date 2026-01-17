@@ -32,20 +32,40 @@ struct TestResult {
 
 impl TestResult {
     fn pass(name: &'static str, message: impl Into<String>, duration_ms: u128) -> Self {
-        Self { name, passed: true, message: message.into(), duration_ms, skipped: false }
+        Self {
+            name,
+            passed: true,
+            message: message.into(),
+            duration_ms,
+            skipped: false,
+        }
     }
 
     fn fail(name: &'static str, message: impl Into<String>, duration_ms: u128) -> Self {
-        Self { name, passed: false, message: message.into(), duration_ms, skipped: false }
+        Self {
+            name,
+            passed: false,
+            message: message.into(),
+            duration_ms,
+            skipped: false,
+        }
     }
 
     fn skip(name: &'static str, reason: impl Into<String>) -> Self {
-        Self { name, passed: true, message: reason.into(), duration_ms: 0, skipped: true }
+        Self {
+            name,
+            passed: true,
+            message: reason.into(),
+            duration_ms: 0,
+            skipped: true,
+        }
     }
 }
 
 fn is_enabled(var: &str) -> bool {
-    env::var(var).map(|v| v == "1" || v.to_lowercase() == "true").unwrap_or(false)
+    env::var(var)
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
 }
 
 fn get_mqtt_host() -> String {
@@ -55,9 +75,12 @@ fn get_mqtt_host() -> String {
 fn check_mqtt_available() -> bool {
     let host = get_mqtt_host();
     TcpStream::connect_timeout(
-        &host.parse().unwrap_or_else(|_| "127.0.0.1:1883".parse().unwrap()),
+        &host
+            .parse()
+            .unwrap_or_else(|_| "127.0.0.1:1883".parse().unwrap()),
         Duration::from_secs(2),
-    ).is_ok()
+    )
+    .is_ok()
 }
 
 // ============================================================================
@@ -66,8 +89,7 @@ fn check_mqtt_available() -> bool {
 
 fn mqtt_connect(client_id: &str) -> Result<TcpStream, String> {
     let host = get_mqtt_host();
-    let mut stream = TcpStream::connect(&host)
-        .map_err(|e| format!("Connect failed: {}", e))?;
+    let mut stream = TcpStream::connect(&host).map_err(|e| format!("Connect failed: {}", e))?;
 
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
@@ -100,11 +122,15 @@ fn mqtt_connect(client_id: &str) -> Result<TcpStream, String> {
     packet.push((client_id_bytes.len() & 0xFF) as u8);
     packet.extend_from_slice(client_id_bytes);
 
-    stream.write_all(&packet).map_err(|e| format!("Write failed: {}", e))?;
+    stream
+        .write_all(&packet)
+        .map_err(|e| format!("Write failed: {}", e))?;
 
     // Read CONNACK
     let mut buf = [0u8; 4];
-    stream.read_exact(&mut buf).map_err(|e| format!("Read failed: {}", e))?;
+    stream
+        .read_exact(&mut buf)
+        .map_err(|e| format!("Read failed: {}", e))?;
 
     if buf[0] == 0x20 && buf[3] == 0x00 {
         Ok(stream)
@@ -131,7 +157,9 @@ fn mqtt_publish(stream: &mut TcpStream, topic: &str, payload: &[u8]) -> Result<(
     // Payload
     packet.extend_from_slice(payload);
 
-    stream.write_all(&packet).map_err(|e| format!("Publish failed: {}", e))
+    stream
+        .write_all(&packet)
+        .map_err(|e| format!("Publish failed: {}", e))
 }
 
 fn mqtt_subscribe(stream: &mut TcpStream, topic: &str, packet_id: u16) -> Result<(), String> {
@@ -154,11 +182,15 @@ fn mqtt_subscribe(stream: &mut TcpStream, topic: &str, packet_id: u16) -> Result
     packet.extend_from_slice(topic_bytes);
     packet.push(0x00); // QoS 0
 
-    stream.write_all(&packet).map_err(|e| format!("Subscribe failed: {}", e))?;
+    stream
+        .write_all(&packet)
+        .map_err(|e| format!("Subscribe failed: {}", e))?;
 
     // Read SUBACK
     let mut buf = [0u8; 5];
-    stream.read_exact(&mut buf).map_err(|e| format!("SUBACK read failed: {}", e))?;
+    stream
+        .read_exact(&mut buf)
+        .map_err(|e| format!("SUBACK read failed: {}", e))?;
 
     if buf[0] == 0x90 {
         Ok(())
@@ -187,7 +219,11 @@ fn test_mqtt_connection() -> TestResult {
     match mqtt_connect("clasp-test-conn") {
         Ok(mut stream) => {
             mqtt_disconnect(&mut stream);
-            TestResult::pass(name, format!("Connected to {}", get_mqtt_host()), start.elapsed().as_millis())
+            TestResult::pass(
+                name,
+                format!("Connected to {}", get_mqtt_host()),
+                start.elapsed().as_millis(),
+            )
         }
         Err(e) => TestResult::fail(name, e, start.elapsed().as_millis()),
     }
@@ -207,7 +243,11 @@ fn test_mqtt_publish() -> TestResult {
             mqtt_disconnect(&mut stream);
 
             match result {
-                Ok(()) => TestResult::pass(name, "Published to clasp/test/value", start.elapsed().as_millis()),
+                Ok(()) => TestResult::pass(
+                    name,
+                    "Published to clasp/test/value",
+                    start.elapsed().as_millis(),
+                ),
                 Err(e) => TestResult::fail(name, e, start.elapsed().as_millis()),
             }
         }
@@ -229,7 +269,11 @@ fn test_mqtt_subscribe() -> TestResult {
             mqtt_disconnect(&mut stream);
 
             match result {
-                Ok(()) => TestResult::pass(name, "Subscribed to clasp/test/#", start.elapsed().as_millis()),
+                Ok(()) => TestResult::pass(
+                    name,
+                    "Subscribed to clasp/test/#",
+                    start.elapsed().as_millis(),
+                ),
                 Err(e) => TestResult::fail(name, e, start.elapsed().as_millis()),
             }
         }
@@ -270,7 +314,9 @@ fn test_mqtt_pubsub_roundtrip() -> TestResult {
     mqtt_disconnect(&mut pub_stream);
 
     // Try to receive
-    sub_stream.set_read_timeout(Some(Duration::from_secs(3))).ok();
+    sub_stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .ok();
     let mut buf = [0u8; 256];
 
     match sub_stream.read(&mut buf) {
@@ -278,9 +324,17 @@ fn test_mqtt_pubsub_roundtrip() -> TestResult {
             mqtt_disconnect(&mut sub_stream);
             // Check if it's a PUBLISH packet
             if buf[0] & 0xF0 == 0x30 {
-                TestResult::pass(name, format!("Received {} bytes", len), start.elapsed().as_millis())
+                TestResult::pass(
+                    name,
+                    format!("Received {} bytes", len),
+                    start.elapsed().as_millis(),
+                )
             } else {
-                TestResult::fail(name, format!("Unexpected packet type: {:02X}", buf[0]), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Unexpected packet type: {:02X}", buf[0]),
+                    start.elapsed().as_millis(),
+                )
             }
         }
         Ok(_) => {
@@ -289,7 +343,11 @@ fn test_mqtt_pubsub_roundtrip() -> TestResult {
         }
         Err(e) => {
             mqtt_disconnect(&mut sub_stream);
-            TestResult::fail(name, format!("Read error: {}", e), start.elapsed().as_millis())
+            TestResult::fail(
+                name,
+                format!("Read error: {}", e),
+                start.elapsed().as_millis(),
+            )
         }
     }
 }
@@ -324,9 +382,17 @@ fn test_mqtt_multiple_topics() -> TestResult {
     mqtt_disconnect(&mut stream);
 
     if success == topics.len() {
-        TestResult::pass(name, format!("Published to {} topics", success), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("Published to {} topics", success),
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("Only {}/{} topics", success, topics.len()), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only {}/{} topics", success, topics.len()),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -360,7 +426,11 @@ fn test_mqtt_rapid_publish() -> TestResult {
         let rate = (message_count as f64 / elapsed as f64) * 1000.0;
         TestResult::pass(name, format!("{} msg/s", rate as u32), elapsed as u128)
     } else {
-        TestResult::fail(name, format!("Only {}/{}", success, message_count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only {}/{}", success, message_count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -404,7 +474,11 @@ fn main() {
     println!("║              CLASP Broker Integration Tests                      ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
-    let mqtt_status = if check_mqtt_available() { "connected" } else { "not available" };
+    let mqtt_status = if check_mqtt_available() {
+        "connected"
+    } else {
+        "not available"
+    };
     println!("MQTT Broker ({}): {}", get_mqtt_host(), mqtt_status);
     println!();
 
@@ -457,16 +531,25 @@ fn main() {
         } else if test.passed {
             passed += 1;
             if !test.message.is_empty() {
-                println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+                println!(
+                    "│   └─ {:<56} │",
+                    &test.message[..test.message.len().min(56)]
+                );
             }
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 
     println!("└──────────────────────────────────────┴────────┴──────────┘");
-    println!("\nResults: {} passed, {} failed, {} skipped", passed, failed, skipped);
+    println!(
+        "\nResults: {} passed, {} failed, {} skipped",
+        passed, failed, skipped
+    );
 
     if failed > 0 {
         std::process::exit(1);

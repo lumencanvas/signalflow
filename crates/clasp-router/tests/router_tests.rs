@@ -83,11 +83,7 @@ mod websocket_tests {
 
         // Verify we can connect
         let url = format!("ws://{}", addr);
-        let result = timeout(
-            Duration::from_secs(2),
-            WebSocketTransport::connect(&url),
-        )
-        .await;
+        let result = timeout(Duration::from_secs(2), WebSocketTransport::connect(&url)).await;
 
         // Connection should succeed
         assert!(result.is_ok(), "Should connect to WebSocket server");
@@ -117,11 +113,7 @@ mod websocket_tests {
         // Connect multiple clients
         let mut connections = vec![];
         for _ in 0..3 {
-            let result = timeout(
-                Duration::from_secs(2),
-                WebSocketTransport::connect(&url),
-            )
-            .await;
+            let result = timeout(Duration::from_secs(2), WebSocketTransport::connect(&url)).await;
             assert!(result.is_ok());
             connections.push(result.unwrap().unwrap());
         }
@@ -296,7 +288,10 @@ mod websocket_tests {
         use clasp_transport::TransportEvent;
 
         // Helper to complete handshake
-        async fn complete_handshake<S: clasp_transport::TransportSender, R: clasp_transport::TransportReceiver>(
+        async fn complete_handshake<
+            S: clasp_transport::TransportSender,
+            R: clasp_transport::TransportReceiver,
+        >(
             sender: &S,
             receiver: &mut R,
             name: &str,
@@ -335,7 +330,10 @@ mod websocket_tests {
             types: None,
             options: None,
         });
-        sender1.send(codec::encode(&subscribe).unwrap()).await.unwrap();
+        sender1
+            .send(codec::encode(&subscribe).unwrap())
+            .await
+            .unwrap();
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 

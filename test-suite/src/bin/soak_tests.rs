@@ -12,7 +12,7 @@
 
 use clasp_client::Clasp;
 use clasp_router::{Router, RouterConfig};
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -104,7 +104,8 @@ impl SoakStats {
     }
 
     fn record_latency(&self, latency_us: u64) {
-        self.total_latency_us.fetch_add(latency_us, Ordering::Relaxed);
+        self.total_latency_us
+            .fetch_add(latency_us, Ordering::Relaxed);
         self.latency_samples.fetch_add(1, Ordering::Relaxed);
 
         let current_max = self.max_latency_us.load(Ordering::Relaxed);
@@ -123,7 +124,11 @@ impl SoakStats {
         let total_lat = self.total_latency_us.load(Ordering::Relaxed);
         let lat_samples = self.latency_samples.load(Ordering::Relaxed);
 
-        let avg_lat = if lat_samples > 0 { total_lat / lat_samples } else { 0 };
+        let avg_lat = if lat_samples > 0 {
+            total_lat / lat_samples
+        } else {
+            0
+        };
         let rate = sent as f64 / elapsed.as_secs_f64();
         let loss_pct = if sent > 0 {
             ((sent.saturating_sub(received)) as f64 / sent as f64) * 100.0
@@ -134,23 +139,53 @@ impl SoakStats {
         println!("\n╔══════════════════════════════════════════════════════════════════╗");
         println!("║                    SOAK TEST SUMMARY                             ║");
         println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ Duration:          {:>10.1} minutes                           ║", elapsed.as_secs_f64() / 60.0);
+        println!(
+            "║ Duration:          {:>10.1} minutes                           ║",
+            elapsed.as_secs_f64() / 60.0
+        );
         println!("╠══════════════════════════════════════════════════════════════════╣");
         println!("║ Messages:                                                        ║");
-        println!("║   Sent:            {:>15}                              ║", sent);
-        println!("║   Received:        {:>15}                              ║", received);
-        println!("║   Rate:            {:>12.1} msg/s                          ║", rate);
-        println!("║   Loss:            {:>14.2}%                              ║", loss_pct);
+        println!(
+            "║   Sent:            {:>15}                              ║",
+            sent
+        );
+        println!(
+            "║   Received:        {:>15}                              ║",
+            received
+        );
+        println!(
+            "║   Rate:            {:>12.1} msg/s                          ║",
+            rate
+        );
+        println!(
+            "║   Loss:            {:>14.2}%                              ║",
+            loss_pct
+        );
         println!("╠══════════════════════════════════════════════════════════════════╣");
         println!("║ Connections:                                                     ║");
-        println!("║   Established:     {:>15}                              ║", conns);
-        println!("║   Reconnections:   {:>15}                              ║", reconns);
+        println!(
+            "║   Established:     {:>15}                              ║",
+            conns
+        );
+        println!(
+            "║   Reconnections:   {:>15}                              ║",
+            reconns
+        );
         println!("╠══════════════════════════════════════════════════════════════════╣");
         println!("║ Latency:                                                         ║");
-        println!("║   Average:         {:>12} μs                              ║", avg_lat);
-        println!("║   Maximum:         {:>12} μs                              ║", max_lat);
+        println!(
+            "║   Average:         {:>12} μs                              ║",
+            avg_lat
+        );
+        println!(
+            "║   Maximum:         {:>12} μs                              ║",
+            max_lat
+        );
         println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ Errors:            {:>15}                              ║", errors);
+        println!(
+            "║ Errors:            {:>15}                              ║",
+            errors
+        );
         println!("╚══════════════════════════════════════════════════════════════════╝");
     }
 }
@@ -200,23 +235,22 @@ fn get_memory_usage() -> Option<u64> {
 async fn main() {
     // Parse duration from command line
     let args: Vec<String> = std::env::args().collect();
-    let duration_minutes: u64 = args.get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+    let duration_minutes: u64 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
 
     let duration = Duration::from_secs(duration_minutes * 60);
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Long-Running Soak Test                        ║");
     println!("║                                                                  ║");
-    println!("║  Duration: {} minutes                                             ║", duration_minutes);
+    println!(
+        "║  Duration: {} minutes                                             ║",
+        duration_minutes
+    );
     println!("║  Press Ctrl+C to stop early                                      ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 
     // Reduce log noise
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     // Start router
     println!("Starting router...");
@@ -265,17 +299,19 @@ async fn main() {
 
     // Set up receiver subscription
     let stats_clone = stats.clone();
-    let _ = receiver.subscribe("/soak/**", move |value, _| {
-        stats_clone.record_receive();
-        if let Some(sent_time) = value.as_f64() {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as u64;
-            let latency = now.saturating_sub(sent_time as u64);
-            stats_clone.record_latency(latency);
-        }
-    }).await;
+    let _ = receiver
+        .subscribe("/soak/**", move |value, _| {
+            stats_clone.record_receive();
+            if let Some(sent_time) = value.as_f64() {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros() as u64;
+                let latency = now.saturating_sub(sent_time as u64);
+                stats_clone.record_latency(latency);
+            }
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -325,8 +361,14 @@ async fn main() {
             }
 
             let remaining = duration.saturating_sub(elapsed);
-            print!("\r[{:>3}m remaining] sent: {} | recv: {} | rate: {:.0}/s | errors: {}    ",
-                   remaining.as_secs() / 60, sent, received, rate, errors);
+            print!(
+                "\r[{:>3}m remaining] sent: {} | recv: {} | rate: {:.0}/s | errors: {}    ",
+                remaining.as_secs() / 60,
+                sent,
+                received,
+                rate,
+                errors
+            );
             std::io::Write::flush(&mut std::io::stdout()).ok();
 
             last_report = Instant::now();
@@ -350,10 +392,22 @@ async fn main() {
         println!("\n┌──────────────────────────────────────────────────────────────────┐");
         println!("│ MEMORY ANALYSIS                                                  │");
         println!("├──────────────────────────────────────────────────────────────────┤");
-        println!("│ Initial:          {:>12} KB                                │", first / 1024);
-        println!("│ Final:            {:>12} KB                                │", last / 1024);
-        println!("│ Peak:             {:>12} KB                                │", max / 1024);
-        println!("│ Growth:           {:>+12} KB                                │", growth / 1024);
+        println!(
+            "│ Initial:          {:>12} KB                                │",
+            first / 1024
+        );
+        println!(
+            "│ Final:            {:>12} KB                                │",
+            last / 1024
+        );
+        println!(
+            "│ Peak:             {:>12} KB                                │",
+            max / 1024
+        );
+        println!(
+            "│ Growth:           {:>+12} KB                                │",
+            growth / 1024
+        );
 
         if growth > (first as i64 / 10) {
             println!("│ ⚠ WARNING: Significant memory growth detected                    │");
@@ -370,8 +424,16 @@ async fn main() {
     let sent = stats.messages_sent.load(Ordering::Relaxed);
     let received = stats.messages_received.load(Ordering::Relaxed);
 
-    let error_rate = if sent > 0 { (errors as f64 / sent as f64) * 100.0 } else { 0.0 };
-    let loss_rate = if sent > 0 { ((sent.saturating_sub(received)) as f64 / sent as f64) * 100.0 } else { 0.0 };
+    let error_rate = if sent > 0 {
+        (errors as f64 / sent as f64) * 100.0
+    } else {
+        0.0
+    };
+    let loss_rate = if sent > 0 {
+        ((sent.saturating_sub(received)) as f64 / sent as f64) * 100.0
+    } else {
+        0.0
+    };
 
     println!();
     if error_rate < 1.0 && loss_rate < 5.0 {

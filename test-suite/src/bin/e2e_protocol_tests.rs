@@ -5,8 +5,8 @@
 //! - Multiple bridges working together
 //! - Full message flow verification
 
-use clasp_bridge::{Bridge, BridgeEvent};
 use clasp_bridge::osc::OscBridge;
+use clasp_bridge::{Bridge, BridgeEvent};
 use clasp_client::Clasp;
 use clasp_core::Value;
 use clasp_router::{Router, RouterConfig};
@@ -76,7 +76,11 @@ impl TestRouter {
             name: "E2E Test Router".to_string(),
             max_sessions: 100,
             session_timeout: 60,
-            features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
+            features: vec![
+                "param".to_string(),
+                "event".to_string(),
+                "stream".to_string(),
+            ],
         });
 
         let handle = tokio::spawn(async move {
@@ -112,7 +116,11 @@ async fn test_client_to_client_set() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -121,14 +129,16 @@ async fn test_client_to_client_set() -> TestResult {
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
 
-    let _ = receiver.subscribe("/e2e/**", move |value, _address| {
-        if let Value::Float(f) = value {
-            if (f - 42.5).abs() < 0.001 {
-                received_clone.fetch_add(1, Ordering::SeqCst);
-                notify_clone.notify_one();
+    let _ = receiver
+        .subscribe("/e2e/**", move |value, _address| {
+            if let Value::Float(f) = value {
+                if (f - 42.5).abs() < 0.001 {
+                    received_clone.fetch_add(1, Ordering::SeqCst);
+                    notify_clone.notify_one();
+                }
             }
-        }
-    }).await;
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -137,7 +147,11 @@ async fn test_client_to_client_set() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -152,7 +166,11 @@ async fn test_client_to_client_set() -> TestResult {
     if received.load(Ordering::SeqCst) >= 1 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Receiver didn't get the value", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Receiver didn't get the value",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -167,16 +185,22 @@ async fn test_client_to_client_multiple_values() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received = Arc::new(AtomicU32::new(0));
     let received_clone = received.clone();
 
-    let _ = receiver.subscribe("/multi/**", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-    }).await;
+    let _ = receiver
+        .subscribe("/multi/**", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -185,7 +209,11 @@ async fn test_client_to_client_multiple_values() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -199,10 +227,15 @@ async fn test_client_to_client_multiple_values() -> TestResult {
     router.stop();
 
     let count = received.load(Ordering::SeqCst);
-    if count >= 8 { // Allow some margin
+    if count >= 8 {
+        // Allow some margin
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only received {}/10 values", count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only received {}/10 values", count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -217,7 +250,11 @@ async fn test_client_to_client_event() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -226,10 +263,12 @@ async fn test_client_to_client_event() -> TestResult {
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
 
-    let _ = receiver.subscribe("/events/**", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-        notify_clone.notify_one();
-    }).await;
+    let _ = receiver
+        .subscribe("/events/**", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+            notify_clone.notify_one();
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -238,12 +277,18 @@ async fn test_client_to_client_event() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     // Emit event
-    let _ = sender.emit("/events/button", Value::String("pressed".to_string())).await;
+    let _ = sender
+        .emit("/events/button", Value::String("pressed".to_string()))
+        .await;
 
     // Wait for notification or timeout
     let _ = tokio::time::timeout(Duration::from_secs(2), notify.notified()).await;
@@ -275,14 +320,20 @@ async fn test_fanout_to_multiple_clients() -> TestResult {
         match Clasp::connect_to(&router.url()).await {
             Ok(client) => {
                 let counter = counters[i].clone();
-                let _ = client.subscribe("/fanout/**", move |_, _| {
-                    counter.fetch_add(1, Ordering::SeqCst);
-                }).await;
+                let _ = client
+                    .subscribe("/fanout/**", move |_, _| {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                    })
+                    .await;
                 receivers.push(client);
             }
             Err(e) => {
                 router.stop();
-                return TestResult::fail(name, format!("Receiver {} connect failed: {}", i, e), start.elapsed().as_millis());
+                return TestResult::fail(
+                    name,
+                    format!("Receiver {} connect failed: {}", i, e),
+                    start.elapsed().as_millis(),
+                );
             }
         }
     }
@@ -294,7 +345,11 @@ async fn test_fanout_to_multiple_clients() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -311,7 +366,11 @@ async fn test_fanout_to_multiple_clients() -> TestResult {
     if total >= 3 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only {} of 3 receivers got the value", total), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only {} of 3 receivers got the value", total),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -330,7 +389,11 @@ async fn test_state_persistence() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client1 connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client1 connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -342,7 +405,11 @@ async fn test_state_persistence() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client2 connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client2 connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -351,14 +418,16 @@ async fn test_state_persistence() -> TestResult {
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
 
-    let _ = client2.subscribe("/persist/**", move |value, _| {
-        if let Value::Float(f) = value {
-            if (f - 123.0).abs() < 0.001 {
-                received_clone.fetch_add(1, Ordering::SeqCst);
-                notify_clone.notify_one();
+    let _ = client2
+        .subscribe("/persist/**", move |value, _| {
+            if let Value::Float(f) = value {
+                if (f - 123.0).abs() < 0.001 {
+                    received_clone.fetch_add(1, Ordering::SeqCst);
+                    notify_clone.notify_one();
+                }
             }
-        }
-    }).await;
+        })
+        .await;
 
     // Wait for snapshot
     let _ = tokio::time::timeout(Duration::from_secs(2), notify.notified()).await;
@@ -368,7 +437,11 @@ async fn test_state_persistence() -> TestResult {
     if received.load(Ordering::SeqCst) >= 1 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "State not persisted/received", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "State not persisted/received",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -387,7 +460,11 @@ async fn test_wildcard_subscription_patterns() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -395,9 +472,11 @@ async fn test_wildcard_subscription_patterns() -> TestResult {
     let received_clone = received.clone();
 
     // Subscribe to /sensors/*/temperature - should match any sensor's temperature
-    let _ = receiver.subscribe("/sensors/*/temperature", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-    }).await;
+    let _ = receiver
+        .subscribe("/sensors/*/temperature", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -406,7 +485,11 @@ async fn test_wildcard_subscription_patterns() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -424,7 +507,11 @@ async fn test_wildcard_subscription_patterns() -> TestResult {
     if count >= 2 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Received {} (expected 2)", count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Received {} (expected 2)", count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -443,16 +530,22 @@ async fn test_high_throughput_e2e() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received = Arc::new(AtomicU32::new(0));
     let received_clone = received.clone();
 
-    let _ = receiver.subscribe("/throughput/**", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-    }).await;
+    let _ = receiver
+        .subscribe("/throughput/**", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -461,13 +554,19 @@ async fn test_high_throughput_e2e() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     // Send many messages quickly
     for i in 0..100 {
-        let _ = sender.set(&format!("/throughput/value/{}", i % 10), i as f64).await;
+        let _ = sender
+            .set(&format!("/throughput/value/{}", i % 10), i as f64)
+            .await;
     }
 
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -475,10 +574,15 @@ async fn test_high_throughput_e2e() -> TestResult {
     router.stop();
 
     let count = received.load(Ordering::SeqCst);
-    if count >= 80 { // Allow 20% loss under load
+    if count >= 80 {
+        // Allow 20% loss under load
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only received {}/100 messages", count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only received {}/100 messages", count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -488,9 +592,7 @@ async fn test_high_throughput_e2e() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Multi-Protocol E2E Tests                      ║");
@@ -501,16 +603,12 @@ async fn main() {
         test_client_to_client_set().await,
         test_client_to_client_multiple_values().await,
         test_client_to_client_event().await,
-
         // Fan-out tests
         test_fanout_to_multiple_clients().await,
-
         // State persistence tests
         test_state_persistence().await,
-
         // Subscription pattern tests
         test_wildcard_subscription_patterns().await,
-
         // Throughput tests
         test_high_throughput_e2e().await,
     ];
@@ -534,7 +632,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

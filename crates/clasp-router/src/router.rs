@@ -307,22 +307,23 @@ impl Router {
             let handle = tokio::spawn(async move {
                 match config {
                     #[cfg(feature = "websocket")]
-                    TransportConfig::WebSocket { addr } => {
-                        router.serve_websocket(&addr).await
-                    }
+                    TransportConfig::WebSocket { addr } => router.serve_websocket(&addr).await,
                     #[cfg(feature = "quic")]
                     TransportConfig::Quic { addr, cert, key } => {
                         router.serve_quic(addr, cert, key).await
                     }
                     #[allow(unreachable_patterns)]
-                    _ => Err(RouterError::Config("Transport not enabled at compile time".into())),
+                    _ => Err(RouterError::Config(
+                        "Transport not enabled at compile time".into(),
+                    )),
                 }
             });
             handles.push(handle);
         }
 
         // Wait for all transports (or first error)
-        let results = try_join_all(handles).await
+        let results = try_join_all(handles)
+            .await
             .map_err(|e| RouterError::Config(format!("Transport task failed: {}", e)))?;
 
         // Check for errors from any transport

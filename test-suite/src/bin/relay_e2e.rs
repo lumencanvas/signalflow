@@ -9,9 +9,13 @@
 //! - Multi-client scenarios
 //! - Connection resilience
 
-use clasp_core::{codec, HelloMessage, Message, PublishMessage, SetMessage, SubscribeMessage, Value};
+use clasp_core::{
+    codec, HelloMessage, Message, PublishMessage, SetMessage, SubscribeMessage, Value,
+};
 use clasp_router::{Router, RouterConfig};
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{error, info, warn};
@@ -72,7 +76,11 @@ impl TestRouter {
             name: "Test Relay".to_string(),
             max_sessions: 100,
             session_timeout: 60,
-            features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
+            features: vec![
+                "param".to_string(),
+                "event".to_string(),
+                "stream".to_string(),
+            ],
         });
 
         let handle = tokio::spawn(async move {
@@ -119,7 +127,8 @@ impl TestClient {
             version: 2,
             name: self.name.clone(),
             features: vec!["param".to_string(), "event".to_string()],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
 
         self.sender
@@ -180,8 +189,9 @@ impl TestClient {
         let set = Message::Set(SetMessage {
             address: address.to_string(),
             value,
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
 
         self.sender
@@ -357,7 +367,9 @@ async fn test_subscription_delivery() -> TestResult {
         publisher.handshake().await?;
 
         // Publish a value
-        publisher.set("/sensor/temperature", Value::Float(23.5)).await?;
+        publisher
+            .set("/sensor/temperature", Value::Float(23.5))
+            .await?;
 
         // Subscriber should receive it
         let msg = subscriber.recv_message(2000).await?;
@@ -399,7 +411,9 @@ async fn test_wildcard_subscription() -> TestResult {
         publisher.handshake().await?;
 
         // Should match
-        publisher.set("/lights/living-room/brightness", Value::Float(0.8)).await?;
+        publisher
+            .set("/lights/living-room/brightness", Value::Float(0.8))
+            .await?;
 
         let msg = subscriber.recv_message(2000).await?;
         match msg {
@@ -442,7 +456,9 @@ async fn test_multiple_subscribers() -> TestResult {
         // Publisher
         let mut publisher = TestClient::connect(&router.url(), "Publisher").await?;
         publisher.handshake().await?;
-        publisher.set("/broadcast/message", Value::String("hello".to_string())).await?;
+        publisher
+            .set("/broadcast/message", Value::String("hello".to_string()))
+            .await?;
 
         // All should receive
         let r1 = sub1.recv_message(2000).await;
@@ -482,9 +498,7 @@ async fn test_rapid_messages() -> TestResult {
 
         // Send 100 rapid messages
         for i in 0..100 {
-            client
-                .set(&format!("/rapid/{}", i), Value::Int(i))
-                .await?;
+            client.set(&format!("/rapid/{}", i), Value::Int(i)).await?;
         }
 
         // Should receive 100 ACKs
@@ -572,7 +586,9 @@ async fn test_concurrent_clients() -> TestResult {
             tokio::spawn(async move {
                 let mut client = TestClient::connect(&url, &format!("Client{}", i)).await?;
                 client.handshake().await?;
-                client.set(&format!("/client/{}/value", i), Value::Int(i)).await?;
+                client
+                    .set(&format!("/client/{}/value", i), Value::Int(i))
+                    .await?;
                 client.recv_message(2000).await?;
                 Ok::<_, String>(())
             })
@@ -583,7 +599,10 @@ async fn test_concurrent_clients() -> TestResult {
 
     router.stop();
 
-    let success_count = results.iter().filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false)).count();
+    let success_count = results
+        .iter()
+        .filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false))
+        .count();
 
     if success_count >= 8 {
         TestResult::pass(name, start.elapsed().as_millis())
@@ -620,9 +639,14 @@ async fn test_state_persistence() -> TestResult {
             version: 2,
             name: "Client2".to_string(),
             features: vec!["param".to_string()],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
-        client2.sender.send(codec::encode(&hello).unwrap()).await.map_err(|e| e.to_string())?;
+        client2
+            .sender
+            .send(codec::encode(&hello).unwrap())
+            .await
+            .map_err(|e| e.to_string())?;
 
         // Check snapshot contains our value
         let mut found = false;
@@ -666,9 +690,7 @@ async fn test_state_persistence() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Relay Server E2E Tests                        ║");

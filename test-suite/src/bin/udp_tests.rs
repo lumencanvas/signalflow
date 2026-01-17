@@ -52,19 +52,25 @@ async fn test_udp_bind_default() -> TestResult {
     let name = "udp_bind_default";
 
     match UdpTransport::bind("127.0.0.1:0").await {
-        Ok(transport) => {
-            match transport.local_addr() {
-                Ok(addr) => {
-                    if addr.port() > 0 {
-                        TestResult::pass(name, start.elapsed().as_millis())
-                    } else {
-                        TestResult::fail(name, "Port should be > 0", start.elapsed().as_millis())
-                    }
+        Ok(transport) => match transport.local_addr() {
+            Ok(addr) => {
+                if addr.port() > 0 {
+                    TestResult::pass(name, start.elapsed().as_millis())
+                } else {
+                    TestResult::fail(name, "Port should be > 0", start.elapsed().as_millis())
                 }
-                Err(e) => TestResult::fail(name, format!("Failed to get local addr: {}", e), start.elapsed().as_millis()),
             }
-        }
-        Err(e) => TestResult::fail(name, format!("Bind failed: {}", e), start.elapsed().as_millis()),
+            Err(e) => TestResult::fail(
+                name,
+                format!("Failed to get local addr: {}", e),
+                start.elapsed().as_millis(),
+            ),
+        },
+        Err(e) => TestResult::fail(
+            name,
+            format!("Bind failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -82,10 +88,18 @@ async fn test_udp_bind_with_config() -> TestResult {
             if transport.local_addr().is_ok() {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "Failed to get local addr", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "Failed to get local addr",
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        Err(e) => TestResult::fail(name, format!("Bind failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Bind failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -99,19 +113,29 @@ async fn test_udp_bind_specific_port() -> TestResult {
     drop(listener);
 
     match UdpTransport::bind(&format!("127.0.0.1:{}", port)).await {
-        Ok(transport) => {
-            match transport.local_addr() {
-                Ok(addr) => {
-                    if addr.port() == port {
-                        TestResult::pass(name, start.elapsed().as_millis())
-                    } else {
-                        TestResult::fail(name, format!("Wrong port: {} != {}", addr.port(), port), start.elapsed().as_millis())
-                    }
+        Ok(transport) => match transport.local_addr() {
+            Ok(addr) => {
+                if addr.port() == port {
+                    TestResult::pass(name, start.elapsed().as_millis())
+                } else {
+                    TestResult::fail(
+                        name,
+                        format!("Wrong port: {} != {}", addr.port(), port),
+                        start.elapsed().as_millis(),
+                    )
                 }
-                Err(e) => TestResult::fail(name, format!("Failed to get local addr: {}", e), start.elapsed().as_millis()),
             }
-        }
-        Err(e) => TestResult::fail(name, format!("Bind failed: {}", e), start.elapsed().as_millis()),
+            Err(e) => TestResult::fail(
+                name,
+                format!("Failed to get local addr: {}", e),
+                start.elapsed().as_millis(),
+            ),
+        },
+        Err(e) => TestResult::fail(
+            name,
+            format!("Bind failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -125,12 +149,24 @@ async fn test_udp_send_receive() -> TestResult {
 
     let server = match UdpTransport::bind("127.0.0.1:0").await {
         Ok(t) => t,
-        Err(e) => return TestResult::fail(name, format!("Server bind failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Server bind failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     let client = match UdpTransport::bind("127.0.0.1:0").await {
         Ok(t) => t,
-        Err(e) => return TestResult::fail(name, format!("Client bind failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => {
+            return TestResult::fail(
+                name,
+                format!("Client bind failed: {}", e),
+                start.elapsed().as_millis(),
+            )
+        }
     };
 
     let server_addr = server.local_addr().unwrap();
@@ -138,7 +174,11 @@ async fn test_udp_send_receive() -> TestResult {
 
     // Send from client
     if let Err(e) = client.send_to(b"hello udp", server_addr).await {
-        return TestResult::fail(name, format!("Send failed: {}", e), start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            format!("Send failed: {}", e),
+            start.elapsed().as_millis(),
+        );
     }
 
     // Receive with timeout
@@ -152,11 +192,17 @@ async fn test_udp_send_receive() -> TestResult {
                 TestResult::fail(name, "Data or source mismatch", start.elapsed().as_millis())
             }
         }
-        Ok(Some((TransportEvent::Error(e), _))) => {
-            TestResult::fail(name, format!("Receive error: {}", e), start.elapsed().as_millis())
-        }
+        Ok(Some((TransportEvent::Error(e), _))) => TestResult::fail(
+            name,
+            format!("Receive error: {}", e),
+            start.elapsed().as_millis(),
+        ),
         Ok(None) => TestResult::fail(name, "Receiver closed", start.elapsed().as_millis()),
-        Err(_) => TestResult::fail(name, "Timeout waiting for data", start.elapsed().as_millis()),
+        Err(_) => TestResult::fail(
+            name,
+            "Timeout waiting for data",
+            start.elapsed().as_millis(),
+        ),
         _ => TestResult::fail(name, "Unexpected event", start.elapsed().as_millis()),
     }
 }
@@ -181,7 +227,11 @@ async fn test_udp_sender_to() -> TestResult {
 
     // Send using TransportSender trait
     if let Err(e) = sender.send(Bytes::from_static(b"via sender")).await {
-        return TestResult::fail(name, format!("Send failed: {}", e), start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            format!("Send failed: {}", e),
+            start.elapsed().as_millis(),
+        );
     }
 
     // Receive
@@ -224,10 +274,15 @@ async fn test_udp_multiple_messages() -> TestResult {
         }
     }
 
-    if received >= 8 { // Allow some packet loss
+    if received >= 8 {
+        // Allow some packet loss
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only received {}/10 messages", received), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only received {}/10 messages", received),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -253,10 +308,18 @@ async fn test_udp_large_packet() -> TestResult {
             if data.len() == 8192 && data[0] == 0xAB {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Data size/content mismatch: {}", data.len()), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Data size/content mismatch: {}", data.len()),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Failed to receive large packet", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Failed to receive large packet",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -272,7 +335,11 @@ async fn test_udp_set_broadcast() -> TestResult {
 
     match transport.set_broadcast(true) {
         Ok(()) => TestResult::pass(name, start.elapsed().as_millis()),
-        Err(e) => TestResult::fail(name, format!("Failed to enable broadcast: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Failed to enable broadcast: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -282,7 +349,11 @@ async fn test_udp_broadcast_creation() -> TestResult {
 
     match UdpBroadcast::new(7331).await {
         Ok(_broadcast) => TestResult::pass(name, start.elapsed().as_millis()),
-        Err(e) => TestResult::fail(name, format!("Broadcast creation failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Broadcast creation failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -299,18 +370,31 @@ async fn test_udp_concurrent_sockets() -> TestResult {
     for _ in 0..5 {
         match UdpTransport::bind("127.0.0.1:0").await {
             Ok(s) => sockets.push(s),
-            Err(e) => return TestResult::fail(name, format!("Bind failed: {}", e), start.elapsed().as_millis()),
+            Err(e) => {
+                return TestResult::fail(
+                    name,
+                    format!("Bind failed: {}", e),
+                    start.elapsed().as_millis(),
+                )
+            }
         }
     }
 
     // Verify all have unique ports
-    let ports: Vec<u16> = sockets.iter().map(|s| s.local_addr().unwrap().port()).collect();
+    let ports: Vec<u16> = sockets
+        .iter()
+        .map(|s| s.local_addr().unwrap().port())
+        .collect();
     let unique_ports: std::collections::HashSet<u16> = ports.iter().cloned().collect();
 
     if unique_ports.len() == 5 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Not all ports are unique", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Not all ports are unique",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -332,7 +416,8 @@ async fn test_udp_bidirectional() -> TestResult {
 
     // B receives and sends back
     if let Ok(Some((TransportEvent::Data(data), from))) =
-        tokio::time::timeout(Duration::from_secs(2), recv_b.recv_from()).await {
+        tokio::time::timeout(Duration::from_secs(2), recv_b.recv_from()).await
+    {
         if data.as_ref() == b"hello from A" {
             socket_b.send_to(b"hello from B", from).await.unwrap();
         }
@@ -342,7 +427,8 @@ async fn test_udp_bidirectional() -> TestResult {
 
     // A receives response
     if let Ok(Some((TransportEvent::Data(data), _))) =
-        tokio::time::timeout(Duration::from_secs(2), recv_a.recv_from()).await {
+        tokio::time::timeout(Duration::from_secs(2), recv_a.recv_from()).await
+    {
         if data.as_ref() == b"hello from B" {
             return TestResult::pass(name, start.elapsed().as_millis());
         }
@@ -357,9 +443,7 @@ async fn test_udp_bidirectional() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP UDP Transport Tests                           ║");
@@ -370,17 +454,14 @@ async fn main() {
         test_udp_bind_default().await,
         test_udp_bind_with_config().await,
         test_udp_bind_specific_port().await,
-
         // Send/Receive tests
         test_udp_send_receive().await,
         test_udp_sender_to().await,
         test_udp_multiple_messages().await,
         test_udp_large_packet().await,
-
         // Broadcast tests
         test_udp_set_broadcast().await,
         test_udp_broadcast_creation().await,
-
         // Concurrent tests
         test_udp_concurrent_sockets().await,
         test_udp_bidirectional().await,
@@ -405,7 +486,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

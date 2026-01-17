@@ -13,7 +13,9 @@ use clasp_core::{
     SubscribeOptions, UnsubscribeMessage, Value,
 };
 use clasp_router::{Router, RouterConfig};
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -29,10 +31,14 @@ impl std::fmt::Display for StringError {
 }
 impl std::error::Error for StringError {}
 impl From<String> for StringError {
-    fn from(s: String) -> Self { StringError(s) }
+    fn from(s: String) -> Self {
+        StringError(s)
+    }
 }
 impl From<&str> for StringError {
-    fn from(s: &str) -> Self { StringError(s.to_string()) }
+    fn from(s: &str) -> Self {
+        StringError(s.to_string())
+    }
 }
 
 // ============================================================================
@@ -119,7 +125,8 @@ async fn connect_and_handshake(
         version: 2,
         name: name.to_string(),
         features: vec!["param".to_string(), "event".to_string()],
-        capabilities: None, token: None,
+        capabilities: None,
+        token: None,
     });
     sender.send(codec::encode(&hello)?).await?;
 
@@ -155,7 +162,8 @@ async fn test_exact_match_subscription() -> TestResult {
     let env = TestEnv::new().await;
 
     let result: Result<(), TestError> = async {
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         let (pub_sender, mut pub_receiver) = connect_and_handshake(&env.url(), "Publisher").await?;
 
         // Subscribe to exact path
@@ -165,10 +173,7 @@ async fn test_exact_match_subscription() -> TestResult {
             types: vec![],
             options: None,
         });
-        sub_sender
-            .send(codec::encode(&subscribe)?)
-            .await
-            ?;
+        sub_sender.send(codec::encode(&subscribe)?).await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -176,25 +181,21 @@ async fn test_exact_match_subscription() -> TestResult {
         let set1 = Message::Set(SetMessage {
             address: "/exact/path".to_string(),
             value: Value::Int(1),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
-        pub_sender
-            .send(codec::encode(&set1)?)
-            .await
-            ?;
+        pub_sender.send(codec::encode(&set1)?).await?;
 
         // Publish to different path - should NOT match
         let set2 = Message::Set(SetMessage {
             address: "/exact/other".to_string(),
             value: Value::Int(2),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
-        pub_sender
-            .send(codec::encode(&set2)?)
-            .await
-            ?;
+        pub_sender.send(codec::encode(&set2)?).await?;
 
         // Subscriber should only receive first message
         let msg1 = timeout(Duration::from_secs(1), async {
@@ -210,12 +211,17 @@ async fn test_exact_match_subscription() -> TestResult {
         .await;
 
         if msg1.is_err() {
-            return Err(Box::new(StringError::from("Did not receive matching message")) as TestError);
+            return Err(
+                Box::new(StringError::from("Did not receive matching message")) as TestError,
+            );
         }
 
         let set_msg = msg1.unwrap().unwrap();
         if set_msg.address != "/exact/path" {
-            return Err(Box::new(StringError::from(format!("Wrong address: {}", set_msg.address))) as TestError);
+            return Err(Box::new(StringError::from(format!(
+                "Wrong address: {}",
+                set_msg.address
+            ))) as TestError);
         }
 
         // Should NOT receive the second message (timeout expected)
@@ -234,7 +240,9 @@ async fn test_exact_match_subscription() -> TestResult {
         .await;
 
         if msg2.is_ok() {
-            return Err(Box::new(StringError::from("Should NOT receive non-matching message")) as TestError);
+            return Err(
+                Box::new(StringError::from("Should NOT receive non-matching message")) as TestError,
+            );
         }
 
         Ok(())
@@ -256,7 +264,8 @@ async fn test_single_wildcard_subscription() -> TestResult {
     let env = TestEnv::new().await;
 
     let result: Result<(), TestError> = async {
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         let (pub_sender, _) = connect_and_handshake(&env.url(), "Publisher").await?;
 
         // Subscribe with single-level wildcard
@@ -266,26 +275,20 @@ async fn test_single_wildcard_subscription() -> TestResult {
             types: vec![],
             options: None,
         });
-        sub_sender
-            .send(codec::encode(&subscribe)?)
-            .await
-            ?;
+        sub_sender.send(codec::encode(&subscribe)?).await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Should match: /sensors/room1/temperature
         pub_sender
-            .send(
-                codec::encode(&Message::Set(SetMessage {
-                    address: "/sensors/room1/temperature".to_string(),
-                    value: Value::Float(22.5),
-                    revision: None, lock: false, unlock: false,
-                    
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Set(SetMessage {
+                address: "/sensors/room1/temperature".to_string(),
+                value: Value::Float(22.5),
+                revision: None,
+                lock: false,
+                unlock: false,
+            }))?)
+            .await?;
 
         let msg = timeout(Duration::from_secs(1), async {
             loop {
@@ -300,7 +303,9 @@ async fn test_single_wildcard_subscription() -> TestResult {
         .await;
 
         if msg.is_err() {
-            return Err(Box::new(StringError::from("Did not receive matching message")) as TestError);
+            return Err(
+                Box::new(StringError::from("Did not receive matching message")) as TestError,
+            );
         }
 
         Ok(())
@@ -322,7 +327,8 @@ async fn test_multi_wildcard_subscription() -> TestResult {
     let env = TestEnv::new().await;
 
     let result: Result<(), TestError> = async {
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         let (pub_sender, _) = connect_and_handshake(&env.url(), "Publisher").await?;
 
         // Subscribe with multi-level wildcard
@@ -332,10 +338,7 @@ async fn test_multi_wildcard_subscription() -> TestResult {
             types: vec![],
             options: None,
         });
-        sub_sender
-            .send(codec::encode(&subscribe)?)
-            .await
-            ?;
+        sub_sender.send(codec::encode(&subscribe)?).await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -349,17 +352,14 @@ async fn test_multi_wildcard_subscription() -> TestResult {
 
         for path in &paths {
             pub_sender
-                .send(
-                    codec::encode(&Message::Set(SetMessage {
-                        address: path.to_string(),
-                        value: Value::Float(1.0),
-                        revision: None, lock: false, unlock: false,
-                        
-                    }))
-                    ?,
-                )
-                .await
-                ?;
+                .send(codec::encode(&Message::Set(SetMessage {
+                    address: path.to_string(),
+                    value: Value::Float(1.0),
+                    revision: None,
+                    lock: false,
+                    unlock: false,
+                }))?)
+                .await?;
         }
 
         // Should receive all messages
@@ -385,7 +385,11 @@ async fn test_multi_wildcard_subscription() -> TestResult {
         if received >= paths.len() - 1 {
             Ok(())
         } else {
-            Err(Box::new(StringError::from(format!("Only received {}/{} messages", received, paths.len()))) as TestError)
+            Err(Box::new(StringError::from(format!(
+                "Only received {}/{} messages",
+                received,
+                paths.len()
+            ))) as TestError)
         }
     }
     .await;
@@ -405,38 +409,32 @@ async fn test_unsubscribe() -> TestResult {
     let env = TestEnv::new().await;
 
     let result: Result<(), TestError> = async {
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         let (pub_sender, _) = connect_and_handshake(&env.url(), "Publisher").await?;
 
         // Subscribe
         sub_sender
-            .send(
-                codec::encode(&Message::Subscribe(SubscribeMessage {
-                    id: 1,
-                    pattern: "/test/**".to_string(),
-                    types: vec![],
-                    options: None,
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Subscribe(SubscribeMessage {
+                id: 1,
+                pattern: "/test/**".to_string(),
+                types: vec![],
+                options: None,
+            }))?)
+            .await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // First message should be received
         pub_sender
-            .send(
-                codec::encode(&Message::Set(SetMessage {
-                    address: "/test/value1".to_string(),
-                    value: Value::Int(1),
-                    revision: None, lock: false, unlock: false,
-                    
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Set(SetMessage {
+                address: "/test/value1".to_string(),
+                value: Value::Int(1),
+                revision: None,
+                lock: false,
+                unlock: false,
+            }))?)
+            .await?;
 
         let msg1 = timeout(Duration::from_secs(1), async {
             loop {
@@ -456,28 +454,23 @@ async fn test_unsubscribe() -> TestResult {
 
         // Unsubscribe
         sub_sender
-            .send(
-                codec::encode(&Message::Unsubscribe(UnsubscribeMessage { id: 1 }))
-                    ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Unsubscribe(UnsubscribeMessage {
+                id: 1,
+            }))?)
+            .await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Second message should NOT be received
         pub_sender
-            .send(
-                codec::encode(&Message::Set(SetMessage {
-                    address: "/test/value2".to_string(),
-                    value: Value::Int(2),
-                    revision: None, lock: false, unlock: false,
-                    
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Set(SetMessage {
+                address: "/test/value2".to_string(),
+                value: Value::Int(2),
+                revision: None,
+                lock: false,
+                unlock: false,
+            }))?)
+            .await?;
 
         let msg2 = timeout(Duration::from_millis(300), async {
             loop {
@@ -494,7 +487,9 @@ async fn test_unsubscribe() -> TestResult {
         .await;
 
         if msg2.is_ok() {
-            return Err(Box::new(StringError::from("Should NOT receive message after unsubscribe")) as TestError);
+            return Err(Box::new(StringError::from(
+                "Should NOT receive message after unsubscribe",
+            )) as TestError);
         }
 
         Ok(())
@@ -516,23 +511,20 @@ async fn test_multiple_subscriptions() -> TestResult {
     let env = TestEnv::new().await;
 
     let result: Result<(), TestError> = async {
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         let (pub_sender, _) = connect_and_handshake(&env.url(), "Publisher").await?;
 
         // Multiple subscriptions
         for (id, pattern) in [(1, "/a/**"), (2, "/b/**"), (3, "/c/**")] {
             sub_sender
-                .send(
-                    codec::encode(&Message::Subscribe(SubscribeMessage {
-                        id,
-                        pattern: pattern.to_string(),
-                        types: vec![],
-                        options: None,
-                    }))
-                    ?,
-                )
-                .await
-                ?;
+                .send(codec::encode(&Message::Subscribe(SubscribeMessage {
+                    id,
+                    pattern: pattern.to_string(),
+                    types: vec![],
+                    options: None,
+                }))?)
+                .await?;
         }
 
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -540,17 +532,14 @@ async fn test_multiple_subscriptions() -> TestResult {
         // Send to each namespace
         for addr in ["/a/val", "/b/val", "/c/val"] {
             pub_sender
-                .send(
-                    codec::encode(&Message::Set(SetMessage {
-                        address: addr.to_string(),
-                        value: Value::Int(1),
-                        revision: None, lock: false, unlock: false,
-                        
-                    }))
-                    ?,
-                )
-                .await
-                ?;
+                .send(codec::encode(&Message::Set(SetMessage {
+                    address: addr.to_string(),
+                    value: Value::Int(1),
+                    revision: None,
+                    lock: false,
+                    unlock: false,
+                }))?)
+                .await?;
         }
 
         // Should receive all 3
@@ -576,7 +565,10 @@ async fn test_multiple_subscriptions() -> TestResult {
         if received >= 2 {
             Ok(())
         } else {
-            Err(Box::new(StringError::from(format!("Only received {}/3 messages", received))) as TestError)
+            Err(Box::new(StringError::from(format!(
+                "Only received {}/3 messages",
+                received
+            ))) as TestError)
         }
     }
     .await;
@@ -599,17 +591,14 @@ async fn test_subscription_initial_snapshot() -> TestResult {
         // First client sets a value
         let (pub_sender, mut pub_receiver) = connect_and_handshake(&env.url(), "Publisher").await?;
         pub_sender
-            .send(
-                codec::encode(&Message::Set(SetMessage {
-                    address: "/snapshot/test".to_string(),
-                    value: Value::Float(42.0),
-                    revision: None, lock: false, unlock: false,
-                    
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Set(SetMessage {
+                address: "/snapshot/test".to_string(),
+                value: Value::Float(42.0),
+                revision: None,
+                lock: false,
+                unlock: false,
+            }))?)
+            .await?;
 
         // Wait for ACK
         loop {
@@ -622,19 +611,16 @@ async fn test_subscription_initial_snapshot() -> TestResult {
         }
 
         // Second client subscribes and should get snapshot with the value
-        let (sub_sender, mut sub_receiver) = connect_and_handshake(&env.url(), "Subscriber").await?;
+        let (sub_sender, mut sub_receiver) =
+            connect_and_handshake(&env.url(), "Subscriber").await?;
         sub_sender
-            .send(
-                codec::encode(&Message::Subscribe(SubscribeMessage {
-                    id: 1,
-                    pattern: "/snapshot/**".to_string(),
-                    types: vec![],
-                    options: None,
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Subscribe(SubscribeMessage {
+                id: 1,
+                pattern: "/snapshot/**".to_string(),
+                types: vec![],
+                options: None,
+            }))?)
+            .await?;
 
         // Should receive snapshot with current value
         let found = timeout(Duration::from_secs(2), async {
@@ -656,7 +642,9 @@ async fn test_subscription_initial_snapshot() -> TestResult {
         if found.is_ok() {
             Ok(())
         } else {
-            Err(Box::new(StringError::from("Did not receive snapshot with existing value")) as TestError)
+            Err(Box::new(StringError::from(
+                "Did not receive snapshot with existing value",
+            )) as TestError)
         }
     }
     .await;
@@ -680,17 +668,13 @@ async fn test_invalid_subscription_pattern() -> TestResult {
 
         // Subscribe with invalid pattern (empty)
         sender
-            .send(
-                codec::encode(&Message::Subscribe(SubscribeMessage {
-                    id: 1,
-                    pattern: "".to_string(), // Invalid
-                    types: vec![],
-                    options: None,
-                }))
-                ?,
-            )
-            .await
-            ?;
+            .send(codec::encode(&Message::Subscribe(SubscribeMessage {
+                id: 1,
+                pattern: "".to_string(), // Invalid
+                types: vec![],
+                options: None,
+            }))?)
+            .await?;
 
         // Should receive error
         let error = timeout(Duration::from_secs(1), async {
@@ -728,9 +712,7 @@ async fn test_invalid_subscription_pattern() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║                 CLASP Subscription Tests                          ║");
@@ -765,7 +747,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

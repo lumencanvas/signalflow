@@ -56,7 +56,11 @@ fn test_device_creation() -> TestResult {
     if device.id == "test-id-123" && device.name == "Test Device" && device.endpoints.is_empty() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Device properties not set correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Device properties not set correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -73,7 +77,11 @@ fn test_device_with_ws_endpoint() -> TestResult {
         }
     }
 
-    TestResult::fail(name, "WebSocket URL not set correctly", start.elapsed().as_millis())
+    TestResult::fail(
+        name,
+        "WebSocket URL not set correctly",
+        start.elapsed().as_millis(),
+    )
 }
 
 fn test_device_with_udp_endpoint() -> TestResult {
@@ -81,8 +89,7 @@ fn test_device_with_udp_endpoint() -> TestResult {
     let name = "device_with_udp_endpoint";
 
     let addr: SocketAddr = "192.168.1.100:7331".parse().unwrap();
-    let device = Device::new("test-id".to_string(), "Test".to_string())
-        .with_udp_endpoint(addr);
+    let device = Device::new("test-id".to_string(), "Test".to_string()).with_udp_endpoint(addr);
 
     if let Some(udp_addr) = device.udp_addr() {
         if udp_addr == addr {
@@ -90,7 +97,11 @@ fn test_device_with_udp_endpoint() -> TestResult {
         }
     }
 
-    TestResult::fail(name, "UDP endpoint not set correctly", start.elapsed().as_millis())
+    TestResult::fail(
+        name,
+        "UDP endpoint not set correctly",
+        start.elapsed().as_millis(),
+    )
 }
 
 fn test_device_multiple_endpoints() -> TestResult {
@@ -109,7 +120,11 @@ fn test_device_multiple_endpoints() -> TestResult {
     if has_ws && has_udp && endpoints_count == 2 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Expected 2 endpoints, got {}", endpoints_count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Expected 2 endpoints, got {}", endpoints_count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -128,7 +143,11 @@ fn test_device_touch() -> TestResult {
     if device.last_seen > initial {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "last_seen not updated by touch()", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "last_seen not updated by touch()",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -147,7 +166,11 @@ fn test_device_staleness() -> TestResult {
     if not_stale && stale {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Staleness check incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Staleness check incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -168,7 +191,11 @@ fn test_device_info_default() -> TestResult {
     if has_features && is_not_bridge && version_set {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Default DeviceInfo not correct", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Default DeviceInfo not correct",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -176,13 +203,20 @@ fn test_device_info_with_features() -> TestResult {
     let start = std::time::Instant::now();
     let name = "device_info_with_features";
 
-    let info = DeviceInfo::default()
-        .with_features(vec!["param".to_string(), "stream".to_string(), "gesture".to_string()]);
+    let info = DeviceInfo::default().with_features(vec![
+        "param".to_string(),
+        "stream".to_string(),
+        "gesture".to_string(),
+    ]);
 
     if info.features.len() == 3 && info.features.contains(&"gesture".to_string()) {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Features not set correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Features not set correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -195,7 +229,11 @@ fn test_device_info_as_bridge() -> TestResult {
     if info.bridge && info.bridge_protocol == Some("osc".to_string()) {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Bridge configuration incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Bridge configuration incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -212,7 +250,11 @@ fn test_discovery_creation() -> TestResult {
     if discovery.devices().count() == 0 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "New discovery should have no devices", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "New discovery should have no devices",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -239,10 +281,17 @@ fn test_discovery_config_default() -> TestResult {
 
     let config = DiscoveryConfig::default();
 
-    if config.mdns && config.broadcast && config.broadcast_port == clasp_core::DEFAULT_DISCOVERY_PORT {
+    if config.mdns
+        && config.broadcast
+        && config.broadcast_port == clasp_core::DEFAULT_DISCOVERY_PORT
+    {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Default config not correct", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Default config not correct",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -260,7 +309,11 @@ fn test_discovery_manual_add() -> TestResult {
     if discovery.devices().count() == 1 && discovery.get("manual-1").is_some() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Manual device add failed", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Manual device add failed",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -275,7 +328,8 @@ fn test_discovery_manual_remove() -> TestResult {
 
     let removed = discovery.remove("removable");
 
-    if removed.is_some() && discovery.devices().count() == 0 && discovery.get("removable").is_none() {
+    if removed.is_some() && discovery.devices().count() == 0 && discovery.get("removable").is_none()
+    {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
         TestResult::fail(name, "Device removal failed", start.elapsed().as_millis())
@@ -291,7 +345,11 @@ fn test_discovery_get_nonexistent() -> TestResult {
     if discovery.get("nonexistent").is_none() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Should return None for nonexistent device", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Should return None for nonexistent device",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -309,7 +367,11 @@ fn test_discovery_multiple_devices() -> TestResult {
     if discovery.devices().count() == 5 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Multiple devices not added correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Multiple devices not added correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -333,7 +395,11 @@ fn test_discovery_overwrite_device() -> TestResult {
         }
     }
 
-    TestResult::fail(name, "Device overwrite not working correctly", start.elapsed().as_millis())
+    TestResult::fail(
+        name,
+        "Device overwrite not working correctly",
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -352,7 +418,11 @@ fn test_discovery_event_found() -> TestResult {
             if d.id == "found-1" {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "Found event device ID mismatch", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "Found event device ID mismatch",
+                    start.elapsed().as_millis(),
+                )
             }
         }
         _ => TestResult::fail(name, "Wrong event variant", start.elapsed().as_millis()),
@@ -388,7 +458,11 @@ fn test_discovery_event_error() -> TestResult {
             if msg == "Network error" {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "Error event message mismatch", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "Error event message mismatch",
+                    start.elapsed().as_millis(),
+                )
             }
         }
         _ => TestResult::fail(name, "Wrong event variant", start.elapsed().as_millis()),
@@ -416,7 +490,11 @@ async fn test_broadcast_responder_creation() -> TestResult {
     .await
     {
         Ok(_responder) => TestResult::pass(name, start.elapsed().as_millis()),
-        Err(e) => TestResult::fail(name, format!("Failed to create responder: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Failed to create responder: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -426,9 +504,7 @@ async fn test_broadcast_responder_creation() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Discovery Tests                               ║");
@@ -442,12 +518,10 @@ async fn main() {
         test_device_multiple_endpoints(),
         test_device_touch(),
         test_device_staleness(),
-
         // DeviceInfo tests
         test_device_info_default(),
         test_device_info_with_features(),
         test_device_info_as_bridge(),
-
         // Discovery tests
         test_discovery_creation(),
         test_discovery_with_config(),
@@ -457,7 +531,6 @@ async fn main() {
         test_discovery_get_nonexistent(),
         test_discovery_multiple_devices(),
         test_discovery_overwrite_device(),
-
         // DiscoveryEvent tests
         test_discovery_event_found(),
         test_discovery_event_lost(),
@@ -489,7 +562,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

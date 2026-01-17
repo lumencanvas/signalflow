@@ -70,7 +70,11 @@ impl TestRouter {
             name: "Test Router".to_string(),
             max_sessions: 100,
             session_timeout: 60,
-            features: vec!["param".to_string(), "event".to_string(), "stream".to_string()],
+            features: vec![
+                "param".to_string(),
+                "event".to_string(),
+                "stream".to_string(),
+            ],
         });
 
         let handle = tokio::spawn(async move {
@@ -114,7 +118,11 @@ async fn test_builder_default() -> TestResult {
                 TestResult::fail(name, "Client not connected", start.elapsed().as_millis())
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -139,7 +147,11 @@ async fn test_builder_custom_name() -> TestResult {
                 TestResult::fail(name, "Client not connected", start.elapsed().as_millis())
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -150,7 +162,12 @@ async fn test_builder_features() -> TestResult {
     let router = TestRouter::start().await;
 
     let result = ClaspBuilder::new(&router.url())
-        .features(vec!["param".to_string(), "event".to_string(), "stream".to_string(), "gesture".to_string()])
+        .features(vec![
+            "param".to_string(),
+            "event".to_string(),
+            "stream".to_string(),
+            "gesture".to_string(),
+        ])
         .connect()
         .await;
 
@@ -164,7 +181,11 @@ async fn test_builder_features() -> TestResult {
                 TestResult::fail(name, "Client not connected", start.elapsed().as_millis())
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -190,7 +211,11 @@ async fn test_builder_reconnect_settings() -> TestResult {
                 TestResult::fail(name, "Client not connected", start.elapsed().as_millis())
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -213,10 +238,18 @@ async fn test_connect_to() -> TestResult {
             if client.is_connected() && client.session_id().is_some() {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "Client not properly connected", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "Client not properly connected",
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -233,9 +266,12 @@ async fn test_session_id() -> TestResult {
         if session_id.is_some() && !session_id.as_ref().unwrap().is_empty() {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("No session ID".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "No session ID".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -261,9 +297,12 @@ async fn test_graceful_disconnect() -> TestResult {
         if !client.is_connected() {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("Still connected after close".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "Still connected after close".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -282,7 +321,11 @@ async fn test_connection_error() -> TestResult {
 
     match result {
         Err(_) => TestResult::pass(name, start.elapsed().as_millis()),
-        Ok(_) => TestResult::fail(name, "Should have failed to connect", start.elapsed().as_millis()),
+        Ok(_) => TestResult::fail(
+            name,
+            "Should have failed to connect",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -306,7 +349,8 @@ async fn test_set_parameter() -> TestResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -331,7 +375,8 @@ async fn test_set_locked() -> TestResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -354,9 +399,11 @@ async fn test_subscribe_parameter() -> TestResult {
         let received_clone = received.clone();
 
         // Subscribe to a pattern
-        let sub_id = client.subscribe("/test/**", move |_value, _address| {
-            received_clone.fetch_add(1, Ordering::SeqCst);
-        }).await?;
+        let sub_id = client
+            .subscribe("/test/**", move |_value, _address| {
+                received_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .await?;
 
         // Set a value that matches the pattern
         client.set("/test/sensor/temperature", 23.5).await?;
@@ -371,9 +418,12 @@ async fn test_subscribe_parameter() -> TestResult {
         if received.load(Ordering::SeqCst) >= 1 {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("No subscription callback".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "No subscription callback".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -396,9 +446,11 @@ async fn test_on_shorthand() -> TestResult {
         let received_clone = received.clone();
 
         // Use the `on` shorthand
-        let _sub_id = client.on("/sensors/*", move |_value, _address| {
-            received_clone.fetch_add(1, Ordering::SeqCst);
-        }).await?;
+        let _sub_id = client
+            .on("/sensors/*", move |_value, _address| {
+                received_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .await?;
 
         client.set("/sensors/temperature", 25.0).await?;
 
@@ -407,9 +459,12 @@ async fn test_on_shorthand() -> TestResult {
         if received.load(Ordering::SeqCst) >= 1 {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("No callback received".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "No callback received".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -431,9 +486,11 @@ async fn test_unsubscribe() -> TestResult {
         let received = Arc::new(AtomicU32::new(0));
         let received_clone = received.clone();
 
-        let sub_id = client.subscribe("/test/**", move |_value, _address| {
-            received_clone.fetch_add(1, Ordering::SeqCst);
-        }).await?;
+        let sub_id = client
+            .subscribe("/test/**", move |_value, _address| {
+                received_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .await?;
 
         // Unsubscribe immediately
         client.unsubscribe(sub_id).await?;
@@ -446,7 +503,8 @@ async fn test_unsubscribe() -> TestResult {
         // Should not have received anything after unsubscribe
         // (Note: might receive one from the SET before unsubscribe)
         Ok(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -482,7 +540,8 @@ async fn test_cached_value() -> TestResult {
             // Cache might not be populated in time, that's acceptable
             Ok(())
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -506,12 +565,15 @@ async fn test_emit_event() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await?;
 
         // Emit an event
-        client.emit("/events/button", Value::String("pressed".to_string())).await?;
+        client
+            .emit("/events/button", Value::String("pressed".to_string()))
+            .await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -532,13 +594,16 @@ async fn test_stream() -> TestResult {
 
         // Send stream samples
         for i in 0..10 {
-            client.stream("/sensors/accel", Value::Float(i as f64 * 0.1)).await?;
+            client
+                .stream("/sensors/accel", Value::Float(i as f64 * 0.1))
+                .await?;
         }
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -591,7 +656,8 @@ async fn test_bundle() -> TestResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -610,15 +676,13 @@ async fn test_bundle_at() -> TestResult {
     let result = async {
         let client = Clasp::connect_to(&router.url()).await?;
 
-        let messages = vec![
-            Message::Set(SetMessage {
-                address: "/scheduled/value".to_string(),
-                value: Value::Float(99.9),
-                revision: None,
-                lock: false,
-                unlock: false,
-            }),
-        ];
+        let messages = vec![Message::Set(SetMessage {
+            address: "/scheduled/value".to_string(),
+            value: Value::Float(99.9),
+            revision: None,
+            lock: false,
+            unlock: false,
+        })];
 
         // Schedule for 100ms in the future
         let future_time = client.time() + 100_000; // 100ms in microseconds
@@ -627,7 +691,8 @@ async fn test_bundle_at() -> TestResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -653,9 +718,12 @@ async fn test_clock_sync() -> TestResult {
         if server_time > 0 {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("Invalid server time".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "Invalid server time".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -687,7 +755,10 @@ async fn test_concurrent_operations() -> TestResult {
         let mut success_count = 0;
         for (i, client) in clients.iter().enumerate() {
             for j in 0..5 {
-                match client.set(&format!("/concurrent/{}/{}", i, j), (i * 10 + j) as f64).await {
+                match client
+                    .set(&format!("/concurrent/{}/{}", i, j), (i * 10 + j) as f64)
+                    .await
+                {
                     Ok(()) => success_count += 1,
                     Err(_) => {}
                 }
@@ -699,9 +770,13 @@ async fn test_concurrent_operations() -> TestResult {
         if success_count >= 20 {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other(format!("Only {}/25 succeeded", success_count)))
+            Err(clasp_client::ClientError::Other(format!(
+                "Only {}/25 succeeded",
+                success_count
+            )))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -728,13 +803,21 @@ async fn test_multiple_value_types() -> TestResult {
 
         // Test Value enum directly
         client.set("/types/null", Value::Null).await?;
-        client.set("/types/bytes", Value::Bytes(vec![0x00, 0xFF, 0x42])).await?;
-        client.set("/types/array", Value::Array(vec![Value::Int(1), Value::Int(2)])).await?;
+        client
+            .set("/types/bytes", Value::Bytes(vec![0x00, 0xFF, 0x42]))
+            .await?;
+        client
+            .set(
+                "/types/array",
+                Value::Array(vec![Value::Int(1), Value::Int(2)]),
+            )
+            .await?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         Ok::<_, clasp_client::ClientError>(())
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -763,10 +846,12 @@ async fn test_two_client_set_receive() -> TestResult {
         let notify = Arc::new(Notify::new());
         let notify_clone = notify.clone();
 
-        client1.subscribe("/shared/**", move |_value, _address| {
-            received_clone.fetch_add(1, Ordering::SeqCst);
-            notify_clone.notify_one();
-        }).await?;
+        client1
+            .subscribe("/shared/**", move |_value, _address| {
+                received_clone.fetch_add(1, Ordering::SeqCst);
+                notify_clone.notify_one();
+            })
+            .await?;
 
         // Give subscription time to register
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -781,9 +866,12 @@ async fn test_two_client_set_receive() -> TestResult {
         if received.load(Ordering::SeqCst) >= 1 {
             Ok(())
         } else {
-            Err(clasp_client::ClientError::Other("Client 1 did not receive value from Client 2".to_string()))
+            Err(clasp_client::ClientError::Other(
+                "Client 1 did not receive value from Client 2".to_string(),
+            ))
         }
-    }.await;
+    }
+    .await;
 
     router.stop();
 
@@ -799,9 +887,7 @@ async fn test_two_client_set_receive() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Client Library Tests                          ║");
@@ -813,13 +899,11 @@ async fn main() {
         test_builder_custom_name().await,
         test_builder_features().await,
         test_builder_reconnect_settings().await,
-
         // Connection lifecycle tests
         test_connect_to().await,
         test_session_id().await,
         test_graceful_disconnect().await,
         test_connection_error().await,
-
         // Parameter operations tests
         test_set_parameter().await,
         test_set_locked().await,
@@ -827,18 +911,15 @@ async fn main() {
         test_on_shorthand().await,
         test_unsubscribe().await,
         test_cached_value().await,
-
         // Event operations tests
         test_emit_event().await,
         test_stream().await,
-
         // Advanced features tests
         test_bundle().await,
         test_bundle_at().await,
         test_clock_sync().await,
         test_concurrent_operations().await,
         test_multiple_value_types().await,
-
         // Two-client interaction tests
         test_two_client_set_receive().await,
     ];
@@ -862,7 +943,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

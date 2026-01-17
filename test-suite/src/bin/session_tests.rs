@@ -118,7 +118,11 @@ async fn test_session_unique_id() -> TestResult {
             }
             Err(e) => {
                 router.stop();
-                return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+                return TestResult::fail(
+                    name,
+                    format!("Connect failed: {}", e),
+                    start.elapsed().as_millis(),
+                );
             }
         }
     }
@@ -129,7 +133,11 @@ async fn test_session_unique_id() -> TestResult {
     if session_ids.len() == 5 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only {} unique IDs for 5 clients", session_ids.len()), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only {} unique IDs for 5 clients", session_ids.len()),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -150,13 +158,21 @@ async fn test_session_id_format() -> TestResult {
                 if session_id.len() == 36 && session_id.chars().filter(|c| *c == '-').count() == 4 {
                     TestResult::pass(name, start.elapsed().as_millis())
                 } else {
-                    TestResult::fail(name, format!("Invalid UUID format: {}", session_id), start.elapsed().as_millis())
+                    TestResult::fail(
+                        name,
+                        format!("Invalid UUID format: {}", session_id),
+                        start.elapsed().as_millis(),
+                    )
                 }
             } else {
                 TestResult::fail(name, "No session ID", start.elapsed().as_millis())
             }
         }
-        Err(e) => TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Connect failed: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -175,7 +191,11 @@ async fn test_session_cleanup_on_disconnect() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -196,12 +216,20 @@ async fn test_session_cleanup_on_disconnect() -> TestResult {
             if new_session != session_id {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "New client got same session ID", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "New client got same session ID",
+                    start.elapsed().as_millis(),
+                )
             }
         }
         Err(e) => {
             router.stop();
-            TestResult::fail(name, format!("Reconnect failed: {}", e), start.elapsed().as_millis())
+            TestResult::fail(
+                name,
+                format!("Reconnect failed: {}", e),
+                start.elapsed().as_millis(),
+            )
         }
     }
 }
@@ -231,7 +259,14 @@ async fn test_session_multiple_reconnects() -> TestResult {
     if all_sessions.len() == 5 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Only {} unique sessions for 5 reconnects", all_sessions.len()), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!(
+                "Only {} unique sessions for 5 reconnects",
+                all_sessions.len()
+            ),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -291,7 +326,11 @@ async fn test_concurrent_session_state() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client1 connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client1 connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -299,7 +338,11 @@ async fn test_concurrent_session_state() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client2 connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client2 connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -307,7 +350,11 @@ async fn test_concurrent_session_state() -> TestResult {
     let result = if client1.session_id() != client2.session_id() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Clients have same session ID", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Clients have same session ID",
+            start.elapsed().as_millis(),
+        )
     };
 
     router.stop();
@@ -329,30 +376,42 @@ async fn test_session_subscription_isolation() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client1 failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client1 failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received1 = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
     let received1_clone = received1.clone();
-    let _ = client1.subscribe("/client1/**", move |_, _| {
-        received1_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }).await;
+    let _ = client1
+        .subscribe("/client1/**", move |_, _| {
+            received1_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        })
+        .await;
 
     // Client 2 subscribes to /client2/**
     let client2 = match Clasp::connect_to(&router.url()).await {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Client2 failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Client2 failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received2 = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
     let received2_clone = received2.clone();
-    let _ = client2.subscribe("/client2/**", move |_, _| {
-        received2_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }).await;
+    let _ = client2
+        .subscribe("/client2/**", move |_, _| {
+            received2_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -373,7 +432,11 @@ async fn test_session_subscription_isolation() -> TestResult {
     if r1 >= 1 && r2 >= 1 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Unexpected receive count: r1={}, r2={}", r1, r2), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Unexpected receive count: r1={}, r2={}", r1, r2),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -383,9 +446,7 @@ async fn test_session_subscription_isolation() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Session Management Tests                      ║");
@@ -395,15 +456,12 @@ async fn main() {
         // Session creation tests
         test_session_unique_id().await,
         test_session_id_format().await,
-
         // Session cleanup tests
         test_session_cleanup_on_disconnect().await,
         test_session_multiple_reconnects().await,
-
         // Concurrent sessions tests
         test_max_sessions_limit().await,
         test_concurrent_session_state().await,
-
         // Session isolation tests
         test_session_subscription_isolation().await,
     ];
@@ -427,7 +485,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

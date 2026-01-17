@@ -35,11 +35,21 @@ struct TestResult {
 
 impl TestResult {
     fn pass(name: &'static str, message: impl Into<String>, duration_ms: u128) -> Self {
-        Self { name, passed: true, message: message.into(), duration_ms }
+        Self {
+            name,
+            passed: true,
+            message: message.into(),
+            duration_ms,
+        }
     }
 
     fn fail(name: &'static str, message: impl Into<String>, duration_ms: u128) -> Self {
-        Self { name, passed: false, message: message.into(), duration_ms }
+        Self {
+            name,
+            passed: false,
+            message: message.into(),
+            duration_ms,
+        }
     }
 }
 
@@ -99,7 +109,11 @@ async fn test_burst_traffic() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -107,16 +121,22 @@ async fn test_burst_traffic() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received = Arc::new(AtomicU32::new(0));
     let received_clone = received.clone();
 
-    let _ = receiver.subscribe("/burst/**", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-    }).await;
+    let _ = receiver
+        .subscribe("/burst/**", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -133,9 +153,17 @@ async fn test_burst_traffic() -> TestResult {
     router.stop();
 
     if count >= (burst_count * 9 / 10) as u32 {
-        TestResult::pass(name, format!("Received {}/{} messages", count, burst_count), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("Received {}/{} messages", count, burst_count),
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("Only received {}/{} messages", count, burst_count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only received {}/{} messages", count, burst_count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -171,9 +199,20 @@ async fn test_connection_storm() -> TestResult {
     router.stop();
 
     if success_count >= client_count * 9 / 10 {
-        TestResult::pass(name, format!("{}/{} clients connected successfully", success_count, client_count), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!(
+                "{}/{} clients connected successfully",
+                success_count, client_count
+            ),
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("Only {}/{} clients connected", success_count, client_count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only {}/{} clients connected", success_count, client_count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -190,14 +229,22 @@ async fn test_connection_recovery() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Initial connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Initial connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     // Verify working
     if let Err(e) = client.set("/test/value", 1.0).await {
         router.stop();
-        return TestResult::fail(name, format!("Initial set failed: {}", e), start.elapsed().as_millis());
+        return TestResult::fail(
+            name,
+            format!("Initial set failed: {}", e),
+            start.elapsed().as_millis(),
+        );
     }
 
     // Close connection
@@ -210,14 +257,22 @@ async fn test_connection_recovery() -> TestResult {
         Ok(new_client) => {
             if let Err(e) = new_client.set("/test/value", 2.0).await {
                 router.stop();
-                return TestResult::fail(name, format!("Post-reconnect set failed: {}", e), start.elapsed().as_millis());
+                return TestResult::fail(
+                    name,
+                    format!("Post-reconnect set failed: {}", e),
+                    start.elapsed().as_millis(),
+                );
             }
             router.stop();
             TestResult::pass(name, "Reconnection successful", start.elapsed().as_millis())
         }
         Err(e) => {
             router.stop();
-            TestResult::fail(name, format!("Reconnect failed: {}", e), start.elapsed().as_millis())
+            TestResult::fail(
+                name,
+                format!("Reconnect failed: {}", e),
+                start.elapsed().as_millis(),
+            )
         }
     }
 }
@@ -233,7 +288,11 @@ async fn test_slow_consumer() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Sender connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Sender connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -241,7 +300,11 @@ async fn test_slow_consumer() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -249,10 +312,12 @@ async fn test_slow_consumer() -> TestResult {
     let received_clone = received.clone();
 
     // Slow consumer - sleeps on each message
-    let _ = receiver.subscribe("/slow/**", move |_, _| {
-        received_clone.fetch_add(1, Ordering::SeqCst);
-        std::thread::sleep(Duration::from_millis(10)); // Simulate slow processing
-    }).await;
+    let _ = receiver
+        .subscribe("/slow/**", move |_, _| {
+            received_clone.fetch_add(1, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(10)); // Simulate slow processing
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -268,9 +333,17 @@ async fn test_slow_consumer() -> TestResult {
     router.stop();
 
     if count >= 90 {
-        TestResult::pass(name, format!("Slow consumer received {}/100", count), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("Slow consumer received {}/100", count),
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("Slow consumer only got {}/100", count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Slow consumer only got {}/100", count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -285,7 +358,11 @@ async fn test_large_payloads() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -305,10 +382,22 @@ async fn test_large_payloads() -> TestResult {
 
     let passed: Vec<_> = results.iter().filter(|(_, ok)| *ok).collect();
     if passed.len() == sizes.len() {
-        TestResult::pass(name, format!("All sizes passed: {:?}", sizes), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("All sizes passed: {:?}", sizes),
+            start.elapsed().as_millis(),
+        )
     } else {
-        let failed: Vec<_> = results.iter().filter(|(_, ok)| !*ok).map(|(s, _)| *s).collect();
-        TestResult::fail(name, format!("Failed at sizes: {:?}", failed), start.elapsed().as_millis())
+        let failed: Vec<_> = results
+            .iter()
+            .filter(|(_, ok)| !*ok)
+            .map(|(s, _)| *s)
+            .collect();
+        TestResult::fail(
+            name,
+            format!("Failed at sizes: {:?}", failed),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -323,7 +412,11 @@ async fn test_message_ordering() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -331,20 +424,26 @@ async fn test_message_ordering() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Receiver connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Receiver connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
     let received_values = Arc::new(std::sync::Mutex::new(Vec::new()));
     let received_clone = received_values.clone();
 
-    let _ = receiver.subscribe("/order/value", move |value, _| {
-        if let Some(v) = value.as_f64() {
-            if let Ok(mut vec) = received_clone.lock() {
-                vec.push(v as i32);
+    let _ = receiver
+        .subscribe("/order/value", move |value, _| {
+            if let Some(v) = value.as_f64() {
+                if let Ok(mut vec) = received_clone.lock() {
+                    vec.push(v as i32);
+                }
             }
-        }
-    }).await;
+        })
+        .await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -370,11 +469,23 @@ async fn test_message_ordering() -> TestResult {
     }
 
     if in_order && values.len() >= (count * 9 / 10) as usize {
-        TestResult::pass(name, format!("Received {} messages in order", values.len()), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("Received {} messages in order", values.len()),
+            start.elapsed().as_millis(),
+        )
     } else if !in_order {
-        TestResult::fail(name, "Messages received out of order", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Messages received out of order",
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("Only received {}/{} messages", values.len(), count), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Only received {}/{} messages", values.len(), count),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -389,7 +500,11 @@ async fn test_subscription_churn() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -413,9 +528,17 @@ async fn test_subscription_churn() -> TestResult {
     router.stop();
 
     if errors == 0 {
-        TestResult::pass(name, format!("{} subscribe/unsubscribe cycles", cycles), start.elapsed().as_millis())
+        TestResult::pass(
+            name,
+            format!("{} subscribe/unsubscribe cycles", cycles),
+            start.elapsed().as_millis(),
+        )
     } else {
-        TestResult::fail(name, format!("{} errors in {} cycles", errors, cycles), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("{} errors in {} cycles", errors, cycles),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -430,7 +553,11 @@ async fn test_memory_pressure() -> TestResult {
         Ok(c) => c,
         Err(e) => {
             router.stop();
-            return TestResult::fail(name, format!("Connect failed: {}", e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Connect failed: {}", e),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
@@ -439,12 +566,20 @@ async fn test_memory_pressure() -> TestResult {
     for i in 0..address_count {
         if let Err(e) = client.set(&format!("/memory/addr/{}", i), i as f64).await {
             router.stop();
-            return TestResult::fail(name, format!("Failed at {}: {}", i, e), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("Failed at {}: {}", i, e),
+                start.elapsed().as_millis(),
+            );
         }
     }
 
     router.stop();
-    TestResult::pass(name, format!("Created {} unique addresses", address_count), start.elapsed().as_millis())
+    TestResult::pass(
+        name,
+        format!("Created {} unique addresses", address_count),
+        start.elapsed().as_millis(),
+    )
 }
 
 // ============================================================================
@@ -453,9 +588,7 @@ async fn test_memory_pressure() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Network Simulation Tests                      ║");
@@ -499,7 +632,10 @@ async fn main() {
             }
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

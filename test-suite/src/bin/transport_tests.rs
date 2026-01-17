@@ -9,7 +9,9 @@
 
 use clasp_core::{codec, HelloMessage, Message, WS_SUBPROTOCOL};
 use clasp_router::{Router, RouterConfig};
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -131,7 +133,8 @@ async fn test_websocket_binary_frames() -> TestResult {
             version: 2,
             name: "BinaryTest".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         let bytes = codec::encode(&hello)?;
         sender.send(bytes).await?;
@@ -234,7 +237,8 @@ async fn test_large_message() -> TestResult {
             version: 2,
             name: "LargeTest".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -257,8 +261,9 @@ async fn test_large_message() -> TestResult {
         let set = Message::Set(clasp_core::SetMessage {
             address: "/large/data".to_string(),
             value: clasp_core::Value::Bytes(large_data),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
         sender.send(codec::encode(&set)?).await?;
 
@@ -328,7 +333,10 @@ async fn test_concurrent_connections() -> TestResult {
         .collect();
 
     let results = futures::future::join_all(handles).await;
-    let success_count = results.iter().filter(|r| r.as_ref().unwrap_or(&false) == &true).count();
+    let success_count = results
+        .iter()
+        .filter(|r| r.as_ref().unwrap_or(&false) == &true)
+        .count();
 
     handle.abort();
 
@@ -349,9 +357,7 @@ async fn test_concurrent_connections() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║                  CLASP Transport Layer Tests                      ║");
@@ -387,7 +393,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

@@ -10,7 +10,9 @@
 use bytes::Bytes;
 use clasp_core::{codec, HelloMessage, Message, SetMessage, Value, PROTOCOL_VERSION};
 use clasp_router::{Router, RouterConfig};
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -109,8 +111,8 @@ async fn test_malformed_message() -> TestResult {
             Ok(Some(TransportEvent::Error(_))) => Ok(()), // Error is fine
             Ok(Some(TransportEvent::Disconnected { .. })) => Ok(()), // Disconnect is fine
             Ok(Some(TransportEvent::Connected)) => Ok(()), // Connection still ok
-            Ok(Some(TransportEvent::Data(_))) => Ok(()), // Even data response is ok
-            Ok(None) => Ok(()), // Connection closed is fine
+            Ok(Some(TransportEvent::Data(_))) => Ok(()),  // Even data response is ok
+            Ok(None) => Ok(()),                           // Connection closed is fine
             Err(_) => Ok(()), // Timeout is fine (server ignored bad data)
         }
     }
@@ -138,7 +140,8 @@ async fn test_truncated_message() -> TestResult {
             version: 2,
             name: "Test".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         let mut bytes = codec::encode(&hello)?;
         // Truncate to just 3 bytes
@@ -175,7 +178,8 @@ async fn test_wrong_protocol_version() -> TestResult {
             version: 99, // Invalid version (not 2)
             name: "BadVersion".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -202,10 +206,10 @@ async fn test_wrong_protocol_version() -> TestResult {
         // Either error or welcome (with potential version warning) is acceptable
         match response {
             Ok(Ok(Message::Welcome(_))) => Ok(()), // Server accepted anyway
-            Ok(Ok(Message::Error(_))) => Ok(()), // Server rejected - also fine
-            Ok(Ok(_)) => Ok(()), // Any other message - server handled somehow
-            Ok(Err(_)) => Ok(()), // Error during receive
-            Err(_) => Ok(()), // Timeout - server might have ignored
+            Ok(Ok(Message::Error(_))) => Ok(()),   // Server rejected - also fine
+            Ok(Ok(_)) => Ok(()),                   // Any other message - server handled somehow
+            Ok(Err(_)) => Ok(()),                  // Error during receive
+            Err(_) => Ok(()),                      // Timeout - server might have ignored
         }
     }
     .await;
@@ -231,8 +235,9 @@ async fn test_message_before_hello() -> TestResult {
         let set = Message::Set(SetMessage {
             address: "/test".to_string(),
             value: Value::Int(1),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
         sender.send(codec::encode(&set)?).await?;
 
@@ -246,7 +251,7 @@ async fn test_message_before_hello() -> TestResult {
                 match msg {
                     Message::Ack(_) => Err("Should not ACK before HELLO".into()),
                     Message::Error(_) => Ok(()), // Error is correct behavior
-                    _ => Ok(()), // Other responses ok
+                    _ => Ok(()),                 // Other responses ok
                 }
             }
             _ => Ok(()), // Timeout or disconnect is fine
@@ -276,7 +281,8 @@ async fn test_duplicate_hello() -> TestResult {
             version: PROTOCOL_VERSION,
             name: "First".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -299,7 +305,8 @@ async fn test_duplicate_hello() -> TestResult {
             version: PROTOCOL_VERSION,
             name: "Second".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello2)?).await?;
 
@@ -333,7 +340,8 @@ async fn test_very_long_address() -> TestResult {
             version: PROTOCOL_VERSION,
             name: "LongAddressTest".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -356,8 +364,9 @@ async fn test_very_long_address() -> TestResult {
         let set = Message::Set(SetMessage {
             address: long_addr,
             value: Value::Int(1),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
         sender.send(codec::encode(&set)?).await?;
 
@@ -391,7 +400,8 @@ async fn test_empty_address() -> TestResult {
             version: PROTOCOL_VERSION,
             name: "EmptyAddressTest".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -413,8 +423,9 @@ async fn test_empty_address() -> TestResult {
         let set = Message::Set(SetMessage {
             address: "".to_string(), // Empty!
             value: Value::Int(1),
-            revision: None, lock: false, unlock: false,
-            
+            revision: None,
+            lock: false,
+            unlock: false,
         });
         sender.send(codec::encode(&set)?).await?;
 
@@ -426,7 +437,7 @@ async fn test_empty_address() -> TestResult {
                 let (msg, _) = codec::decode(&data)?;
                 match msg {
                     Message::Error(_) => Ok(()), // Error is correct
-                    Message::Ack(_) => Ok(()), // Accepting empty is also valid
+                    Message::Ack(_) => Ok(()),   // Accepting empty is also valid
                     _ => Ok(()),
                 }
             }
@@ -458,7 +469,8 @@ async fn test_rapid_disconnect_reconnect() -> TestResult {
                 version: PROTOCOL_VERSION,
                 name: format!("Rapid{}", i),
                 features: vec![],
-                capabilities: None, token: None,
+                capabilities: None,
+                token: None,
             });
             sender.send(codec::encode(&hello)?).await?;
 
@@ -494,7 +506,7 @@ async fn test_connection_to_closed_port() -> TestResult {
 
     match result {
         Ok(Err(_)) => TestResult::pass(name, start.elapsed().as_millis()), // Connection refused
-        Err(_) => TestResult::pass(name, start.elapsed().as_millis()), // Timeout
+        Err(_) => TestResult::pass(name, start.elapsed().as_millis()),     // Timeout
         Ok(Ok(_)) => TestResult::fail(name, "Should not connect", start.elapsed().as_millis()),
     }
 }
@@ -513,7 +525,8 @@ async fn test_special_characters_in_address() -> TestResult {
             version: PROTOCOL_VERSION,
             name: "SpecialChars".to_string(),
             features: vec![],
-            capabilities: None, token: None,
+            capabilities: None,
+            token: None,
         });
         sender.send(codec::encode(&hello)?).await?;
 
@@ -544,8 +557,9 @@ async fn test_special_characters_in_address() -> TestResult {
             let set = Message::Set(SetMessage {
                 address: addr.to_string(),
                 value: Value::Int(1),
-                revision: None, lock: false, unlock: false,
-                
+                revision: None,
+                lock: false,
+                unlock: false,
             });
             sender.send(codec::encode(&set)?).await?;
 
@@ -571,9 +585,7 @@ async fn test_special_characters_in_address() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("warn")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("warn").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║                 CLASP Error Handling Tests                        ║");
@@ -611,7 +623,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

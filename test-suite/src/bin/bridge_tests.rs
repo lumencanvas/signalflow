@@ -64,7 +64,11 @@ fn test_mqtt_config_default() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Default MQTT config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Default MQTT config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -93,7 +97,11 @@ fn test_mqtt_config_custom() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Custom MQTT config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Custom MQTT config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -108,13 +116,14 @@ fn test_mqtt_bridge_creation() -> TestResult {
 
     let bridge_config = bridge.config();
 
-    if bridge_config.protocol == "mqtt"
-        && bridge_config.bidirectional
-        && !bridge.is_running()
-    {
+    if bridge_config.protocol == "mqtt" && bridge_config.bidirectional && !bridge.is_running() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "MQTT bridge not created correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "MQTT bridge not created correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -138,7 +147,11 @@ fn test_http_config_default() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Default HTTP config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Default HTTP config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -165,7 +178,11 @@ fn test_http_config_client_mode() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "HTTP client config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "HTTP client config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -180,13 +197,14 @@ fn test_http_bridge_creation() -> TestResult {
 
     let bridge_config = bridge.config();
 
-    if bridge_config.protocol == "http"
-        && bridge_config.bidirectional
-        && !bridge.is_running()
-    {
+    if bridge_config.protocol == "http" && bridge_config.bidirectional && !bridge.is_running() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "HTTP bridge not created correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "HTTP bridge not created correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -222,10 +240,18 @@ async fn test_http_server_start_stop() -> TestResult {
             if connected && !bridge.is_running() {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "HTTP server didn't connect/stop properly", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "HTTP server didn't connect/stop properly",
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        Err(e) => TestResult::fail(name, format!("Failed to start: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Failed to start: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -237,7 +263,7 @@ fn test_websocket_config_default() -> TestResult {
     let start = std::time::Instant::now();
     let name = "websocket_config_default";
 
-    use clasp_bridge::websocket::{WebSocketBridgeConfig, WsMode, WsMessageFormat};
+    use clasp_bridge::websocket::{WebSocketBridgeConfig, WsMessageFormat, WsMode};
 
     let config = WebSocketBridgeConfig::default();
 
@@ -249,7 +275,11 @@ fn test_websocket_config_default() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Default WebSocket config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Default WebSocket config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -257,7 +287,7 @@ fn test_websocket_config_server_mode() -> TestResult {
     let start = std::time::Instant::now();
     let name = "websocket_config_server_mode";
 
-    use clasp_bridge::websocket::{WebSocketBridgeConfig, WsMode, WsMessageFormat};
+    use clasp_bridge::websocket::{WebSocketBridgeConfig, WsMessageFormat, WsMode};
 
     let config = WebSocketBridgeConfig {
         mode: WsMode::Server,
@@ -277,7 +307,11 @@ fn test_websocket_config_server_mode() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "WebSocket server config incorrect", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "WebSocket server config incorrect",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -292,13 +326,15 @@ fn test_websocket_bridge_creation() -> TestResult {
 
     let bridge_config = bridge.config();
 
-    if bridge_config.protocol == "websocket"
-        && bridge_config.bidirectional
-        && !bridge.is_running()
+    if bridge_config.protocol == "websocket" && bridge_config.bidirectional && !bridge.is_running()
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "WebSocket bridge not created correctly", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "WebSocket bridge not created correctly",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -336,10 +372,18 @@ async fn test_websocket_server_start_stop() -> TestResult {
             if connected && !bridge.is_running() {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, "WebSocket server didn't connect/stop properly", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "WebSocket server didn't connect/stop properly",
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        Err(e) => TestResult::fail(name, format!("Failed to start: {}", e), start.elapsed().as_millis()),
+        Err(e) => TestResult::fail(
+            name,
+            format!("Failed to start: {}", e),
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -370,10 +414,18 @@ fn test_transform_scale() -> TestResult {
             if (f - 50.0).abs() < 0.001 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Scale wrong: {} != 50.0", f), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Scale wrong: {} != 50.0", f),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Transform did not produce float", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Transform did not produce float",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -398,10 +450,18 @@ fn test_transform_clamp() -> TestResult {
             if (f - 100.0).abs() < 0.001 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Clamp wrong: {} != 100.0", f), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Clamp wrong: {} != 100.0", f),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Transform did not produce float", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Transform did not produce float",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -423,10 +483,18 @@ fn test_transform_invert() -> TestResult {
             if (f - 0.7).abs() < 0.001 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Invert wrong: {} != 0.7", f), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Invert wrong: {} != 0.7", f),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Transform did not produce float", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Transform did not produce float",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -450,10 +518,18 @@ fn test_transform_expression() -> TestResult {
             if (f - 20.0).abs() < 0.001 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Expression wrong: {} != 20.0", f), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Expression wrong: {} != 20.0", f),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Transform did not produce float", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Transform did not produce float",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -474,7 +550,11 @@ fn test_mapping_simple() -> TestResult {
     if result == Some("/synth/cutoff".to_string()) {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Mapping wrong: {:?}", result), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Mapping wrong: {:?}", result),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -499,7 +579,11 @@ fn test_mapping_table() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Mapping table lookup failed", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Mapping table lookup failed",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -524,10 +608,18 @@ fn test_mapping_with_transform() -> TestResult {
             if (f - 0.5).abs() < 0.01 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Transform wrong: {} != 0.5", f), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Transform wrong: {} != 0.5", f),
+                    start.elapsed().as_millis(),
+                )
             }
         }
-        _ => TestResult::fail(name, "Transform did not produce float", start.elapsed().as_millis()),
+        _ => TestResult::fail(
+            name,
+            "Transform did not produce float",
+            start.elapsed().as_millis(),
+        ),
     }
 }
 
@@ -537,9 +629,7 @@ fn test_mapping_with_transform() -> TestResult {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║              CLASP Bridge Tests                                  ║");
@@ -550,25 +640,21 @@ async fn main() {
         test_mqtt_config_default(),
         test_mqtt_config_custom(),
         test_mqtt_bridge_creation(),
-
         // HTTP Bridge tests
         test_http_config_default(),
         test_http_config_client_mode(),
         test_http_bridge_creation(),
         test_http_server_start_stop().await,
-
         // WebSocket Bridge tests
         test_websocket_config_default(),
         test_websocket_config_server_mode(),
         test_websocket_bridge_creation(),
         test_websocket_server_start_stop().await,
-
         // Transform tests
         test_transform_scale(),
         test_transform_clamp(),
         test_transform_invert(),
         test_transform_expression(),
-
         // Mapping tests
         test_mapping_simple(),
         test_mapping_table(),
@@ -594,7 +680,10 @@ async fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 

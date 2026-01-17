@@ -5,7 +5,7 @@
 //! - Lite message decoding
 //! - Fixed-size frame handling
 
-use clasp_embedded::{encode_lite_set, decode_lite_header, LiteMessageType};
+use clasp_embedded::{decode_lite_header, encode_lite_set, LiteMessageType};
 
 // ============================================================================
 // Test Framework
@@ -61,7 +61,11 @@ fn test_encode_lite_set_basic() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Wrong encoding: {:?}", &buf[..len]), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Wrong encoding: {:?}", &buf[..len]),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -73,15 +77,14 @@ fn test_encode_lite_set_negative() -> TestResult {
     let len = encode_lite_set(0x0100, -1, &mut buf);
 
     // -1 in two's complement is 0xFFFFFFFF
-    if len == 8
-        && buf[4] == 0xFF
-        && buf[5] == 0xFF
-        && buf[6] == 0xFF
-        && buf[7] == 0xFF
-    {
+    if len == 8 && buf[4] == 0xFF && buf[5] == 0xFF && buf[6] == 0xFF && buf[7] == 0xFF {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Wrong encoding: {:?}", &buf[..len]), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Wrong encoding: {:?}", &buf[..len]),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -102,7 +105,11 @@ fn test_encode_lite_set_large_value() -> TestResult {
     {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Wrong encoding: {:?}", &buf[..len]), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Wrong encoding: {:?}", &buf[..len]),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -116,7 +123,11 @@ fn test_encode_lite_set_buffer_too_small() -> TestResult {
     if len == 0 {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, format!("Should return 0 for small buffer, got {}", len), start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            format!("Should return 0 for small buffer, got {}", len),
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -137,7 +148,11 @@ fn test_decode_lite_header_set() -> TestResult {
             if is_set && address == 0x0042 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Wrong decode: addr={}", address), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Wrong decode: addr={}", address),
+                    start.elapsed().as_millis(),
+                )
             }
         }
         None => TestResult::fail(name, "Decode returned None", start.elapsed().as_millis()),
@@ -157,7 +172,11 @@ fn test_decode_lite_header_hello() -> TestResult {
             if is_hello && address == 0x1234 {
                 TestResult::pass(name, start.elapsed().as_millis())
             } else {
-                TestResult::fail(name, format!("Wrong decode: addr={}", address), start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    format!("Wrong decode: addr={}", address),
+                    start.elapsed().as_millis(),
+                )
             }
         }
         None => TestResult::fail(name, "Decode returned None", start.elapsed().as_millis()),
@@ -194,7 +213,11 @@ fn test_decode_lite_header_invalid_magic() -> TestResult {
     if result.is_none() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Should return None for invalid magic", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Should return None for invalid magic",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -208,7 +231,11 @@ fn test_decode_lite_header_invalid_type() -> TestResult {
     if result.is_none() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Should return None for invalid type", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Should return None for invalid type",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -222,7 +249,11 @@ fn test_decode_lite_header_too_short() -> TestResult {
     if result.is_none() {
         TestResult::pass(name, start.elapsed().as_millis())
     } else {
-        TestResult::fail(name, "Should return None for short buffer", start.elapsed().as_millis())
+        TestResult::fail(
+            name,
+            "Should return None for short buffer",
+            start.elapsed().as_millis(),
+        )
     }
 }
 
@@ -259,10 +290,18 @@ fn test_encode_decode_roundtrip() -> TestResult {
                 if decoded_value == value {
                     TestResult::pass(name, start.elapsed().as_millis())
                 } else {
-                    TestResult::fail(name, format!("Value mismatch: {} != {}", decoded_value, value), start.elapsed().as_millis())
+                    TestResult::fail(
+                        name,
+                        format!("Value mismatch: {} != {}", decoded_value, value),
+                        start.elapsed().as_millis(),
+                    )
                 }
             } else {
-                TestResult::fail(name, "Address mismatch or wrong type", start.elapsed().as_millis())
+                TestResult::fail(
+                    name,
+                    "Address mismatch or wrong type",
+                    start.elapsed().as_millis(),
+                )
             }
         }
         None => TestResult::fail(name, "Decode returned None", start.elapsed().as_millis()),
@@ -289,7 +328,11 @@ fn test_all_message_types() -> TestResult {
 
     for (actual, expected, type_name) in checks {
         if actual != expected {
-            return TestResult::fail(name, format!("{} type: {} != {}", type_name, actual, expected), start.elapsed().as_millis());
+            return TestResult::fail(
+                name,
+                format!("{} type: {} != {}", type_name, actual, expected),
+                start.elapsed().as_millis(),
+            );
         }
     }
 
@@ -311,7 +354,6 @@ fn main() {
         test_encode_lite_set_negative(),
         test_encode_lite_set_large_value(),
         test_encode_lite_set_buffer_too_small(),
-
         // Decoding tests
         test_decode_lite_header_set(),
         test_decode_lite_header_hello(),
@@ -319,10 +361,8 @@ fn main() {
         test_decode_lite_header_invalid_magic(),
         test_decode_lite_header_invalid_type(),
         test_decode_lite_header_too_short(),
-
         // Round-trip tests
         test_encode_decode_roundtrip(),
-
         // Message type tests
         test_all_message_types(),
     ];
@@ -346,7 +386,10 @@ fn main() {
             passed += 1;
         } else {
             failed += 1;
-            println!("│   └─ {:<56} │", &test.message[..test.message.len().min(56)]);
+            println!(
+                "│   └─ {:<56} │",
+                &test.message[..test.message.len().min(56)]
+            );
         }
     }
 
