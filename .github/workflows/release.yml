@@ -154,12 +154,8 @@ jobs:
         working-directory: apps/bridge
         run: npm run build
         env:
-          # macOS signing (passed through, empty if not set)
-          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Disable automatic code signing discovery - we'll use explicit certs if available
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload macOS DMG
         if: matrix.os == 'macos-latest'
