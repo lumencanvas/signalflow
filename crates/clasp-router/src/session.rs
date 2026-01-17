@@ -1,7 +1,7 @@
 //! Session management
 
 use bytes::Bytes;
-use clasp_core::{Message, WelcomeMessage, PROTOCOL_VERSION};
+use clasp_core::{Action, Message, Scope, WelcomeMessage, PROTOCOL_VERSION};
 use clasp_transport::TransportSender;
 use parking_lot::RwLock;
 use std::collections::HashSet;
@@ -32,6 +32,10 @@ pub struct Session {
     pub authenticated: bool,
     /// Permission token (if any)
     pub token: Option<String>,
+    /// Subject identifier from token (user, device, or service ID)
+    pub subject: Option<String>,
+    /// Scopes granted to this session
+    scopes: Vec<Scope>,
 }
 
 impl Session {
@@ -48,7 +52,32 @@ impl Session {
             last_activity: RwLock::new(now),
             authenticated: false,
             token: None,
+            subject: None,
+            scopes: Vec::new(),
         }
+    }
+
+    /// Set authentication info from a validated token
+    pub fn set_authenticated(&mut self, token: String, subject: Option<String>, scopes: Vec<Scope>) {
+        self.authenticated = true;
+        self.token = Some(token);
+        self.subject = subject;
+        self.scopes = scopes;
+    }
+
+    /// Check if this session has permission for the given action on the given address
+    pub fn has_scope(&self, action: Action, address: &str) -> bool {
+        // Unauthenticated sessions in open mode have no scope restrictions
+        // (handled by router based on SecurityMode)
+        if self.scopes.is_empty() && !self.authenticated {
+            return true;
+        }
+        self.scopes.iter().any(|scope| scope.allows(action, address))
+    }
+
+    /// Get the scopes for this session
+    pub fn scopes(&self) -> &[Scope] {
+        &self.scopes
     }
 
     /// Send a message to this session
@@ -117,6 +146,8 @@ impl std::fmt::Debug for Session {
             .field("name", &self.name)
             .field("features", &self.features)
             .field("authenticated", &self.authenticated)
+            .field("subject", &self.subject)
+            .field("scopes", &self.scopes.len())
             .finish()
     }
 }

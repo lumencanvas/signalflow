@@ -196,6 +196,12 @@ async function startClaspServer(config) {
     args.push('--announce');
   }
 
+  // Add security configuration
+  if (config.token) {
+    args.push('--auth-mode', 'authenticated');
+    args.push('--token', config.token);
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const proc = spawn(routerPath, args, {
@@ -294,7 +300,7 @@ async function startClaspServer(config) {
 
         // Create a monitor connection to observe CLASP traffic
         try {
-          await createClaspMonitor(config.id, `ws://127.0.0.1:${port}`);
+          await createClaspMonitor(config.id, `ws://127.0.0.1:${port}`, config.token);
         } catch (err) {
           // CLASP monitor connection failed - non-critical
         }
@@ -360,7 +366,7 @@ function decodeClaspFrame(buffer) {
 }
 
 // Create a WebSocket monitor connection to observe CLASP traffic
-async function createClaspMonitor(serverId, wsUrl) {
+async function createClaspMonitor(serverId, wsUrl, token = null) {
   // Close existing monitor if any
   if (claspMonitors.has(serverId)) {
     try {
@@ -378,13 +384,17 @@ async function createClaspMonitor(serverId, wsUrl) {
       connected = true;
       claspMonitors.set(serverId, ws);
 
-      // Send HELLO message
-      const hello = encodeClaspFrame({
+      // Send HELLO message with optional token
+      const helloMsg = {
         type: MSG.HELLO,
         version: 2,
         name: 'CLASP Bridge Monitor',
         features: ['param', 'event', 'stream'],
-      });
+      };
+      if (token) {
+        helloMsg.token = token;
+      }
+      const hello = encodeClaspFrame(helloMsg);
       ws.send(hello);
     });
 
@@ -406,6 +416,32 @@ async function createClaspMonitor(serverId, wsUrl) {
           });
           ws.send(subscribe);
           resolve(ws);
+          return;
+        }
+
+        // Handle ERROR - authentication or authorization failure
+        if (msg.type === MSG.ERROR) {
+          const errorCode = msg.code || 0;
+          const errorMessage = msg.message || 'Unknown error';
+
+          // 300 = Unauthorized (no token), 301 = Forbidden (bad scopes), 302 = Token expired
+          if (errorCode >= 300 && errorCode < 400) {
+            ws.close();
+            claspMonitors.delete(serverId);
+
+            // Notify renderer about auth failure
+            mainWindow?.webContents.send('server-status', {
+              id: serverId,
+              status: 'error',
+              error: `Authentication failed: ${errorMessage}`,
+            });
+
+            reject(new Error(`Authentication failed: ${errorMessage}`));
+            return;
+          }
+
+          // Log other errors but don't disconnect
+          console.error(`CLASP error from server ${serverId}: ${errorCode} - ${errorMessage}`);
           return;
         }
 

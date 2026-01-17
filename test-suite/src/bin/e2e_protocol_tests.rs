@@ -8,7 +8,7 @@
 use clasp_bridge::osc::OscBridge;
 use clasp_bridge::{Bridge, BridgeEvent};
 use clasp_client::Clasp;
-use clasp_core::Value;
+use clasp_core::{SecurityMode, Value};
 use clasp_router::{Router, RouterConfig};
 use rosc::{OscMessage, OscPacket, OscType};
 use std::net::UdpSocket;
@@ -81,6 +81,7 @@ impl TestRouter {
                 "event".to_string(),
                 "stream".to_string(),
             ],
+            security_mode: SecurityMode::Open,
         });
 
         let handle = tokio::spawn(async move {

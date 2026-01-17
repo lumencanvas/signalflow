@@ -77,7 +77,7 @@ const helloMsg = `// HELLO - sent by client after WebSocket connects
   "version": 2,
   "name": "My Controller App",
   "features": ["param", "event", "stream"],
-  "token": "optional-jwt-for-auth"
+  "token": "cpsk_7kX9mP2nQ4rT6vW8xZ0aB3cD5eF1gH"  // optional CPSK token
 }`
 
 const welcomeMsg = `// WELCOME - server response with session info
@@ -264,30 +264,35 @@ For browsers (can't do mDNS/UDP) or WAN connections,
 provide the WebSocket URL directly: wss://example.com:7330`
 
 // Security
-const securityCode = `// Three security modes:
+const securityCode = `## Security Modes
 
-1. OPEN (default for local dev)
+### 1. OPEN (default for local dev)
    - No encryption, no auth
    - Use only on trusted networks
 
-2. ENCRYPTED
-   - WSS (TLS 1.3) for WebSocket
-   - DTLS for UDP/WebRTC
-   - Protects data in transit
+### 2. TRANSPORT ENCRYPTED
+   - WSS (TLS 1.3) via reverse proxy
+   - QUIC with built-in TLS 1.3
+   - Wire-level encryption without application auth
 
-3. AUTHENTICATED
-   - JWT capability tokens in HELLO message
-   - Fine-grained read/write permissions:
+### 3. TOKEN AUTHENTICATED
+   Capability Pre-Shared Keys (CPSK) with scoped permissions:
 
-{
-  "clasp": {
-    "read": ["/lights/**"],
-    "write": ["/lights/*/brightness"],
-    "constraints": {
-      "/lights/*/brightness": { "range": [0, 1] }
-    }
-  }
-}`
+   # Generate token via CLI
+   clasp token create --scopes "read:/**,write:/lights/**"
+   # Output: cpsk_7kX9mP2nQ4rT6vW8xZ0aB3cD5eF1gH
+
+   # Use in client
+   const client = await Clasp.builder('wss://venue.example.com')
+     .token('cpsk_7kX9mP2nQ4rT6vW8xZ0aB3cD5eF1gH')
+     .connect();
+
+   Scope patterns:
+   - read:/**        - Subscribe to all
+   - write:/lights/* - Control lights namespace
+   - admin:/**       - Full access
+
+   Optional: External PASETO/JWT tokens for federated auth`
 
 // Message catalog
 const messages = [
@@ -337,7 +342,7 @@ const benchmarks = {
     { feature: 'Late-joiner support', clasp: true, osc: false, mqtt: true },
     { feature: 'Typed signals (Param/Event/Stream)', clasp: true, osc: false, mqtt: false },
     { feature: 'QoS levels', clasp: '3', osc: '0', mqtt: '3' },
-    { feature: 'JWT security with scopes', clasp: true, osc: false, mqtt: true },
+    { feature: 'Token security with scopes', clasp: true, osc: false, mqtt: true },
     { feature: 'Multi-protocol bridging', clasp: true, osc: false, mqtt: false },
     { feature: 'Clock sync', clasp: true, osc: true, mqtt: false },
     { feature: 'Wildcard subscriptions', clasp: true, osc: false, mqtt: true }
@@ -642,7 +647,7 @@ const benchmarks = {
             <ul>
               <li>Local dev: Open mode is fine</li>
               <li>Production LAN: Use WSS (encrypted)</li>
-              <li>Public internet: Use WSS + JWT tokens</li>
+              <li>Public internet: Use WSS + CPSK tokens</li>
             </ul>
           </div>
         </section>

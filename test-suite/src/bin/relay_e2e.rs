@@ -10,7 +10,8 @@
 //! - Connection resilience
 
 use clasp_core::{
-    codec, HelloMessage, Message, PublishMessage, SetMessage, SubscribeMessage, Value,
+    codec, HelloMessage, Message, PublishMessage, SecurityMode, SetMessage, SubscribeMessage,
+    Value,
 };
 use clasp_router::{Router, RouterConfig};
 use clasp_transport::{
@@ -81,6 +82,7 @@ impl TestRouter {
                 "event".to_string(),
                 "stream".to_string(),
             ],
+            security_mode: SecurityMode::Open,
         });
 
         let handle = tokio::spawn(async move {

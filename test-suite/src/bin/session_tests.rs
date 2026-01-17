@@ -8,6 +8,7 @@
 //! - Session state isolation
 
 use clasp_client::Clasp;
+use clasp_core::SecurityMode;
 use clasp_router::{Router, RouterConfig};
 use std::collections::HashSet;
 use std::time::Duration;
@@ -64,6 +65,7 @@ impl TestRouter {
             max_sessions: 100,
             session_timeout: 60,
             features: vec!["param".to_string(), "event".to_string()],
+            security_mode: SecurityMode::Open,
         })
         .await
     }
@@ -284,6 +286,7 @@ async fn test_max_sessions_limit() -> TestResult {
         max_sessions: 3,
         session_timeout: 60,
         features: vec!["param".to_string()],
+        security_mode: SecurityMode::Open,
     })
     .await;
 

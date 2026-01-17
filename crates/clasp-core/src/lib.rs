@@ -19,6 +19,8 @@ pub mod address;
 pub mod codec;
 pub mod error;
 pub mod frame;
+#[cfg(feature = "std")]
+pub mod security;
 pub mod state;
 pub mod time;
 pub mod types;
@@ -27,6 +29,11 @@ pub use address::Address;
 pub use codec::{decode, encode};
 pub use error::{Error, Result};
 pub use frame::Frame;
+#[cfg(feature = "std")]
+pub use security::{
+    Action, CpskValidator, Scope, SecurityMode, TokenInfo, TokenValidator, ValidatorChain,
+    ValidationResult,
+};
 pub use state::ParamState;
 pub use time::Timestamp;
 pub use types::*;

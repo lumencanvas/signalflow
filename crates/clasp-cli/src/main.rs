@@ -2,15 +2,17 @@
 //!
 //! Start protocol servers, bridges, and manage CLASP signals from the command line.
 
+mod server;
+mod tokens;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
+use tokens::{create_token, default_token_file, format_timestamp, TokenStore};
 use tracing::{info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
-mod server;
 
 /// CLASP - Creative Low-Latency Application Streaming Protocol
 #[derive(Parser)]
@@ -143,6 +145,57 @@ enum Commands {
 
     /// Show version and system info
     Info,
+
+    /// Manage authentication tokens
+    Token {
+        /// Token file path (default: ~/.config/clasp/tokens.json)
+        #[arg(long)]
+        file: Option<String>,
+
+        #[command(subcommand)]
+        action: TokenAction,
+    },
+}
+
+/// Token management actions
+#[derive(Subcommand)]
+enum TokenAction {
+    /// Create a new token
+    Create {
+        /// Scopes (comma-separated, e.g., "read:/**,write:/lights/**")
+        #[arg(short, long)]
+        scopes: String,
+
+        /// Expiration (e.g., "7d", "24h", "30m")
+        #[arg(short, long)]
+        expires: Option<String>,
+
+        /// Subject/description for the token
+        #[arg(long)]
+        subject: Option<String>,
+    },
+
+    /// List all tokens
+    List {
+        /// Show expired tokens
+        #[arg(long)]
+        show_expired: bool,
+    },
+
+    /// Show details of a specific token
+    Show {
+        /// Token string or prefix
+        token: String,
+    },
+
+    /// Revoke a token
+    Revoke {
+        /// Token string or prefix
+        token: String,
+    },
+
+    /// Remove all expired tokens
+    Prune,
 }
 
 #[tokio::main]
@@ -252,6 +305,137 @@ async fn main() -> Result<()> {
 
         Commands::Info => {
             print_info();
+        }
+
+        Commands::Token { file, action } => {
+            let token_path = file
+                .map(PathBuf::from)
+                .unwrap_or_else(default_token_file);
+
+            match action {
+                TokenAction::Create { scopes, expires, subject } => {
+                    let record = create_token(
+                        &scopes,
+                        expires.as_deref(),
+                        subject.as_deref(),
+                    )?;
+
+                    // Load existing store, add token, save
+                    let mut store = TokenStore::load(&token_path)?;
+                    let token = record.token.clone();
+                    store.add(record);
+                    store.save(&token_path)?;
+
+                    println!("{}", token);
+                    eprintln!("{} Token saved to: {}", "OK".green().bold(), token_path.display());
+                }
+
+                TokenAction::List { show_expired } => {
+                    let store = TokenStore::load(&token_path)?;
+
+                    if store.is_empty() {
+                        println!("No tokens found in {}", token_path.display());
+                        return Ok(());
+                    }
+
+                    println!("{} Tokens in {}:\n", "CLASP".cyan().bold(), token_path.display());
+
+                    for record in store.list() {
+                        let is_expired = record.is_expired();
+                        if !show_expired && is_expired {
+                            continue;
+                        }
+
+                        let status = if is_expired {
+                            " [EXPIRED]".red().to_string()
+                        } else {
+                            "".to_string()
+                        };
+
+                        // Show truncated token for security
+                        let display_token = if record.token.len() > 20 {
+                            format!("{}...{}", &record.token[..12], &record.token[record.token.len()-4..])
+                        } else {
+                            record.token.clone()
+                        };
+
+                        println!("  {}{}", display_token.yellow(), status);
+
+                        if let Some(ref subject) = record.subject {
+                            println!("    Subject: {}", subject);
+                        }
+
+                        println!("    Scopes: {}", record.scopes.join(", "));
+
+                        if let Some(expires_at) = record.expires_at {
+                            println!("    Expires: {}", format_timestamp(expires_at));
+                        } else {
+                            println!("    Expires: never");
+                        }
+
+                        println!();
+                    }
+                }
+
+                TokenAction::Show { token } => {
+                    let store = TokenStore::load(&token_path)?;
+
+                    // Find token by exact match or prefix
+                    let record = store
+                        .list()
+                        .find(|r| r.token == token || r.token.starts_with(&token))
+                        .context("Token not found")?;
+
+                    println!("{}: {}", "Token".cyan(), record.token);
+                    if let Some(ref subject) = record.subject {
+                        println!("{}: {}", "Subject".cyan(), subject);
+                    }
+                    println!("{}:", "Scopes".cyan());
+                    for scope in &record.scopes {
+                        println!("  - {}", scope);
+                    }
+                    if let Some(expires_at) = record.expires_at {
+                        print!("{}: {}", "Expires".cyan(), format_timestamp(expires_at));
+                        if record.is_expired() {
+                            println!(" {}", "[EXPIRED]".red());
+                        } else {
+                            println!();
+                        }
+                    } else {
+                        println!("{}: never", "Expires".cyan());
+                    }
+                    println!("{}: {} seconds ago", "Created".cyan(),
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs() - record.created_at
+                    );
+                }
+
+                TokenAction::Revoke { token } => {
+                    let mut store = TokenStore::load(&token_path)?;
+
+                    // Find token by exact match or prefix
+                    let full_token = store
+                        .list()
+                        .find(|r| r.token == token || r.token.starts_with(&token))
+                        .map(|r| r.token.clone())
+                        .context("Token not found")?;
+
+                    store.remove(&full_token);
+                    store.save(&token_path)?;
+
+                    println!("{} Revoked: {}", "OK".green().bold(), full_token);
+                }
+
+                TokenAction::Prune => {
+                    let mut store = TokenStore::load(&token_path)?;
+                    let count = store.prune_expired();
+                    store.save(&token_path)?;
+
+                    println!("{} Removed {} expired token(s)", "OK".green().bold(), count);
+                }
+            }
         }
     }
 

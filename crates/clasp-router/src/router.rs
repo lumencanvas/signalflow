@@ -28,15 +28,14 @@
 
 use bytes::Bytes;
 use clasp_core::{
-    codec, AckMessage, ErrorMessage, Frame, HelloMessage, Message, SetMessage, SignalType,
-    SubscribeMessage, SubscribeOptions, UnsubscribeMessage, PROTOCOL_VERSION,
+    codec, Action, AckMessage, CpskValidator, ErrorMessage, Frame, Message, SecurityMode,
+    SignalType, TokenValidator, ValidationResult, PROTOCOL_VERSION,
 };
 use clasp_transport::{TransportEvent, TransportReceiver, TransportSender, TransportServer};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
 #[cfg(feature = "websocket")]
@@ -90,6 +89,8 @@ pub struct RouterConfig {
     pub max_sessions: usize,
     /// Session timeout (seconds)
     pub session_timeout: u64,
+    /// Security mode (Open or Authenticated)
+    pub security_mode: SecurityMode,
 }
 
 impl Default for RouterConfig {
@@ -104,6 +105,7 @@ impl Default for RouterConfig {
             ],
             max_sessions: 100,
             session_timeout: 300,
+            security_mode: SecurityMode::Open,
         }
     }
 }
@@ -119,9 +121,12 @@ pub struct Router {
     state: Arc<RouterState>,
     /// Running flag
     running: Arc<RwLock<bool>>,
+    /// Token validator (None = always reject in authenticated mode)
+    token_validator: Option<Arc<dyn TokenValidator>>,
 }
 
 impl Router {
+    /// Create a new router with the given configuration
     pub fn new(config: RouterConfig) -> Self {
         Self {
             config,
@@ -129,7 +134,32 @@ impl Router {
             subscriptions: Arc::new(SubscriptionManager::new()),
             state: Arc::new(RouterState::new()),
             running: Arc::new(RwLock::new(false)),
+            token_validator: None,
         }
+    }
+
+    /// Create a router with a token validator for authenticated mode
+    pub fn with_validator<V: TokenValidator + 'static>(mut self, validator: V) -> Self {
+        self.token_validator = Some(Arc::new(validator));
+        self
+    }
+
+    /// Set the token validator
+    pub fn set_validator<V: TokenValidator + 'static>(&mut self, validator: V) {
+        self.token_validator = Some(Arc::new(validator));
+    }
+
+    /// Get a reference to the CPSK validator if one is configured
+    /// This allows adding tokens at runtime
+    pub fn cpsk_validator(&self) -> Option<&CpskValidator> {
+        self.token_validator
+            .as_ref()
+            .and_then(|v| v.as_any().downcast_ref::<CpskValidator>())
+    }
+
+    /// Get the security mode
+    pub fn security_mode(&self) -> SecurityMode {
+        self.config.security_mode
     }
 
     // =========================================================================
@@ -343,6 +373,7 @@ impl Router {
             subscriptions: Arc::clone(&self.subscriptions),
             state: Arc::clone(&self.state),
             running: Arc::clone(&self.running),
+            token_validator: self.token_validator.clone(),
         }
     }
 
@@ -358,6 +389,8 @@ impl Router {
         let state = Arc::clone(&self.state);
         let config = self.config.clone();
         let running = Arc::clone(&self.running);
+        let token_validator = self.token_validator.clone();
+        let security_mode = self.config.security_mode;
 
         tokio::spawn(async move {
             let mut session: Option<Arc<Session>> = None;
@@ -378,6 +411,8 @@ impl Router {
                                     &subscriptions,
                                     &state,
                                     &config,
+                                    security_mode,
+                                    &token_validator,
                                 )
                                 .await
                                 {
@@ -394,6 +429,10 @@ impl Router {
                                         MessageResult::Broadcast(bytes, exclude) => {
                                             broadcast_to_subscribers(&bytes, &sessions, &exclude)
                                                 .await;
+                                        }
+                                        MessageResult::Disconnect => {
+                                            info!("Disconnecting client {} due to auth failure", addr);
+                                            break;
                                         }
                                         MessageResult::None => {}
                                     }
@@ -460,33 +499,139 @@ enum MessageResult {
     NewSession(Arc<Session>),
     Send(Bytes),
     Broadcast(Bytes, SessionId),
+    Disconnect,
     None,
 }
 
 /// Handle an incoming message
 async fn handle_message(
     msg: &Message,
-    frame: &Frame,
+    _frame: &Frame,
     session: &Option<Arc<Session>>,
     sender: &Arc<dyn TransportSender>,
     sessions: &Arc<DashMap<SessionId, Arc<Session>>>,
     subscriptions: &Arc<SubscriptionManager>,
     state: &Arc<RouterState>,
     config: &RouterConfig,
+    security_mode: SecurityMode,
+    token_validator: &Option<Arc<dyn TokenValidator>>,
 ) -> Option<MessageResult> {
     match msg {
         Message::Hello(hello) => {
+            // In authenticated mode, validate the token
+            let (authenticated, subject, scopes) = match security_mode {
+                SecurityMode::Open => {
+                    // Open mode: no authentication required
+                    (false, None, Vec::new())
+                }
+                SecurityMode::Authenticated => {
+                    // Authenticated mode: require valid token
+                    let token = match &hello.token {
+                        Some(t) => t,
+                        None => {
+                            warn!("Connection rejected: no token provided in authenticated mode");
+                            let error = Message::Error(ErrorMessage {
+                                code: 300, // Unauthorized
+                                message: "Authentication required".to_string(),
+                                address: None,
+                                correlation_id: None,
+                            });
+                            let bytes = codec::encode(&error).ok()?;
+                            let _ = sender.send(bytes).await;
+                            return Some(MessageResult::Disconnect);
+                        }
+                    };
+
+                    // Validate token
+                    let validator = match token_validator {
+                        Some(v) => v,
+                        None => {
+                            error!("Authenticated mode but no token validator configured");
+                            let error = Message::Error(ErrorMessage {
+                                code: 500, // Internal error
+                                message: "Server misconfiguration".to_string(),
+                                address: None,
+                                correlation_id: None,
+                            });
+                            let bytes = codec::encode(&error).ok()?;
+                            let _ = sender.send(bytes).await;
+                            return Some(MessageResult::Disconnect);
+                        }
+                    };
+
+                    match validator.validate(token) {
+                        ValidationResult::Valid(info) => {
+                            info!(
+                                "Token validated for subject: {:?}, scopes: {}",
+                                info.subject,
+                                info.scopes.len()
+                            );
+                            (true, info.subject, info.scopes)
+                        }
+                        ValidationResult::Expired => {
+                            warn!("Connection rejected: token expired");
+                            let error = Message::Error(ErrorMessage {
+                                code: 302, // TokenExpired
+                                message: "Token has expired".to_string(),
+                                address: None,
+                                correlation_id: None,
+                            });
+                            let bytes = codec::encode(&error).ok()?;
+                            let _ = sender.send(bytes).await;
+                            return Some(MessageResult::Disconnect);
+                        }
+                        ValidationResult::Invalid(reason) => {
+                            warn!("Connection rejected: invalid token - {}", reason);
+                            let error = Message::Error(ErrorMessage {
+                                code: 300, // Unauthorized
+                                message: format!("Invalid token: {}", reason),
+                                address: None,
+                                correlation_id: None,
+                            });
+                            let bytes = codec::encode(&error).ok()?;
+                            let _ = sender.send(bytes).await;
+                            return Some(MessageResult::Disconnect);
+                        }
+                        ValidationResult::NotMyToken => {
+                            warn!("Connection rejected: unrecognized token format");
+                            let error = Message::Error(ErrorMessage {
+                                code: 300, // Unauthorized
+                                message: "Unrecognized token format".to_string(),
+                                address: None,
+                                correlation_id: None,
+                            });
+                            let bytes = codec::encode(&error).ok()?;
+                            let _ = sender.send(bytes).await;
+                            return Some(MessageResult::Disconnect);
+                        }
+                    }
+                }
+            };
+
             // Create new session
-            let new_session = Arc::new(Session::new(
+            let mut new_session = Session::new(
                 sender.clone(),
                 hello.name.clone(),
                 hello.features.clone(),
-            ));
+            );
 
+            // Set authentication state
+            if authenticated {
+                new_session.set_authenticated(
+                    hello.token.clone().unwrap_or_default(),
+                    subject,
+                    scopes,
+                );
+            }
+
+            let new_session = Arc::new(new_session);
             let session_id = new_session.id.clone();
             sessions.insert(session_id.clone(), new_session.clone());
 
-            info!("Session created: {} ({})", hello.name, session_id);
+            info!(
+                "Session created: {} ({}) authenticated={}",
+                hello.name, session_id, new_session.authenticated
+            );
 
             // Send welcome
             let welcome = new_session.welcome_message(&config.name, &config.features);
@@ -505,6 +650,22 @@ async fn handle_message(
 
         Message::Subscribe(sub) => {
             let session = session.as_ref()?;
+
+            // Check scope for read access (in authenticated mode)
+            if security_mode == SecurityMode::Authenticated && !session.has_scope(Action::Read, &sub.pattern) {
+                warn!(
+                    "Session {} denied SUBSCRIBE to {} - insufficient scope",
+                    session.id, sub.pattern
+                );
+                let error = Message::Error(ErrorMessage {
+                    code: 301, // Forbidden
+                    message: "Insufficient scope for subscription".to_string(),
+                    address: Some(sub.pattern.clone()),
+                    correlation_id: None,
+                });
+                let bytes = codec::encode(&error).ok()?;
+                return Some(MessageResult::Send(bytes));
+            }
 
             // Create subscription
             match Subscription::new(
@@ -554,6 +715,22 @@ async fn handle_message(
         Message::Set(set) => {
             let session = session.as_ref()?;
 
+            // Check scope for write access (in authenticated mode)
+            if security_mode == SecurityMode::Authenticated && !session.has_scope(Action::Write, &set.address) {
+                warn!(
+                    "Session {} denied SET to {} - insufficient scope",
+                    session.id, set.address
+                );
+                let error = Message::Error(ErrorMessage {
+                    code: 301, // Forbidden
+                    message: "Insufficient scope for write operation".to_string(),
+                    address: Some(set.address.clone()),
+                    correlation_id: None,
+                });
+                let bytes = codec::encode(&error).ok()?;
+                return Some(MessageResult::Send(bytes));
+            }
+
             // Apply to state
             match state.apply_set(set, &session.id) {
                 Ok(revision) => {
@@ -600,6 +777,24 @@ async fn handle_message(
         }
 
         Message::Get(get) => {
+            let session = session.as_ref()?;
+
+            // Check scope for read access (in authenticated mode)
+            if security_mode == SecurityMode::Authenticated && !session.has_scope(Action::Read, &get.address) {
+                warn!(
+                    "Session {} denied GET to {} - insufficient scope",
+                    session.id, get.address
+                );
+                let error = Message::Error(ErrorMessage {
+                    code: 301, // Forbidden
+                    message: "Insufficient scope for read operation".to_string(),
+                    address: Some(get.address.clone()),
+                    correlation_id: None,
+                });
+                let bytes = codec::encode(&error).ok()?;
+                return Some(MessageResult::Send(bytes));
+            }
+
             if let Some(param_state) = state.get_state(&get.address) {
                 let snapshot = Message::Snapshot(clasp_core::SnapshotMessage {
                     params: vec![clasp_core::ParamValue {
@@ -619,6 +814,22 @@ async fn handle_message(
 
         Message::Publish(pub_msg) => {
             let session = session.as_ref()?;
+
+            // Check scope for write access (in authenticated mode)
+            if security_mode == SecurityMode::Authenticated && !session.has_scope(Action::Write, &pub_msg.address) {
+                warn!(
+                    "Session {} denied PUBLISH to {} - insufficient scope",
+                    session.id, pub_msg.address
+                );
+                let error = Message::Error(ErrorMessage {
+                    code: 301, // Forbidden
+                    message: "Insufficient scope for publish operation".to_string(),
+                    address: Some(pub_msg.address.clone()),
+                    correlation_id: None,
+                });
+                let bytes = codec::encode(&error).ok()?;
+                return Some(MessageResult::Send(bytes));
+            }
 
             // Determine signal type
             let signal_type = pub_msg.signal;
@@ -646,7 +857,7 @@ async fn handle_message(
             Some(MessageResult::Send(bytes))
         }
 
-        Message::Query(query) => {
+        Message::Query(_query) => {
             // Return signal definitions (simplified - would need schema registry)
             let result = Message::Result(clasp_core::ResultMessage { signals: vec![] });
             let bytes = codec::encode(&result).ok()?;

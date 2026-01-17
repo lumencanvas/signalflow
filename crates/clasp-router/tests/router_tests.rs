@@ -6,9 +6,8 @@
 //! - Message routing
 //! - Subscription handling
 
-use clasp_core::{codec, HelloMessage, Message, SetMessage, SubscribeMessage, Value};
+use clasp_core::{codec, HelloMessage, Message, SetMessage, SubscribeMessage, Value, SecurityMode};
 use clasp_router::{Router, RouterConfig};
-use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -28,6 +27,7 @@ async fn test_router_custom_config() {
         max_sessions: 50,
         session_timeout: 120,
         features: vec!["param".to_string(), "event".to_string()],
+        security_mode: SecurityMode::Open,
     };
     let router = Router::new(config);
     assert_eq!(router.session_count(), 0);
@@ -53,7 +53,7 @@ async fn test_router_state_access() {
 #[cfg(feature = "websocket")]
 mod websocket_tests {
     use super::*;
-    use clasp_transport::{WebSocketServer, WebSocketTransport};
+    use clasp_transport::{Transport, TransportReceiver, TransportSender, WebSocketTransport};
     use tokio::net::TcpListener;
 
     /// Find an available port for testing
@@ -149,6 +149,7 @@ mod websocket_tests {
             version: 2,
             name: "Test Client".to_string(),
             features: vec!["param".to_string()],
+            capabilities: None,
             token: None,
         });
         let hello_bytes = codec::encode(&hello).unwrap();
@@ -208,6 +209,7 @@ mod websocket_tests {
             version: 2,
             name: "Test Client".to_string(),
             features: vec!["param".to_string()],
+            capabilities: None,
             token: None,
         });
         sender.send(codec::encode(&hello).unwrap()).await.unwrap();
@@ -238,7 +240,8 @@ mod websocket_tests {
             address: "/test/value".to_string(),
             value: Value::Float(42.0),
             revision: None,
-            timestamp: None,
+            lock: false,
+            unlock: false,
         });
         sender.send(codec::encode(&set).unwrap()).await.unwrap();
 
@@ -300,6 +303,7 @@ mod websocket_tests {
                 version: 2,
                 name: name.to_string(),
                 features: vec!["param".to_string()],
+                capabilities: None,
                 token: None,
             });
             sender.send(codec::encode(&hello).unwrap()).await.unwrap();
@@ -327,7 +331,7 @@ mod websocket_tests {
         let subscribe = Message::Subscribe(SubscribeMessage {
             id: 1,
             pattern: "/test/**".to_string(),
-            types: None,
+            types: vec![],
             options: None,
         });
         sender1
@@ -342,7 +346,8 @@ mod websocket_tests {
             address: "/test/sensor/temperature".to_string(),
             value: Value::Float(23.5),
             revision: None,
-            timestamp: None,
+            lock: false,
+            unlock: false,
         });
         sender2.send(codec::encode(&set).unwrap()).await.unwrap();
 

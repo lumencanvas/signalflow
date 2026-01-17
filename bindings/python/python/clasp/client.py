@@ -463,7 +463,68 @@ class Clasp:
                         cb(e)
 
     def _match_pattern(self, pattern: str, address: str) -> bool:
-        """Match address against pattern"""
-        # Convert CLASP pattern to fnmatch pattern
-        fn_pattern = pattern.replace("**", "§§").replace("*", "[^/]*").replace("§§", "*")
-        return fnmatch.fnmatch(address, fn_pattern)
+        """
+        Match address against CLASP pattern.
+
+        Patterns:
+          /exact/path  - Exact match
+          /path/*      - Matches single segment (no /)
+          /path/**     - Matches zero or more segments
+
+        Examples:
+          /test/* matches /test/foo but not /test/foo/bar
+          /test/** matches /test, /test/foo, /test/foo/bar
+        """
+        # Exact match
+        if pattern == address:
+            return True
+
+        # Split into segments
+        pattern_parts = pattern.split('/')
+        address_parts = address.split('/')
+
+        return self._match_segments(pattern_parts, address_parts)
+
+    def _match_segments(self, pattern_parts: List[str], address_parts: List[str]) -> bool:
+        """Recursively match pattern segments against address segments."""
+        pi = 0  # pattern index
+        ai = 0  # address index
+
+        while pi < len(pattern_parts):
+            p = pattern_parts[pi]
+
+            if p == '**':
+                # ** can match zero or more segments
+                # Try matching 0, 1, 2, ... segments
+                remaining_pattern = pattern_parts[pi + 1:]
+
+                if not remaining_pattern:
+                    # ** at end matches everything remaining
+                    return True
+
+                # Try matching from current position onwards
+                for skip in range(len(address_parts) - ai + 1):
+                    if self._match_segments(remaining_pattern, address_parts[ai + skip:]):
+                        return True
+                return False
+
+            elif p == '*':
+                # * matches exactly one non-empty segment
+                if ai >= len(address_parts):
+                    return False
+                if not address_parts[ai]:  # Empty segment
+                    return False
+                pi += 1
+                ai += 1
+
+            else:
+                # Exact segment match
+                if ai >= len(address_parts):
+                    return False
+                if p != address_parts[ai]:
+                    return False
+                pi += 1
+                ai += 1
+
+        # Pattern consumed, check if address is also consumed
+        return ai == len(address_parts)

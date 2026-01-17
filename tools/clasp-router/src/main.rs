@@ -23,6 +23,7 @@
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
+use clasp_core::{CpskValidator, Scope, SecurityMode, TokenInfo};
 use clasp_router::{Router, RouterConfig};
 use std::net::SocketAddr;
 use tracing_subscriber::EnvFilter;
@@ -41,6 +42,17 @@ enum Transport {
     /// WARNING: Not supported on DigitalOcean App Platform (use Droplet instead)
     #[cfg(feature = "quic")]
     Quic,
+}
+
+/// Security/authentication mode
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+enum AuthMode {
+    /// Open - no authentication required (default)
+    #[default]
+    Open,
+
+    /// Authenticated - require valid tokens for all connections
+    Authenticated,
 }
 
 #[derive(Parser)]
@@ -90,6 +102,19 @@ struct Cli {
     #[arg(short = 'C', long)]
     config: Option<String>,
 
+    /// Security/authentication mode
+    #[arg(long, default_value = "open")]
+    auth_mode: AuthMode,
+
+    /// Token file for authenticated mode (one CPSK token per line)
+    /// Format: cpsk_<base62-random-32-chars>
+    #[arg(long)]
+    token_file: Option<String>,
+
+    /// Single token for authenticated mode (alternative to --token-file)
+    #[arg(long)]
+    token: Option<String>,
+
     /// Enable verbose logging
     #[arg(short, long)]
     verbose: bool,
@@ -122,14 +147,80 @@ async fn main() -> Result<()> {
         None
     };
 
+    // Determine security mode
+    let security_mode = match cli.auth_mode {
+        AuthMode::Open => SecurityMode::Open,
+        AuthMode::Authenticated => SecurityMode::Authenticated,
+    };
+
     // Create router config
     let config = RouterConfig {
         name: cli.name.clone(),
+        security_mode,
         ..Default::default()
     };
 
-    // Create router
-    let router = Router::new(config);
+    // Create router with optional token validator
+    let router = if security_mode == SecurityMode::Authenticated {
+        // Load tokens from file or CLI argument
+        let validator = CpskValidator::new();
+
+        // Helper to register a token with scope strings
+        let register_token = |token: &str, scope_strs: Vec<&str>| -> Result<()> {
+            let scopes: Vec<Scope> = scope_strs
+                .iter()
+                .map(|s| Scope::parse(s).map_err(|e| anyhow::anyhow!("Invalid scope '{}': {}", s, e)))
+                .collect::<Result<Vec<_>>>()?;
+            let info = TokenInfo::new(token.to_string(), scopes);
+            validator.register(token.to_string(), info);
+            Ok(())
+        };
+
+        // Add token from CLI argument
+        if let Some(token) = &cli.token {
+            tracing::info!("Adding token from CLI argument");
+            // Parse scopes from token (format: token or token scope1,scope2)
+            if token.contains(' ') {
+                let parts: Vec<&str> = token.splitn(2, ' ').collect();
+                let scopes: Vec<&str> = parts[1].split(',').map(|s| s.trim()).collect();
+                register_token(parts[0], scopes)?;
+            } else {
+                // Default to full admin access
+                register_token(token, vec!["admin:/**"])?;
+            }
+        }
+
+        // Load tokens from file
+        if let Some(token_file) = &cli.token_file {
+            tracing::info!("Loading tokens from file: {}", token_file);
+            let contents = std::fs::read_to_string(token_file)?;
+            for line in contents.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                // Format: token or token scope1,scope2 (space-separated)
+                if line.contains(' ') {
+                    let parts: Vec<&str> = line.splitn(2, ' ').collect();
+                    let scopes: Vec<&str> = parts[1].split(',').map(|s| s.trim()).collect();
+                    register_token(parts[0], scopes)?;
+                } else {
+                    // Token only - default to admin access
+                    register_token(line, vec!["admin:/**"])?;
+                }
+            }
+        }
+
+        if validator.is_empty() {
+            anyhow::bail!("Authenticated mode requires at least one token (use --token or --token-file)");
+        }
+
+        tracing::info!("Security mode: Authenticated with {} token(s)", validator.len());
+        Router::new(config).with_validator(validator)
+    } else {
+        tracing::info!("Security mode: Open (no authentication)");
+        Router::new(config)
+    };
 
     tracing::info!("Router ready, accepting connections...");
 

@@ -153,6 +153,10 @@ path = "src/bin/soak_tests.rs"
 name = "protocol-tests"
 path = "src/bin/protocol_tests.rs"
 
+[[bin]]
+name = "security-pentest"
+path = "src/bin/security_pentest.rs"
+
 [[bench]]
 name = "throughput"
 harness = false

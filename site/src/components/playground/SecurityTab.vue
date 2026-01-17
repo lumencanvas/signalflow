@@ -5,37 +5,44 @@ import CodeSnippet from './CodeSnippet.vue'
 
 const { connected, set, emit } = useClasp()
 
-// JWT Token Builder
-const tokenPayload = ref({
-  sub: 'playground-user',
-  name: 'Playground Client',
+// CPSK Token Builder
+const tokenConfig = ref({
+  subject: 'playground-user',
   scopes: ['read:/**', 'write:/playground/**'],
-  exp: Math.floor(Date.now() / 1000) + 3600,
+  expiresIn: '7d',
 })
 
 const newScope = ref('')
 
+// Generate a demo CPSK token (format: cpsk_<base62-random-32-chars>)
 const generatedToken = computed(() => {
-  // Simple base64 "token" for demonstration (not a real JWT)
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify(tokenPayload.value))
-  const signature = btoa('demo-signature')
-  return `${header}.${payload}.${signature}`
+  // This is a demo token - real tokens are generated server-side via CLI
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let random = ''
+  // Use a deterministic "random" based on scopes for demo consistency
+  const seed = tokenConfig.value.scopes.join(',') + tokenConfig.value.subject
+  for (let i = 0; i < 32; i++) {
+    random += chars[(seed.charCodeAt(i % seed.length) + i * 7) % chars.length]
+  }
+  return `cpsk_${random}`
 })
 
-const decodedPayload = computed(() => {
-  return JSON.stringify(tokenPayload.value, null, 2)
+const cliCommand = computed(() => {
+  const scopes = tokenConfig.value.scopes.join(',')
+  const expires = tokenConfig.value.expiresIn ? ` --expires ${tokenConfig.value.expiresIn}` : ''
+  const subject = tokenConfig.value.subject ? ` --subject "${tokenConfig.value.subject}"` : ''
+  return `clasp token create --scopes "${scopes}"${expires}${subject}`
 })
 
 function addScope() {
-  if (newScope.value && !tokenPayload.value.scopes.includes(newScope.value)) {
-    tokenPayload.value.scopes.push(newScope.value)
+  if (newScope.value && !tokenConfig.value.scopes.includes(newScope.value)) {
+    tokenConfig.value.scopes.push(newScope.value)
     newScope.value = ''
   }
 }
 
 function removeScope(index) {
-  tokenPayload.value.scopes.splice(index, 1)
+  tokenConfig.value.scopes.splice(index, 1)
 }
 
 // Lock Demo
@@ -80,37 +87,37 @@ function simulateConflict() {
     <div class="security-header">
       <h3>Security Features</h3>
       <p class="hint">
-        Explore CLASP's security model including JWT authentication, scoped permissions, parameter
-        locking, and conflict resolution strategies.
+        Explore CLASP's security model including CPSK (Capability Pre-Shared Key) authentication,
+        scoped permissions, parameter locking, and conflict resolution strategies.
       </p>
     </div>
 
     <div class="security-grid">
-      <!-- JWT Token Builder -->
+      <!-- CPSK Token Builder -->
       <div class="security-card full-width">
-        <h4>JWT Token Structure</h4>
+        <h4>CPSK Token (Capability Pre-Shared Key)</h4>
         <p class="card-hint">
-          CLASP uses JWT tokens for authentication. Tokens can contain scopes that restrict read/write
-          access to specific address patterns.
+          CLASP uses CPSK tokens for authentication. Tokens are generated server-side via CLI and
+          contain scoped permissions for read/write access to specific address patterns.
         </p>
 
         <div class="token-builder">
           <div class="token-fields">
             <div class="field">
-              <label>Subject (sub)</label>
-              <input v-model="tokenPayload.sub" type="text" placeholder="user-id" />
+              <label>Subject (description)</label>
+              <input v-model="tokenConfig.subject" type="text" placeholder="my-device" />
             </div>
 
             <div class="field">
-              <label>Name</label>
-              <input v-model="tokenPayload.name" type="text" placeholder="Client Name" />
+              <label>Expires In</label>
+              <input v-model="tokenConfig.expiresIn" type="text" placeholder="7d, 24h, etc." />
             </div>
 
             <div class="field">
               <label>Scopes</label>
               <div class="scopes-list">
                 <div
-                  v-for="(scope, i) in tokenPayload.scopes"
+                  v-for="(scope, i) in tokenConfig.scopes"
                   :key="i"
                   class="scope-tag"
                 >
@@ -132,25 +139,26 @@ function simulateConflict() {
 
           <div class="token-output">
             <div class="output-section">
-              <div class="output-label">Decoded Payload</div>
-              <pre>{{ decodedPayload }}</pre>
+              <div class="output-label">CLI Command</div>
+              <pre>{{ cliCommand }}</pre>
             </div>
 
             <div class="output-section">
-              <div class="output-label">Encoded Token</div>
+              <div class="output-label">Demo Token (format only)</div>
               <div class="token-string">{{ generatedToken }}</div>
+              <div class="demo-note">Real tokens are generated server-side via the CLI</div>
             </div>
           </div>
         </div>
 
-        <CodeSnippet :code="`// Connect with JWT token
-const client = await new ClaspBuilder('wss://relay.clasp.to')
-  .name('${tokenPayload.name}')
-  .token('${generatedToken.slice(0, 50)}...')
-  .connect();
+        <CodeSnippet :code="`// 1. Generate token via CLI (server-side)
+${cliCommand}
+// Output: ${generatedToken}
 
-// Token payload structure:
-${decodedPayload}`" />
+// 2. Connect with CPSK token (client-side)
+const client = await Clasp.builder('wss://venue.example.com')
+  .token('${generatedToken}')
+  .connect();`" />
       </div>
 
       <!-- Scope Examples -->
@@ -174,7 +182,7 @@ ${decodedPayload}`" />
             <span>Read all sensor values</span>
           </div>
           <div class="example">
-            <code>write:/user/${tokenPayload.sub}/**</code>
+            <code>write:/user/${tokenConfig.subject}/**</code>
             <span>Write only to own namespace</span>
           </div>
         </div>
@@ -474,6 +482,13 @@ input:disabled {
   font-size: 0.7rem;
   word-break: break-all;
   line-height: 1.4;
+}
+
+.demo-note {
+  font-size: 0.7rem;
+  opacity: 0.5;
+  font-style: italic;
+  margin-top: 0.5rem;
 }
 
 /* Examples */

@@ -11,6 +11,7 @@
 //! Example: cargo run -p clasp-test-suite --bin soak-tests -- 60  # 1 hour
 
 use clasp_client::Clasp;
+use clasp_core::SecurityMode;
 use clasp_router::{Router, RouterConfig};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -43,6 +44,7 @@ impl TestRouter {
             max_sessions: 1000,
             session_timeout: 300,
             features: vec!["param".to_string(), "event".to_string()],
+            security_mode: SecurityMode::Open,
         });
 
         let handle = tokio::spawn(async move {

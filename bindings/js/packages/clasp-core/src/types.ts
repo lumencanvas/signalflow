@@ -45,6 +45,15 @@ export enum QoS {
   Commit = 2,
 }
 
+/** Signal type values */
+export const SignalType = {
+  Param: 'param' as const,
+  Event: 'event' as const,
+  Stream: 'stream' as const,
+  Gesture: 'gesture' as const,
+  Timeline: 'timeline' as const,
+};
+
 /** Signal types */
 export type SignalType = 'param' | 'event' | 'stream' | 'gesture' | 'timeline';
 
@@ -258,4 +267,43 @@ export interface ClaspEvents {
   disconnect: (reason?: string) => void;
   error: (error: Error) => void;
   message: (message: Message) => void;
+}
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+/** Type guard for HelloMessage */
+export function isHelloMessage(msg: unknown): msg is HelloMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'HELLO';
+}
+
+/** Type guard for WelcomeMessage */
+export function isWelcomeMessage(msg: unknown): msg is WelcomeMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'WELCOME';
+}
+
+/** Type guard for SetMessage */
+export function isSetMessage(msg: unknown): msg is SetMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'SET';
+}
+
+/** Type guard for PublishMessage */
+export function isPublishMessage(msg: unknown): msg is PublishMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'PUBLISH';
+}
+
+/** Type guard for SubscribeMessage */
+export function isSubscribeMessage(msg: unknown): msg is SubscribeMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'SUBSCRIBE';
+}
+
+/** Type guard for ErrorMessage */
+export function isErrorMessage(msg: unknown): msg is ErrorMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'ERROR';
+}
+
+/** Type guard for AckMessage */
+export function isAckMessage(msg: unknown): msg is AckMessage {
+  return typeof msg === 'object' && msg !== null && (msg as Message).type === 'ACK';
 }

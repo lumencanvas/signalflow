@@ -6,7 +6,10 @@ import { encode as msgpackEncode, decode as msgpackDecode } from '@msgpack/msgpa
 import { Message, QoS, FrameFlags } from './types';
 
 /** Magic byte */
-const MAGIC = 0x53; // 'S'
+export const MAGIC_BYTE = 0x53; // 'S'
+
+// Re-export QoS for convenience
+export { QoS };
 
 /** Header size without timestamp */
 const HEADER_SIZE = 4;
@@ -38,16 +41,28 @@ export function decodeFlags(byte: number): FrameFlags {
   };
 }
 
+/** Frame encoding options */
+export interface FrameOptions {
+  qos?: QoS;
+  timestamp?: bigint | number;
+  sequence?: number;
+}
+
+/** Decoded frame result */
+export interface DecodedFrame {
+  payload: Uint8Array;
+  qos: QoS;
+  timestamp?: bigint;
+  flags: FrameFlags;
+}
+
 /**
- * Encode a message to a frame
+ * Encode a raw payload to a frame
  */
 export function encodeFrame(
-  message: Message,
-  options: { qos?: QoS; timestamp?: number } = {}
+  payload: Uint8Array,
+  options: FrameOptions = {}
 ): Uint8Array {
-  // Encode payload with MessagePack
-  const payload = msgpackEncode(message);
-
   // Determine header size
   const hasTimestamp = options.timestamp !== undefined;
   const headerSize = hasTimestamp ? HEADER_SIZE_WITH_TS : HEADER_SIZE;
@@ -57,7 +72,7 @@ export function encodeFrame(
   const view = new DataView(frame.buffer);
 
   // Write header
-  frame[0] = MAGIC;
+  frame[0] = MAGIC_BYTE;
   frame[1] = encodeFlags({
     qos: options.qos ?? QoS.Fire,
     hasTimestamp,
@@ -68,8 +83,9 @@ export function encodeFrame(
 
   // Write timestamp if present
   if (hasTimestamp && options.timestamp !== undefined) {
-    // Write as BigInt64
-    const ts = BigInt(options.timestamp);
+    const ts = typeof options.timestamp === 'bigint'
+      ? options.timestamp
+      : BigInt(options.timestamp);
     view.setBigUint64(4, ts, false);
   }
 
@@ -80,18 +96,14 @@ export function encodeFrame(
 }
 
 /**
- * Decode a frame to a message
+ * Decode a frame to its payload
  */
-export function decodeFrame(data: Uint8Array): {
-  message: Message;
-  flags: FrameFlags;
-  timestamp?: number;
-} {
+export function decodeFrame(data: Uint8Array): DecodedFrame {
   if (data.length < HEADER_SIZE) {
     throw new Error('Frame too small');
   }
 
-  if (data[0] !== MAGIC) {
+  if (data[0] !== MAGIC_BYTE) {
     throw new Error(`Invalid magic byte: 0x${data[0].toString(16)}`);
   }
 
@@ -105,14 +117,37 @@ export function decodeFrame(data: Uint8Array): {
     throw new Error('Frame incomplete');
   }
 
-  let timestamp: number | undefined;
+  let timestamp: bigint | undefined;
   if (flags.hasTimestamp) {
-    timestamp = Number(view.getBigUint64(4, false));
+    timestamp = view.getBigUint64(4, false);
   }
 
   const payload = data.slice(headerSize, headerSize + payloadLength);
-  const message = msgpackDecode(payload) as Message;
 
+  return { payload, qos: flags.qos, timestamp, flags };
+}
+
+/**
+ * Encode a message to a frame
+ */
+export function encodeMessage(
+  message: Message,
+  options: FrameOptions = {}
+): Uint8Array {
+  const payload = msgpackEncode(message);
+  return encodeFrame(new Uint8Array(payload), options);
+}
+
+/**
+ * Decode a frame to a message
+ */
+export function decodeMessage(data: Uint8Array): {
+  message: Message;
+  flags: FrameFlags;
+  timestamp?: bigint;
+} {
+  const { payload, flags, timestamp } = decodeFrame(data);
+  const message = msgpackDecode(payload) as Message;
   return { message, flags, timestamp };
 }
 
@@ -120,14 +155,14 @@ export function decodeFrame(data: Uint8Array): {
  * Encode a message to bytes (convenience function)
  */
 export function encode(message: Message, qos?: QoS): Uint8Array {
-  return encodeFrame(message, { qos });
+  return encodeMessage(message, { qos });
 }
 
 /**
  * Decode bytes to a message (convenience function)
  */
 export function decode(data: Uint8Array): Message {
-  return decodeFrame(data).message;
+  return decodeMessage(data).message;
 }
 
 /**
@@ -138,7 +173,7 @@ export function checkComplete(data: Uint8Array): number | null {
     return null;
   }
 
-  if (data[0] !== MAGIC) {
+  if (data[0] !== MAGIC_BYTE) {
     return null;
   }
 

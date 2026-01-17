@@ -25,11 +25,25 @@ export class ClaspBuilder {
   }
 
   /**
+   * Set client name (alias)
+   */
+  withName(name: string): this {
+    return this.name(name);
+  }
+
+  /**
    * Set supported features
    */
   features(features: string[]): this {
     this.options.features = features;
     return this;
+  }
+
+  /**
+   * Set supported features (alias)
+   */
+  withFeatures(features: string[]): this {
+    return this.features(features);
   }
 
   /**
@@ -41,10 +55,28 @@ export class ClaspBuilder {
   }
 
   /**
+   * Set authentication token (alias)
+   */
+  withToken(token: string): this {
+    return this.token(token);
+  }
+
+  /**
    * Enable/disable auto-reconnect
    */
   reconnect(enabled: boolean): this {
     this.options.reconnect = enabled;
+    return this;
+  }
+
+  /**
+   * Enable/disable auto-reconnect with optional interval
+   */
+  withReconnect(enabled: boolean, intervalMs?: number): this {
+    this.options.reconnect = enabled;
+    if (intervalMs !== undefined) {
+      this.options.reconnectInterval = intervalMs;
+    }
     return this;
   }
 

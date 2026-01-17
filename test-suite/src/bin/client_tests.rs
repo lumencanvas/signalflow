@@ -8,7 +8,7 @@
 //! - Advanced features (bundles, caching, clock sync)
 
 use clasp_client::{Clasp, ClaspBuilder};
-use clasp_core::{Message, SetMessage, Value};
+use clasp_core::{Message, SecurityMode, SetMessage, Value};
 use clasp_router::{Router, RouterConfig};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -75,6 +75,7 @@ impl TestRouter {
                 "event".to_string(),
                 "stream".to_string(),
             ],
+            security_mode: SecurityMode::Open,
         });
 
         let handle = tokio::spawn(async move {

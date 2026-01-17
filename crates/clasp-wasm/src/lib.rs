@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{CloseEvent, ErrorEvent, MessageEvent, WebSocket};
 
 use clasp_core::{
-    codec, frame::Frame, HelloMessage, Message, SetMessage, SubscribeMessage, SubscribeOptions,
+    codec, HelloMessage, Message, SetMessage, SubscribeMessage, SubscribeOptions,
     Value, PROTOCOL_VERSION, WS_SUBPROTOCOL,
 };
 
@@ -37,7 +37,9 @@ pub struct ClaspWasm {
     on_connect: Rc<RefCell<Option<js_sys::Function>>>,
     on_disconnect: Rc<RefCell<Option<js_sys::Function>>>,
     on_error: Rc<RefCell<Option<js_sys::Function>>>,
+    on_auth_error: Rc<RefCell<Option<js_sys::Function>>>,
     sub_id: Rc<RefCell<u32>>,
+    token: Rc<RefCell<Option<String>>>,
 }
 
 #[wasm_bindgen]
@@ -45,6 +47,12 @@ impl ClaspWasm {
     /// Create a new Clasp client
     #[wasm_bindgen(constructor)]
     pub fn new(url: &str) -> Result<ClaspWasm, JsValue> {
+        Self::new_with_token(url, None)
+    }
+
+    /// Create a new Clasp client with an authentication token
+    #[wasm_bindgen(js_name = newWithToken)]
+    pub fn new_with_token(url: &str, token: Option<String>) -> Result<ClaspWasm, JsValue> {
         // Create WebSocket with subprotocol
         let ws = WebSocket::new_with_str(url, WS_SUBPROTOCOL)?;
         ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
@@ -58,12 +66,20 @@ impl ClaspWasm {
             on_connect: Rc::new(RefCell::new(None)),
             on_disconnect: Rc::new(RefCell::new(None)),
             on_error: Rc::new(RefCell::new(None)),
+            on_auth_error: Rc::new(RefCell::new(None)),
             sub_id: Rc::new(RefCell::new(1)),
+            token: Rc::new(RefCell::new(token)),
         };
 
         client.setup_handlers()?;
 
         Ok(client)
+    }
+
+    /// Set the authentication token (must be called before connection is established)
+    #[wasm_bindgen(js_name = setToken)]
+    pub fn set_token(&self, token: String) {
+        *self.token.borrow_mut() = Some(token);
     }
 
     /// Set up WebSocket event handlers
@@ -73,13 +89,16 @@ impl ClaspWasm {
         let params = self.params.clone();
         let on_connect = self.on_connect.clone();
         let on_message = self.on_message.clone();
+        let on_auth_error = self.on_auth_error.clone();
         let ws = self.ws.clone();
+        let token = self.token.clone();
 
         // onopen handler
-        let connected_open = connected.clone();
         let ws_open = ws.clone();
+        let token_open = token.clone();
         let onopen = Closure::wrap(Box::new(move |_: JsValue| {
-            // Send HELLO
+            // Send HELLO with optional token
+            let token_value = token_open.borrow().clone();
             let hello = Message::Hello(HelloMessage {
                 version: PROTOCOL_VERSION,
                 name: "Clasp WASM Client".to_string(),
@@ -89,7 +108,7 @@ impl ClaspWasm {
                     "stream".to_string(),
                 ],
                 capabilities: None,
-                token: None,
+                token: token_value,
             });
 
             if let Ok(bytes) = codec::encode(&hello) {
@@ -106,6 +125,8 @@ impl ClaspWasm {
         let params_msg = params.clone();
         let on_connect_msg = on_connect.clone();
         let on_message_msg = on_message.clone();
+        let on_auth_error_msg = on_auth_error.clone();
+        let ws_msg = ws.clone();
 
         let onmessage = Closure::wrap(Box::new(move |e: MessageEvent| {
             if let Ok(abuf) = e.data().dyn_into::<js_sys::ArrayBuffer>() {
@@ -120,6 +141,35 @@ impl ClaspWasm {
 
                             if let Some(callback) = on_connect_msg.borrow().as_ref() {
                                 let _ = callback.call0(&JsValue::NULL);
+                            }
+                        }
+                        Message::Error(error) => {
+                            // Handle authentication errors
+                            match error.code {
+                                300 | 302 => {
+                                    // 300 = Unauthorized, 302 = TokenExpired
+                                    // Close the connection and notify
+                                    let _ = ws_msg.close();
+                                    *connected_msg.borrow_mut() = false;
+
+                                    if let Some(callback) = on_auth_error_msg.borrow().as_ref() {
+                                        let error_obj = js_sys::Object::new();
+                                        let _ = js_sys::Reflect::set(
+                                            &error_obj,
+                                            &JsValue::from_str("code"),
+                                            &JsValue::from_f64(error.code as f64),
+                                        );
+                                        let _ = js_sys::Reflect::set(
+                                            &error_obj,
+                                            &JsValue::from_str("message"),
+                                            &JsValue::from_str(&error.message),
+                                        );
+                                        let _ = callback.call1(&JsValue::NULL, &error_obj.into());
+                                    }
+                                }
+                                _ => {
+                                    // Other errors - just log for now
+                                }
                             }
                         }
                         Message::Set(set) => {
@@ -232,6 +282,15 @@ impl ClaspWasm {
     /// Set error callback
     pub fn set_on_error(&self, callback: js_sys::Function) {
         *self.on_error.borrow_mut() = Some(callback);
+    }
+
+    /// Set authentication error callback
+    ///
+    /// Called when the server returns an authentication error (code 300 or 302).
+    /// The callback receives an object with `code` and `message` properties.
+    #[wasm_bindgen(js_name = setOnAuthError)]
+    pub fn set_on_auth_error(&self, callback: js_sys::Function) {
+        *self.on_auth_error.borrow_mut() = Some(callback);
     }
 
     /// Subscribe to address pattern
