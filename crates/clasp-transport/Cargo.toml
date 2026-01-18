@@ -11,12 +11,20 @@ readme = "README.md"
 [features]
 default = ["websocket", "udp", "quic"]
 full = ["websocket", "udp", "quic", "serial", "ble", "webrtc"]
+
+# WebSocket - native uses tokio-tungstenite, WASM uses web-sys
 websocket = ["tokio-tungstenite", "futures-util", "url"]
+wasm-websocket = ["wasm-bindgen", "wasm-bindgen-futures", "web-sys", "js-sys"]
+
+# Native-only transports (not available in WASM)
 udp = []
 quic = ["quinn", "rustls"]
 serial = ["tokio-serial"]
 ble = ["btleplug", "uuid"]
 webrtc = ["webrtc-rs", "serde_json"]
+
+# WASM build - only includes wasm-compatible transports
+wasm = ["wasm-websocket"]
 
 [dependencies]
 clasp-core = { workspace = true }
@@ -56,6 +64,22 @@ uuid = { version = "1.0", optional = true }
 # WebRTC (optional)
 webrtc-rs = { package = "webrtc", version = "0.10", optional = true }
 serde_json = { version = "1.0", optional = true }
+
+# WASM (optional)
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", optional = true, features = [
+    "WebSocket",
+    "MessageEvent",
+    "BinaryType",
+    "CloseEvent",
+    "ErrorEvent",
+    "Blob",
+    "FileReader",
+] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

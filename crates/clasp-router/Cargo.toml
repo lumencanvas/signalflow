@@ -19,6 +19,8 @@ websocket = ["clasp-transport/websocket"]
 quic = ["clasp-transport/quic"]
 # Raw TCP - simple fallback, works everywhere
 tcp = []
+# WASM build - client-only, uses web-sys WebSocket
+wasm = ["clasp-transport/wasm", "wasm-bindgen", "wasm-bindgen-futures"]
 
 [dependencies]
 clasp-core = { workspace = true }
@@ -41,6 +43,10 @@ bytes = { workspace = true }
 parking_lot = { workspace = true }
 dashmap = { workspace = true }
 uuid = { workspace = true }
+
+# WASM (optional)
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

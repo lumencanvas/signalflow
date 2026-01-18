@@ -7,6 +7,51 @@
 
 export const presets = [
   {
+    id: 'latch-flow',
+    name: 'Latch Flow Designer',
+    description: 'OSC bridge for Latch visual flow designer',
+    icon: 'latch',
+    category: 'visual',
+    tags: ['latch', 'osc', 'flow', 'visual', 'creative'],
+    servers: [
+      {
+        type: 'clasp',
+        name: 'Latch Bridge Server',
+        address: '0.0.0.0:7330',
+        announce: true,
+      },
+      {
+        type: 'osc',
+        name: 'OSC Input (TouchOSC/Lemur)',
+        bind: '0.0.0.0',
+        port: 9000,
+      },
+      {
+        type: 'osc',
+        name: 'OSC Output',
+        bind: '0.0.0.0',
+        port: 8000,
+        mode: 'client',
+      },
+    ],
+    bridges: [
+      {
+        source: 'osc',
+        sourceAddr: '0.0.0.0:9000',
+        target: 'clasp',
+        targetAddr: 'internal',
+      },
+      {
+        source: 'clasp',
+        sourceAddr: 'internal',
+        target: 'osc',
+        targetAddr: 'localhost:8000',
+      },
+    ],
+    mappings: [],
+  },
+
+  {
     id: 'vj-setup',
     name: 'VJ Setup',
     description: 'TouchOSC/Lemur → Resolume/VDMX',
@@ -228,6 +273,17 @@ export const categories = {
   web: { name: 'Web/API', color: '#3b82f6' },
   basic: { name: 'Basic', color: '#78716c' },
 };
+
+// Latch logo SVG for the preset icon
+export const latchLogoSvg = `<svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M 50 35 L 25 35 Q 15 35 15 45 L 15 155 Q 15 165 25 165 L 50 165" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+  <path d="M 150 35 L 175 35 Q 185 35 185 45 L 185 155 Q 185 165 175 165 L 150 165" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+  <line x1="50" y1="75" x2="150" y2="75" stroke="currentColor" stroke-width="4"/>
+  <line x1="50" y1="125" x2="150" y2="125" stroke="currentColor" stroke-width="4"/>
+  <line x1="65" y1="115" x2="135" y2="85" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+  <rect x="58" y="108" width="18" height="14" rx="3" fill="#e85d3b"/>
+  <rect x="130" y="80" width="14" height="10" rx="2" fill="#e85d3b"/>
+</svg>`;
 
 // Get preset by ID
 export function getPreset(id) {
