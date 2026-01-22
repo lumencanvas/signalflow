@@ -48,11 +48,7 @@ impl TestResult {
         }
     }
 
-    fn from_result(
-        name: &'static str,
-        result: Result<(), String>,
-        duration_ms: u128,
-    ) -> Self {
+    fn from_result(name: &'static str, result: Result<(), String>, duration_ms: u128) -> Self {
         match result {
             Ok(()) => Self::pass(name, duration_ms),
             Err(msg) => Self::fail(name, msg, duration_ms),
@@ -217,11 +213,7 @@ async fn test_session_unique_id() -> TestResult {
         }
 
         // Verify we got exactly 5 unique session IDs
-        assert_eq_msg(
-            session_ids.len(),
-            5,
-            "Expected 5 unique session IDs",
-        )?;
+        assert_eq_msg(session_ids.len(), 5, "Expected 5 unique session IDs")?;
 
         // Cleanup: close all clients
         for client in clients {
@@ -417,7 +409,10 @@ async fn test_graceful_vs_abrupt_disconnect() -> TestResult {
             .map_err(|e| format!("Connect 1 failed: {}", e))?;
         assert_that(client1.is_connected(), "Client1 not connected")?;
         client1.close().await;
-        assert_that(!client1.is_connected(), "Client1 still connected after close")?;
+        assert_that(
+            !client1.is_connected(),
+            "Client1 still connected after close",
+        )?;
 
         // Test abrupt disconnect (drop without close)
         let client2 = Clasp::connect_to(&router.url())
@@ -696,10 +691,22 @@ async fn test_session_subscription_isolation() -> TestResult {
         let c1_wrong = client1_wrong.load(Ordering::SeqCst);
         let c2_wrong = client2_wrong.load(Ordering::SeqCst);
 
-        assert_that(c1_count >= 1, &format!("Client1 received {} values (expected >= 1)", c1_count))?;
-        assert_that(c2_count >= 1, &format!("Client2 received {} values (expected >= 1)", c2_count))?;
-        assert_that(!c1_wrong, "Client1 received wrong address (isolation violated)")?;
-        assert_that(!c2_wrong, "Client2 received wrong address (isolation violated)")?;
+        assert_that(
+            c1_count >= 1,
+            &format!("Client1 received {} values (expected >= 1)", c1_count),
+        )?;
+        assert_that(
+            c2_count >= 1,
+            &format!("Client2 received {} values (expected >= 1)", c2_count),
+        )?;
+        assert_that(
+            !c1_wrong,
+            "Client1 received wrong address (isolation violated)",
+        )?;
+        assert_that(
+            !c2_wrong,
+            "Client2 received wrong address (isolation violated)",
+        )?;
 
         client1.close().await;
         client2.close().await;
@@ -758,8 +765,14 @@ async fn test_session_value_isolation() -> TestResult {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Both clients send values
-        client1.set("/shared/counter", 100.0).await.map_err(|e| format!("Set 1 failed: {}", e))?;
-        client2.set("/shared/counter", 200.0).await.map_err(|e| format!("Set 2 failed: {}", e))?;
+        client1
+            .set("/shared/counter", 100.0)
+            .await
+            .map_err(|e| format!("Set 1 failed: {}", e))?;
+        client2
+            .set("/shared/counter", 200.0)
+            .await
+            .map_err(|e| format!("Set 2 failed: {}", e))?;
 
         // Wait for values
         for _ in 0..4 {
@@ -857,7 +870,10 @@ async fn test_operations_after_close() -> TestResult {
 
         // Operations after close should fail gracefully (not panic)
         // Note: exact behavior depends on implementation
-        assert_that(!client.is_connected(), "Should not be connected after close")?;
+        assert_that(
+            !client.is_connected(),
+            "Should not be connected after close",
+        )?;
 
         // Trying to set should either fail or be no-op, but not panic
         let set_result = client.set("/test", 1.0).await;

@@ -224,7 +224,14 @@ impl Clasp {
                 match event {
                     TransportEvent::Data(data) => {
                         if let Ok((msg, _)) = codec::decode(&data) {
-                            handle_message(&msg, &params, &subscriptions, &pending_gets, &signals, &last_error);
+                            handle_message(
+                                &msg,
+                                &params,
+                                &subscriptions,
+                                &pending_gets,
+                                &signals,
+                                &last_error,
+                            );
                         }
                     }
                     TransportEvent::Disconnected { reason } => {
@@ -268,14 +275,20 @@ impl Clasp {
                 loop {
                     let attempts = client.reconnect_attempts.fetch_add(1, Ordering::SeqCst);
 
-                    if client.max_reconnect_attempts > 0 && attempts >= client.max_reconnect_attempts {
-                        error!("Max reconnect attempts ({}) reached", client.max_reconnect_attempts);
+                    if client.max_reconnect_attempts > 0
+                        && attempts >= client.max_reconnect_attempts
+                    {
+                        error!(
+                            "Max reconnect attempts ({}) reached",
+                            client.max_reconnect_attempts
+                        );
                         break;
                     }
 
                     // Exponential backoff: base * 1.5^attempts, max 30 seconds
                     let base_ms = client.reconnect_interval_ms;
-                    let delay_ms = (base_ms as f64 * 1.5_f64.powi(attempts as i32)).min(30000.0) as u64;
+                    let delay_ms =
+                        (base_ms as f64 * 1.5_f64.powi(attempts as i32)).min(30000.0) as u64;
 
                     info!("Reconnect attempt {} in {}ms", attempts + 1, delay_ms);
                     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
@@ -346,30 +359,28 @@ impl Clasp {
 
         loop {
             match tokio::time::timeout_at(deadline, receiver.recv()).await {
-                Ok(Some(TransportEvent::Data(data))) => {
-                    match codec::decode(&data) {
-                        Ok((Message::Welcome(welcome), _)) => {
-                            *self.session_id.write() = Some(welcome.session.clone());
-                            *self.connected.write() = true;
+                Ok(Some(TransportEvent::Data(data))) => match codec::decode(&data) {
+                    Ok((Message::Welcome(welcome), _)) => {
+                        *self.session_id.write() = Some(welcome.session.clone());
+                        *self.connected.write() = true;
 
-                            self.clock.write().process_sync(
-                                clasp_core::time::now(),
-                                welcome.time,
-                                welcome.time,
-                                clasp_core::time::now(),
-                            );
+                        self.clock.write().process_sync(
+                            clasp_core::time::now(),
+                            welcome.time,
+                            welcome.time,
+                            clasp_core::time::now(),
+                        );
 
-                            info!("Reconnected, session: {}", welcome.session);
-                            break;
-                        }
-                        Ok((msg, _)) => {
-                            debug!("Received during reconnect handshake: {:?}", msg);
-                        }
-                        Err(e) => {
-                            warn!("Decode error during reconnect: {}", e);
-                        }
+                        info!("Reconnected, session: {}", welcome.session);
+                        break;
                     }
-                }
+                    Ok((msg, _)) => {
+                        debug!("Received during reconnect handshake: {:?}", msg);
+                    }
+                    Err(e) => {
+                        warn!("Decode error during reconnect: {}", e);
+                    }
+                },
                 Ok(Some(TransportEvent::Error(e))) => {
                     return Err(ClientError::ConnectionFailed(e));
                 }
@@ -379,7 +390,9 @@ impl Clasp {
                     ));
                 }
                 Ok(None) => {
-                    return Err(ClientError::ConnectionFailed("Connection closed".to_string()));
+                    return Err(ClientError::ConnectionFailed(
+                        "Connection closed".to_string(),
+                    ));
                 }
                 Err(_) => {
                     return Err(ClientError::Timeout);
@@ -404,7 +417,14 @@ impl Clasp {
                 match event {
                     TransportEvent::Data(data) => {
                         if let Ok((msg, _)) = codec::decode(&data) {
-                            handle_message(&msg, &params, &subscriptions, &pending_gets, &signals, &last_error);
+                            handle_message(
+                                &msg,
+                                &params,
+                                &subscriptions,
+                                &pending_gets,
+                                &signals,
+                                &last_error,
+                            );
                         }
                     }
                     TransportEvent::Disconnected { reason } => {
@@ -771,10 +791,7 @@ fn handle_message(
             // Process clock sync response
             // Note: This handles sync messages from server with t2/t3 filled in
             if let (Some(t2), Some(t3)) = (sync.t2, sync.t3) {
-                debug!(
-                    "Clock sync: t1={}, t2={}, t3={}",
-                    sync.t1, t2, t3
-                );
+                debug!("Clock sync: t1={}, t2={}, t3={}", sync.t1, t2, t3);
                 // Clock sync is processed through ClockSync::process_sync
                 // but we don't have access to the clock here.
                 // For now, log it. A more complete implementation would
@@ -784,10 +801,7 @@ fn handle_message(
 
         Message::Result(result) => {
             // Handle query results
-            debug!(
-                "Received result with {} signals",
-                result.signals.len()
-            );
+            debug!("Received result with {} signals", result.signals.len());
             // Store any returned signals
             for signal in &result.signals {
                 signals.insert(signal.address.clone(), signal.clone());
@@ -795,15 +809,26 @@ fn handle_message(
         }
 
         // Messages that are typically client-initiated, not expected from server
-        Message::Hello(_) | Message::Welcome(_) | Message::Subscribe(_)
-        | Message::Unsubscribe(_) | Message::Get(_) | Message::Query(_) => {
+        Message::Hello(_)
+        | Message::Welcome(_)
+        | Message::Subscribe(_)
+        | Message::Unsubscribe(_)
+        | Message::Get(_)
+        | Message::Query(_) => {
             debug!("Received unexpected client-type message: {:?}", msg);
         }
 
         // Bundle: process contained messages recursively
         Message::Bundle(bundle) => {
             for inner_msg in &bundle.messages {
-                handle_message(inner_msg, params, subscriptions, pending_gets, signals, last_error);
+                handle_message(
+                    inner_msg,
+                    params,
+                    subscriptions,
+                    pending_gets,
+                    signals,
+                    last_error,
+                );
             }
         }
 

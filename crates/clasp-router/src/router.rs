@@ -228,7 +228,8 @@ impl Router {
         let timeout_secs = self.config.session_timeout;
 
         tokio::spawn(async move {
-            let check_interval = std::time::Duration::from_secs(timeout_secs / 4).max(std::time::Duration::from_secs(10));
+            let check_interval = std::time::Duration::from_secs(timeout_secs / 4)
+                .max(std::time::Duration::from_secs(10));
             let timeout = std::time::Duration::from_secs(timeout_secs);
 
             loop {
@@ -247,7 +248,11 @@ impl Router {
 
                 for session_id in timed_out {
                     if let Some((id, session)) = sessions.remove(&session_id) {
-                        info!("Session {} timed out after {:?} idle", id, session.idle_duration());
+                        info!(
+                            "Session {} timed out after {:?} idle",
+                            id,
+                            session.idle_duration()
+                        );
                         subscriptions.remove_session(&id);
                     }
                 }
@@ -1135,8 +1140,7 @@ async fn handle_message(
 
             // Process PUBLISH messages
             for pub_msg in &validated_pubs {
-                let subscribers =
-                    subscriptions.find_subscribers(&pub_msg.address, pub_msg.signal);
+                let subscribers = subscriptions.find_subscribers(&pub_msg.address, pub_msg.signal);
 
                 let inner_msg = Message::Publish((*pub_msg).clone());
                 if let Ok(bytes) = codec::encode(&inner_msg) {

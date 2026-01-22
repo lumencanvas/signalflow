@@ -445,7 +445,10 @@ async fn test_graceful_disconnect() -> TestResult {
 
         client.close().await;
 
-        assert_that(!client.is_connected(), "Should not be connected after close")?;
+        assert_that(
+            !client.is_connected(),
+            "Should not be connected after close",
+        )?;
 
         Ok(())
     }
@@ -459,8 +462,11 @@ async fn test_connection_error_nonexistent() -> TestResult {
     let name = "connection_error_nonexistent";
 
     let result: Result<(), String> = async {
-        let connect_result =
-            timeout(Duration::from_secs(3), Clasp::connect_to("ws://127.0.0.1:1")).await;
+        let connect_result = timeout(
+            Duration::from_secs(3),
+            Clasp::connect_to("ws://127.0.0.1:1"),
+        )
+        .await;
 
         match connect_result {
             Ok(Ok(_)) => Err("Should have failed to connect to nonexistent server".to_string()),
@@ -607,8 +613,14 @@ async fn test_subscribe_pattern_wildcard() -> TestResult {
 
         // Send to matching addresses
         client.set("/sensors/temp", 25.0).await.map_string_err()?;
-        client.set("/sensors/humidity", 60.0).await.map_string_err()?;
-        client.set("/sensors/pressure", 1013.25).await.map_string_err()?;
+        client
+            .set("/sensors/humidity", 60.0)
+            .await
+            .map_string_err()?;
+        client
+            .set("/sensors/pressure", 1013.25)
+            .await
+            .map_string_err()?;
 
         // Wait for all three
         let received = collector.wait_for_count(3, Duration::from_secs(2)).await;
@@ -655,7 +667,10 @@ async fn test_subscribe_pattern_globstar() -> TestResult {
             .map_err(|e| format!("Subscribe failed: {}", e))?;
 
         client.set("/app/level1", 1.0).await.map_string_err()?;
-        client.set("/app/level1/level2", 2.0).await.map_string_err()?;
+        client
+            .set("/app/level1/level2", 2.0)
+            .await
+            .map_string_err()?;
         client.set("/app/a/b/c/d", 4.0).await.map_string_err()?;
 
         let received = collector.wait_for_count(3, Duration::from_secs(2)).await;
@@ -805,13 +820,15 @@ async fn test_emit_and_receive() -> TestResult {
 
         receiver
             .subscribe("/events/**", collector.callback())
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         emitter
             .emit("/events/trigger", Value::String("activated".to_string()))
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
         let received = collector.wait_for_count(1, Duration::from_secs(2)).await;
         assert_that(received, "Event not received")?;
@@ -918,7 +935,10 @@ async fn test_bundle_atomicity() -> TestResult {
         let receiver = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         let collector = ValueCollector::new();
-        receiver.subscribe("/atomic/**", collector.callback()).await.map_string_err()?;
+        receiver
+            .subscribe("/atomic/**", collector.callback())
+            .await
+            .map_string_err()?;
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Send bundle of 5 values
@@ -1030,12 +1050,21 @@ async fn test_value_type_int() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         let collector = ValueCollector::new();
-        client.subscribe("/types/**", collector.callback()).await.map_string_err()?;
+        client
+            .subscribe("/types/**", collector.callback())
+            .await
+            .map_string_err()?;
 
         client.set("/types/int", 42i64).await.map_string_err()?;
-        client.set("/types/int_neg", -100i64).await.map_string_err()?;
+        client
+            .set("/types/int_neg", -100i64)
+            .await
+            .map_string_err()?;
         client.set("/types/int_zero", 0i64).await.map_string_err()?;
-        client.set("/types/int_max", i64::MAX).await.map_string_err()?;
+        client
+            .set("/types/int_max", i64::MAX)
+            .await
+            .map_string_err()?;
 
         collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -1056,12 +1085,27 @@ async fn test_value_type_float() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         let collector = ValueCollector::new();
-        client.subscribe("/types/**", collector.callback()).await.map_string_err()?;
+        client
+            .subscribe("/types/**", collector.callback())
+            .await
+            .map_string_err()?;
 
-        client.set("/types/float", 3.14159f64).await.map_string_err()?;
-        client.set("/types/float_neg", -273.15f64).await.map_string_err()?;
-        client.set("/types/float_zero", 0.0f64).await.map_string_err()?;
-        client.set("/types/float_tiny", 1e-100f64).await.map_string_err()?;
+        client
+            .set("/types/float", 3.14159f64)
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/float_neg", -273.15f64)
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/float_zero", 0.0f64)
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/float_tiny", 1e-100f64)
+            .await
+            .map_string_err()?;
 
         collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -1082,10 +1126,19 @@ async fn test_value_type_bool() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         let collector = ValueCollector::new();
-        client.subscribe("/types/**", collector.callback()).await.map_string_err()?;
+        client
+            .subscribe("/types/**", collector.callback())
+            .await
+            .map_string_err()?;
 
-        client.set("/types/bool_true", true).await.map_string_err()?;
-        client.set("/types/bool_false", false).await.map_string_err()?;
+        client
+            .set("/types/bool_true", true)
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/bool_false", false)
+            .await
+            .map_string_err()?;
 
         let received = collector.wait_for_count(2, Duration::from_secs(2)).await;
         assert_that(received, "Did not receive bool values")?;
@@ -1107,12 +1160,24 @@ async fn test_value_type_string() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         let collector = ValueCollector::new();
-        client.subscribe("/types/**", collector.callback()).await.map_string_err()?;
+        client
+            .subscribe("/types/**", collector.callback())
+            .await
+            .map_string_err()?;
 
-        client.set("/types/str", "hello world").await.map_string_err()?;
+        client
+            .set("/types/str", "hello world")
+            .await
+            .map_string_err()?;
         client.set("/types/str_empty", "").await.map_string_err()?;
-        client.set("/types/str_unicode", "Hello, \u{1F30D}!").await.map_string_err()?;
-        client.set("/types/str_long", "x".repeat(1000)).await.map_string_err()?;
+        client
+            .set("/types/str_unicode", "Hello, \u{1F30D}!")
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/str_long", "x".repeat(1000))
+            .await
+            .map_string_err()?;
 
         collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -1133,9 +1198,16 @@ async fn test_value_type_bytes() -> TestResult {
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
         client
-            .set("/types/bytes", Value::Bytes(vec![0x00, 0xFF, 0x42, 0xDE, 0xAD]))
-            .await.map_string_err()?;
-        client.set("/types/bytes_empty", Value::Bytes(vec![])).await.map_string_err()?;
+            .set(
+                "/types/bytes",
+                Value::Bytes(vec![0x00, 0xFF, 0x42, 0xDE, 0xAD]),
+            )
+            .await
+            .map_string_err()?;
+        client
+            .set("/types/bytes_empty", Value::Bytes(vec![]))
+            .await
+            .map_string_err()?;
 
         client.close().await;
         Ok(())
@@ -1158,7 +1230,8 @@ async fn test_value_type_array() -> TestResult {
                 "/types/array",
                 Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
             )
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
         client
             .set(
@@ -1169,9 +1242,13 @@ async fn test_value_type_array() -> TestResult {
                     Value::String("three".to_string()),
                 ]),
             )
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
-        client.set("/types/array_empty", Value::Array(vec![])).await.map_string_err()?;
+        client
+            .set("/types/array_empty", Value::Array(vec![]))
+            .await
+            .map_string_err()?;
 
         client.close().await;
         Ok(())
@@ -1189,7 +1266,10 @@ async fn test_value_type_null() -> TestResult {
         let router = TestRouter::start().await;
         let client = Clasp::connect_to(&router.url()).await.map_string_err()?;
 
-        client.set("/types/null", Value::Null).await.map_string_err()?;
+        client
+            .set("/types/null", Value::Null)
+            .await
+            .map_string_err()?;
 
         client.close().await;
         Ok(())
@@ -1217,7 +1297,8 @@ async fn test_two_client_set_receive() -> TestResult {
 
         client1
             .subscribe("/shared/**", collector.callback())
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -1250,16 +1331,24 @@ async fn test_bidirectional_communication() -> TestResult {
 
         client1
             .subscribe("/from2/**", collector1.callback())
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
         client2
             .subscribe("/from1/**", collector2.callback())
-            .await.map_string_err()?;
+            .await
+            .map_string_err()?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Bidirectional sends
-        client1.set("/from1/message", 100.0).await.map_string_err()?;
-        client2.set("/from2/message", 200.0).await.map_string_err()?;
+        client1
+            .set("/from1/message", 100.0)
+            .await
+            .map_string_err()?;
+        client2
+            .set("/from2/message", 200.0)
+            .await
+            .map_string_err()?;
 
         let recv1 = collector1.wait_for_count(1, Duration::from_secs(2)).await;
         let recv2 = collector2.wait_for_count(1, Duration::from_secs(2)).await;
@@ -1292,7 +1381,8 @@ async fn test_concurrent_operations() -> TestResult {
             let client = Clasp::builder(&router.url())
                 .name(&format!("ConcurrentClient{}", i))
                 .connect()
-                .await.map_string_err()?;
+                .await
+                .map_string_err()?;
             clients.push(client);
         }
 
@@ -1337,7 +1427,8 @@ async fn test_rapid_subscribe_unsubscribe() -> TestResult {
             let collector = ValueCollector::new();
             let sub_id = client
                 .subscribe(&format!("/rapid/{}", i), collector.callback())
-                .await.map_string_err()?;
+                .await
+                .map_string_err()?;
             client.unsubscribe(sub_id).await.map_string_err()?;
         }
 

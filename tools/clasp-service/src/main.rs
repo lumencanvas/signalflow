@@ -385,10 +385,7 @@ impl BridgeService {
                     })
                     .unwrap_or_else(|| vec!["message".to_string()]);
 
-                let auth = extra_config
-                    .as_ref()
-                    .and_then(|c| c.get("auth"))
-                    .cloned();
+                let auth = extra_config.as_ref().and_then(|c| c.get("auth")).cloned();
 
                 let config = SocketIOBridgeConfig {
                     url: source_addr.clone(),
@@ -681,10 +678,12 @@ impl BridgeService {
                         "target_addr": b.info.target_addr,
                     }),
                     metrics,
-                    last_activity: Some(std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0)),
+                    last_activity: Some(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0),
+                    ),
                     recent_errors: errors,
                 };
 

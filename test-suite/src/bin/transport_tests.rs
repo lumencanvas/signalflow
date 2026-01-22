@@ -10,7 +10,10 @@
 //! - Large message handling
 //! - Concurrent connections
 
-use clasp_core::{codec, HelloMessage, Message, WelcomeMessage, SetMessage, Value, WS_SUBPROTOCOL, PROTOCOL_VERSION};
+use clasp_core::{
+    codec, HelloMessage, Message, SetMessage, Value, WelcomeMessage, PROTOCOL_VERSION,
+    WS_SUBPROTOCOL,
+};
 use clasp_router::{Router, RouterConfig};
 use clasp_transport::{
     Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
@@ -222,7 +225,10 @@ async fn test_websocket_connect() -> TestResult {
         let (sender, _) = connect_result.unwrap();
         assert_that(sender.is_connected(), "Not connected after connect")?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         Ok(())
     }
@@ -285,7 +291,10 @@ async fn test_websocket_binary_frames() -> TestResult {
             token: None,
         });
         let bytes = codec::encode(&hello).map_err(|e| format!("Encode failed: {}", e))?;
-        sender.send(bytes).await.map_err(|e| format!("Send failed: {}", e))?;
+        sender
+            .send(bytes)
+            .await
+            .map_err(|e| format!("Send failed: {}", e))?;
 
         // Should receive binary WELCOME
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -294,7 +303,8 @@ async fn test_websocket_binary_frames() -> TestResult {
         while Instant::now() < deadline && !got_welcome {
             match timeout(Duration::from_millis(500), receiver.recv()).await {
                 Ok(Some(TransportEvent::Data(data))) => {
-                    let (msg, _) = codec::decode(&data).map_err(|e| format!("Decode failed: {}", e))?;
+                    let (msg, _) =
+                        codec::decode(&data).map_err(|e| format!("Decode failed: {}", e))?;
                     if matches!(msg, Message::Welcome(_)) {
                         got_welcome = true;
                     }
@@ -306,7 +316,10 @@ async fn test_websocket_binary_frames() -> TestResult {
 
         assert_that(got_welcome, "Did not receive WELCOME message")?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         Ok(())
     }
@@ -351,7 +364,8 @@ async fn test_roundtrip_encode_decode() -> TestResult {
 
         for original in messages {
             let encoded = codec::encode(&original).map_err(|e| format!("Encode failed: {}", e))?;
-            let (decoded, _) = codec::decode(&encoded).map_err(|e| format!("Decode failed: {}", e))?;
+            let (decoded, _) =
+                codec::decode(&encoded).map_err(|e| format!("Decode failed: {}", e))?;
 
             // Verify message type matches
             match (&original, &decoded) {
@@ -359,7 +373,12 @@ async fn test_roundtrip_encode_decode() -> TestResult {
                 (Message::Set(o), Message::Set(d)) => {
                     assert_eq_msg(&o.address, &d.address, "SET address mismatch")?;
                 }
-                _ => return Err(format!("Message type mismatch: {:?} vs {:?}", original, decoded)),
+                _ => {
+                    return Err(format!(
+                        "Message type mismatch: {:?} vs {:?}",
+                        original, decoded
+                    ))
+                }
             }
         }
 
@@ -397,7 +416,10 @@ async fn test_roundtrip_via_server() -> TestResult {
             types: vec![],
             options: None,
         });
-        sender.send(codec::encode(&sub_msg).unwrap()).await.map_err(|e| format!("Sub send failed: {}", e))?;
+        sender
+            .send(codec::encode(&sub_msg).unwrap())
+            .await
+            .map_err(|e| format!("Sub send failed: {}", e))?;
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -409,7 +431,10 @@ async fn test_roundtrip_via_server() -> TestResult {
             lock: false,
             unlock: false,
         });
-        sender.send(codec::encode(&set_msg).unwrap()).await.map_err(|e| format!("Set send failed: {}", e))?;
+        sender
+            .send(codec::encode(&set_msg).unwrap())
+            .await
+            .map_err(|e| format!("Set send failed: {}", e))?;
 
         // Wait for the SET to come back
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -435,7 +460,10 @@ async fn test_roundtrip_via_server() -> TestResult {
 
         assert_that(received_value, "Did not receive SET back from server")?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         Ok(())
     }
@@ -461,9 +489,15 @@ async fn test_connection_close() -> TestResult {
 
         assert_that(sender.is_connected(), "Should be connected")?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
-        assert_that(!sender.is_connected(), "Should not be connected after close")?;
+        assert_that(
+            !sender.is_connected(),
+            "Should not be connected after close",
+        )?;
 
         Ok(())
     }
@@ -483,7 +517,10 @@ async fn test_double_close() -> TestResult {
             .await
             .map_err(|e| format!("Connect failed: {}", e))?;
 
-        sender.close().await.map_err(|e| format!("First close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("First close failed: {}", e))?;
 
         // Second close should not panic or error
         let _ = sender.close().await;
@@ -558,7 +595,10 @@ async fn test_send_after_close() -> TestResult {
             .await
             .map_err(|e| format!("Connect failed: {}", e))?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         // Send after close should fail gracefully
         let hello = Message::Hello(HelloMessage {
@@ -612,7 +652,10 @@ async fn test_large_message() -> TestResult {
             lock: false,
             unlock: false,
         });
-        sender.send(codec::encode(&set).unwrap()).await.map_err(|e| format!("Send failed: {}", e))?;
+        sender
+            .send(codec::encode(&set).unwrap())
+            .await
+            .map_err(|e| format!("Send failed: {}", e))?;
 
         // Should get ACK for large message
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -632,7 +675,10 @@ async fn test_large_message() -> TestResult {
 
         assert_that(got_ack, "Did not receive ACK for large message")?;
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         Ok(())
     }
@@ -665,11 +711,18 @@ async fn test_message_size_boundaries() -> TestResult {
                 lock: false,
                 unlock: false,
             });
-            let encoded = codec::encode(&set).map_err(|e| format!("Encode size {} failed: {}", size, e))?;
-            sender.send(encoded).await.map_err(|e| format!("Send size {} failed: {}", size, e))?;
+            let encoded =
+                codec::encode(&set).map_err(|e| format!("Encode size {} failed: {}", size, e))?;
+            sender
+                .send(encoded)
+                .await
+                .map_err(|e| format!("Send size {} failed: {}", size, e))?;
         }
 
-        sender.close().await.map_err(|e| format!("Close failed: {}", e))?;
+        sender
+            .close()
+            .await
+            .map_err(|e| format!("Close failed: {}", e))?;
 
         Ok(())
     }
@@ -736,7 +789,10 @@ async fn test_concurrent_connections() -> TestResult {
             .collect();
 
         let results = futures::future::join_all(handles).await;
-        let success_count = results.iter().filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false)).count();
+        let success_count = results
+            .iter()
+            .filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false))
+            .count();
 
         assert_that(
             success_count >= 15,
@@ -779,7 +835,10 @@ async fn test_concurrent_unique_sessions() -> TestResult {
             .collect();
 
         let results = futures::future::join_all(handles).await;
-        let success_count = results.iter().filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false)).count();
+        let success_count = results
+            .iter()
+            .filter(|r| r.as_ref().map(|r| r.is_ok()).unwrap_or(false))
+            .count();
 
         assert_that(
             success_count >= 8,
@@ -886,8 +945,10 @@ async fn test_value_roundtrip_all_types() -> TestResult {
                 unlock: false,
             });
 
-            let encoded = codec::encode(&msg).map_err(|e| format!("Encode {} failed: {}", name, e))?;
-            let (decoded, _) = codec::decode(&encoded).map_err(|e| format!("Decode {} failed: {}", name, e))?;
+            let encoded =
+                codec::encode(&msg).map_err(|e| format!("Encode {} failed: {}", name, e))?;
+            let (decoded, _) =
+                codec::decode(&encoded).map_err(|e| format!("Decode {} failed: {}", name, e))?;
 
             if let Message::Set(set) = decoded {
                 // Values should match

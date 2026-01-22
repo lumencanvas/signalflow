@@ -24,7 +24,8 @@ fn parse_concatenated_json(s: &str) -> Vec<serde_json::Value> {
 
     while !remaining.is_empty() {
         // Try to parse from the start
-        let mut stream = serde_json::Deserializer::from_str(remaining).into_iter::<serde_json::Value>();
+        let mut stream =
+            serde_json::Deserializer::from_str(remaining).into_iter::<serde_json::Value>();
 
         if let Some(Ok(value)) = stream.next() {
             let bytes_read = stream.byte_offset();
@@ -313,7 +314,11 @@ async fn test_websocket_server_startup() {
 
     // Verify port is listening
     let listening = wait_for_port(port, Duration::from_secs(2)).await;
-    assert!(listening, "WebSocket server should be listening on port {}", port);
+    assert!(
+        listening,
+        "WebSocket server should be listening on port {}",
+        port
+    );
 
     // Verify in list
     let list = harness
@@ -370,7 +375,9 @@ async fn test_websocket_server_diagnostics() {
     assert_eq!(diag["data"]["id"], "ws-diag");
     assert_eq!(diag["data"]["protocol"], "websocket");
     assert_eq!(diag["data"]["status"], "running");
-    assert!(diag["data"]["metrics"]["messages_received"].as_u64().is_some());
+    assert!(diag["data"]["metrics"]["messages_received"]
+        .as_u64()
+        .is_some());
 
     // Cleanup
     harness
@@ -402,7 +409,11 @@ async fn test_http_server_startup() {
 
     // Verify port is listening
     let listening = wait_for_port(port, Duration::from_secs(2)).await;
-    assert!(listening, "HTTP server should be listening on port {}", port);
+    assert!(
+        listening,
+        "HTTP server should be listening on port {}",
+        port
+    );
 
     // Cleanup
     harness
@@ -548,9 +559,7 @@ async fn test_unknown_request_type() {
     let mut harness = ServiceHarness::start().await.expect("Service should start");
 
     // Send unknown request type
-    let response = harness
-        .request(r#"{"type":"unknown_type"}"#)
-        .await;
+    let response = harness.request(r#"{"type":"unknown_type"}"#).await;
 
     // Should get error (serde will fail to parse)
     assert!(response.is_err() || response.unwrap()["type"] == "error");

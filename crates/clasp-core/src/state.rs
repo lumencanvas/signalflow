@@ -169,7 +169,11 @@ impl std::fmt::Display for UpdateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RevisionConflict { expected, actual } => {
-                write!(f, "Revision conflict: expected {}, got {}", expected, actual)
+                write!(
+                    f,
+                    "Revision conflict: expected {}, got {}",
+                    expected, actual
+                )
             }
             Self::LockHeld { holder } => {
                 write!(f, "Parameter locked by {}", holder)

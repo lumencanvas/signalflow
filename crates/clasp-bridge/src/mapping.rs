@@ -170,10 +170,8 @@ impl ValueTransform {
                     "PI".to_string(),
                     evalexpr::Value::Float(std::f64::consts::PI),
                 );
-                let _ = context.set_value(
-                    "E".to_string(),
-                    evalexpr::Value::Float(std::f64::consts::E),
-                );
+                let _ =
+                    context.set_value("E".to_string(), evalexpr::Value::Float(std::f64::consts::E));
 
                 match eval_with_context_mut(expr, &mut context) {
                     Ok(evalexpr::Value::Float(f)) => Value::Float(f),

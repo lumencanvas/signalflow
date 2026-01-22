@@ -477,7 +477,8 @@ impl WebSocketBridge {
         let _ = event_tx.send(BridgeEvent::Connected).await;
 
         // Track connected clients with their send channels
-        let clients: Arc<RwLock<HashMap<u64, mpsc::Sender<WsMessage>>>> = Arc::new(RwLock::new(HashMap::new()));
+        let clients: Arc<RwLock<HashMap<u64, mpsc::Sender<WsMessage>>>> =
+            Arc::new(RwLock::new(HashMap::new()));
         let next_client_id = Arc::new(AtomicU64::new(0));
 
         loop {

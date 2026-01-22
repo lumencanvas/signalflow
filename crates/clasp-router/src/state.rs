@@ -44,7 +44,10 @@ impl RouterState {
 
     /// Get all registered signals
     pub fn all_signals(&self) -> Vec<SignalDefinition> {
-        self.signals.iter().map(|entry| entry.value().clone()).collect()
+        self.signals
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect()
     }
 
     /// Get a parameter value

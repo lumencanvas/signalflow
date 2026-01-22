@@ -84,6 +84,7 @@ jobs:
   build-electron:
     name: Build Electron (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    environment: Prod
     strategy:
       fail-fast: false
       matrix:
@@ -119,44 +120,24 @@ jobs:
         working-directory: apps/bridge
         run: npm install
 
-      - name: Import macOS code signing certificate
+      - name: Build Electron app (macOS with signing & notarization)
         if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "No certificate configured, skipping signing setup"
-            exit 0
-          fi
-
-          # Create temporary keychain
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          # Decode certificate
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-
-          # Create and configure keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # Import certificate
-          security import certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-
-          # Allow codesign to access keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # Cleanup
-          rm certificate.p12
-
-      - name: Build Electron app
         working-directory: apps/bridge
         run: npm run build
         env:
-          # Disable automatic code signing discovery - we'll use explicit certs if available
+          # Code signing
+          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # Notarization
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build Electron app (Linux/Windows)
+        if: runner.os != 'macOS'
+        working-directory: apps/bridge
+        run: npm run build
+        env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload macOS DMG

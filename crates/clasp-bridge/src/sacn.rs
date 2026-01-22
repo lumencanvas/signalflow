@@ -205,7 +205,9 @@ impl SacnBridge {
             .bind_address
             .as_ref()
             .and_then(|s| s.parse().ok())
-            .unwrap_or_else(|| SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), ACN_SDT_MULTICAST_PORT));
+            .unwrap_or_else(|| {
+                SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), ACN_SDT_MULTICAST_PORT)
+            });
 
         // Create receiver
         let mut receiver = match SacnReceiver::with_ip(bind_addr, None) {
