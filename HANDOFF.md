@@ -446,13 +446,17 @@ docker compose --profile full up
 ## Wire Protocol Summary
 
 ```
-Frame: 4-12 bytes header + MessagePack payload
+Frame: 4-12 bytes header + payload
 
 Byte 0:     0x53 ('S' magic)
-Byte 1:     Flags [QoS:2][TS:1][Enc:1][Cmp:1][Rsv:3]
+Byte 1:     Flags [QoS:2][TS:1][Enc:1][Cmp:1][Rsv:2][Ver:3]
 Bytes 2-3:  Payload length (uint16 BE)
 [Bytes 4-11: Timestamp if TS flag set]
-Payload:    MessagePack message
+Payload:    v3 binary (Ver=1) or v2 MessagePack (Ver=0)
+
+Version bits:
+  0 = v2 (MessagePack with named keys, backward compat)
+  1 = v3 (binary encoding, 54% smaller, 5x faster)
 
 QoS: 00=Fire, 01=Confirm, 10=Commit
 

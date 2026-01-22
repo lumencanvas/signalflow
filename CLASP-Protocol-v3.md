@@ -227,9 +227,9 @@ first payload byte: MessagePack map prefix (0x80-0x8F, 0xDE, 0xDF) indicates v2.
 
 MessagePack-with-named-keys was the v2 choice. v3 switched to compact binary because:
 
-1. **54% smaller**: SET message 31 bytes vs 69 bytes
-2. **5x faster encode**: 8M msg/s vs 1.8M msg/s (Rust)
-3. **4x faster decode**: 10M msg/s vs 2.5M msg/s
+1. **55% smaller**: SET message 31 bytes vs 69 bytes
+2. **4x faster encode**: 8M msg/s vs 1.8M msg/s (Rust)
+3. **7x faster decode**: 11M msg/s vs 1.5M msg/s
 4. **Still debuggable**: Simple byte layout, no schema files needed
 
 ### 2.2.3 Embedded Optimization

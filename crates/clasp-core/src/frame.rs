@@ -37,6 +37,8 @@ pub struct FrameFlags {
     pub has_timestamp: bool,
     pub encrypted: bool,
     pub compressed: bool,
+    /// Encoding version: 0 = v2 (MessagePack named), 1 = v3 (binary)
+    pub version: u8,
 }
 
 impl FrameFlags {
@@ -52,6 +54,8 @@ impl FrameFlags {
         if self.compressed {
             flags |= 0x08;
         }
+        // Version in bits 0-2 (0 = v2 legacy, 1 = v3 binary)
+        flags |= self.version & 0x07;
         flags
     }
 
@@ -61,7 +65,13 @@ impl FrameFlags {
             has_timestamp: (byte & 0x20) != 0,
             encrypted: (byte & 0x10) != 0,
             compressed: (byte & 0x08) != 0,
+            version: byte & 0x07,
         }
+    }
+
+    /// Check if frame uses v3 binary encoding
+    pub fn is_v3_binary(&self) -> bool {
+        self.version >= 1
     }
 }
 
@@ -254,6 +264,7 @@ mod tests {
             has_timestamp: true,
             encrypted: true,
             compressed: false,
+            version: 1, // v3 binary encoding
         };
 
         let byte = flags.to_byte();
@@ -263,6 +274,25 @@ mod tests {
         assert!(decoded.has_timestamp);
         assert!(decoded.encrypted);
         assert!(!decoded.compressed);
+        assert_eq!(decoded.version, 1);
+        assert!(decoded.is_v3_binary());
+    }
+
+    #[test]
+    fn test_flags_version_bits() {
+        // Test v2 legacy (version = 0)
+        let v2_flags = FrameFlags {
+            version: 0,
+            ..Default::default()
+        };
+        assert!(!v2_flags.is_v3_binary());
+
+        // Test v3 binary (version = 1)
+        let v3_flags = FrameFlags {
+            version: 1,
+            ..Default::default()
+        };
+        assert!(v3_flags.is_v3_binary());
     }
 
     #[test]

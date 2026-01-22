@@ -65,9 +65,22 @@ const clasp = new Clasp('wss://192.168.1.42:7330');
 ## Frame Format (4 bytes minimum)
 ```
 [0]    Magic 'S' (0x53)
-[1]    Flags (QoS, timestamp, encrypted, compressed)
+[1]    Flags [QoS:2][TS:1][Enc:1][Cmp:1][Rsv:2][Ver:3]
+       Ver: 0=v2 (MessagePack), 1=v3 (binary)
 [2-3]  Payload length (uint16 BE)
-[4+]   MessagePack payload
+[4+]   Payload (v3 binary or v2 MessagePack)
+```
+
+## v3 Binary Encoding (54% smaller)
+
+SET message format:
+```
+[0]    Type 0x21
+[1]    Flags [has_rev:1][lock:1][unlock:1][rsv:1][vtype:4]
+[2-3]  Address length
+[4..N] Address (UTF-8)
+[N+1..] Value (per vtype)
+[opt]  Revision (u64 BE if has_rev)
 ```
 
 ## Bridge Mappings

@@ -57,9 +57,9 @@ clasp.emit('/scene/activate', { name: 'movie-mode' });`
 // Connection handshake
 const handshakeFlow = `Client                           Server
   |                                |
-  |-- WebSocket Connect ---------->|  (ws://host:7330, subprotocol: clasp.v2)
+  |-- WebSocket Connect ---------->|  (ws://host:7330, subprotocol: clasp.v3)
   |                                |
-  |-- HELLO ---------------------->|  { version: 2, name: "My App", features: [...] }
+  |-- HELLO ---------------------->|  { version: 3, name: "My App", features: [...] }
   |                                |
   |<--------- WELCOME -------------|  { session: "abc123", time: 1704067200000000 }
   |                                |
@@ -74,7 +74,7 @@ const handshakeFlow = `Client                           Server
 const helloMsg = `// HELLO - sent by client after WebSocket connects
 {
   "type": "HELLO",
-  "version": 2,
+  "version": 3,
   "name": "My Controller App",
   "features": ["param", "event", "stream"],
   "token": "cpsk_7kX9mP2nQ4rT6vW8xZ0aB3cD5eF1gH"  // optional CPSK token
@@ -83,7 +83,7 @@ const helloMsg = `// HELLO - sent by client after WebSocket connects
 const welcomeMsg = `// WELCOME - server response with session info
 {
   "type": "WELCOME",
-  "version": 2,
+  "version": 3,
   "session": "sess_a1b2c3",      // unique session ID
   "name": "CLASP Router",
   "time": 1704067200000000,      // server time in microseconds
@@ -140,14 +140,18 @@ const frameCode = `┌───────────────────�
 │ Byte 1:    Flags                                                 │
 │            ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐    │
 │            │  7  │  6  │  5  │  4  │  3  │  2  │  1  │  0  │    │
-│            │  QoS (2b) │ TS  │ Enc │ Cmp │   Reserved    │    │
+│            │  QoS (2b) │ TS  │ Enc │ Cmp │ Version (3b)  │    │
 │            └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘    │
 │ Bytes 2-3: Payload length (uint16 big-endian, max 65535)         │
 │ [Optional] Bytes 4-11: Timestamp (uint64 microseconds)           │
-│ Payload:   MessagePack-encoded message                           │
+│ Payload:   v3 compact binary (version=1) or MessagePack (v=0)    │
 └──────────────────────────────────────────────────────────────────┘
 
-QoS Values:
+Version bits (0-2):
+  000 = v2 legacy (MessagePack with named keys)
+  001 = v3 compact (positional binary, 54% smaller)
+
+QoS Values (bits 6-7):
   00 = Fire    - Best effort, no ACK (streams)
   01 = Confirm - At-least-once, server sends ACK (params, events)
   10 = Commit  - Exactly-once, ordered (bundles, timelines)`
@@ -195,23 +199,23 @@ const bundleMsg = `// BUNDLE - atomic group of messages, optionally scheduled
 }`
 
 // Data types
-const dataTypesCode = `// MessagePack native types (these just work):
-null, true/false, integers, floats, strings, binary, arrays, maps
-
-// Creative primitives (MessagePack extension types):
-Type     Code   Layout          Example Use
-───────────────────────────────────────────────────────
-vec2     0x10   f32 × 2        UV coordinates, 2D position
-vec3     0x11   f32 × 3        3D position, RGB color
-vec4     0x12   f32 × 4        RGBA color, quaternion
-color    0x13   u8 × 4         8-bit RGBA (0-255)
-mat4     0x16   f32 × 16       4×4 transform matrix
+const dataTypesCode = `// v3 compact binary value types:
+Type     Code   Encoding            Example Use
+───────────────────────────────────────────────────────────
+null     0x00   1 byte              No value
+bool     0x01   1 byte (false)      Toggles
+bool     0x02   1 byte (true)       Toggles
+f64      0x07   9 bytes             Most numeric values
+string   0x08   2+N bytes (len+utf8) Labels, names
+bytes    0x09   4+N bytes           Binary data
+array    0x0A   4+N×X bytes         Lists
+map      0x0B   4+N×X bytes         Objects
 
 // In practice, most values are just numbers or simple types:
-clasp.set('/volume', 0.8);                    // float
-clasp.set('/mute', true);                     // boolean
+clasp.set('/volume', 0.8);                    // f64
+clasp.set('/mute', true);                     // bool
 clasp.set('/label', 'Main Mix');              // string
-clasp.set('/color', { r: 255, g: 128, b: 0}); // object`
+clasp.set('/color', { r: 255, g: 128, b: 0}); // map`
 
 // Bridges
 const bridgesCode = `Protocol bridges translate between CLASP and legacy protocols.
@@ -253,7 +257,7 @@ clasp.bundle([...], { at: clasp.time() + 100000 }); // 100ms from now
 // Discovery
 const discoveryCode = `// 1. mDNS (recommended for LAN)
 Service type: _clasp._tcp.local
-TXT record: { version: "2", name: "My App", ws: "7330" }
+TXT record: { version: "3", name: "My App", ws: "7330" }
 
 // 2. UDP broadcast fallback (port 7331)
 Client broadcasts: HELLO
@@ -320,22 +324,22 @@ const signalTypes = [
   { name: 'Timeline', qos: 'Commit', persist: 'Yes', desc: 'Automation lanes. Time-indexed keyframes for playback.' }
 ]
 
-// Benchmark data (from cargo run -p clasp-test-suite --bin proof-tests --release)
+// Benchmark data (from cargo test --package clasp-core --release)
 const benchmarks = {
   encoding: [
     { proto: 'MQTT', rate: '11.4M', winner: true },
-    { proto: 'OSC', rate: '4.5M', winner: false },
-    { proto: 'CLASP', rate: '1.8M', winner: false }
+    { proto: 'CLASP v3', rate: '8M', winner: false },
+    { proto: 'OSC', rate: '4.5M', winner: false }
   ],
   decoding: [
     { proto: 'MQTT', rate: '11.4M', winner: true },
-    { proto: 'OSC', rate: '5.7M', winner: false },
-    { proto: 'CLASP', rate: '1.5M', winner: false }
+    { proto: 'CLASP v3', rate: '11M', winner: false },
+    { proto: 'OSC', rate: '5.7M', winner: false }
   ],
   size: [
     { proto: 'MQTT', bytes: 19, winner: true },
     { proto: 'OSC', bytes: 24, winner: false },
-    { proto: 'CLASP', bytes: 64, winner: false }
+    { proto: 'CLASP v3', bytes: 31, winner: false }
   ],
   features: [
     { feature: 'State synchronization', clasp: true, osc: false, mqtt: false },
@@ -352,7 +356,7 @@ const benchmarks = {
 
 <template>
   <section class="section" id="spec">
-    <h2>FULL SPEC (CLASP v2)</h2>
+    <h2>FULL SPEC (CLASP v3)</h2>
 
     <div class="spec-wrap">
       <aside class="spec-toc">
@@ -432,7 +436,7 @@ const benchmarks = {
 
             <p style="margin-top: 1rem;"><b>Key points:</b></p>
             <ul>
-              <li>WebSocket subprotocol is <code>clasp.v2</code></li>
+              <li>WebSocket subprotocol is <code>clasp.v3</code></li>
               <li>Default port is <code>7330</code></li>
               <li>Server time is in <b>microseconds</b> (not milliseconds)</li>
               <li>After WELCOME, you can immediately SUBSCRIBE and start sending</li>
@@ -511,7 +515,7 @@ const benchmarks = {
         >
           <h3 @click="toggleSection(specSections[5])">5. Message Reference</h3>
           <div class="spec-content">
-            <p>All messages are MessagePack-encoded maps with a <code>type</code> field:</p>
+            <p>All messages start with a <code>type</code> byte (v3 compact binary) or <code>type</code> field (v2 MessagePack):</p>
 
             <div class="table">
               <div class="row head">
@@ -569,7 +573,7 @@ const benchmarks = {
         >
           <h3 @click="toggleSection(specSections[7])">7. Data Types</h3>
           <div class="spec-content">
-            <p>Values use MessagePack encoding. Most of the time you'll just use numbers, strings, and objects:</p>
+            <p>Values use v3 compact binary encoding (54% smaller than MessagePack). Most of the time you'll just use numbers, strings, and objects:</p>
             <CodeBlock :code="dataTypesCode" language="plaintext" />
           </div>
         </section>
@@ -710,8 +714,8 @@ const benchmarks = {
             </div>
 
             <p class="bench-note">
-              <b>Bottom line:</b> MQTT and OSC win on raw speed. But CLASP's ~900ns latency is still well under a 60fps frame (16.6ms).
-              If you need state sync, typed signals, and multi-protocol bridging, CLASP delivers that without perceptible latency.
+              <b>Bottom line:</b> CLASP v3 compact encoding is competitive with raw protocols while offering state sync, typed signals, and multi-protocol bridging.
+              The ~125ns encode latency is imperceptible—well under a 60fps frame (16.6ms).
             </p>
 
             <p class="bench-run">

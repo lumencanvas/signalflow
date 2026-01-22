@@ -1,11 +1,15 @@
 """
 CLASP Python client
+
+Supports v3 binary encoding for efficient wire format.
+Backward compatible: can decode v2 MessagePack frames.
 """
 
 import asyncio
+import struct
 import time
 import fnmatch
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
 
 try:
@@ -28,6 +32,47 @@ from .types import (
     WS_SUBPROTOCOL,
     SubscriptionCallback,
 )
+
+
+# Message type codes (v3 binary format)
+MSG_HELLO = 0x01
+MSG_WELCOME = 0x02
+MSG_ANNOUNCE = 0x03
+MSG_SUBSCRIBE = 0x10
+MSG_UNSUBSCRIBE = 0x11
+MSG_PUBLISH = 0x20
+MSG_SET = 0x21
+MSG_GET = 0x22
+MSG_SNAPSHOT = 0x23
+MSG_BUNDLE = 0x30
+MSG_SYNC = 0x40
+MSG_PING = 0x41
+MSG_PONG = 0x42
+MSG_ACK = 0x50
+MSG_ERROR = 0x51
+MSG_QUERY = 0x60
+MSG_RESULT = 0x61
+
+# Value type codes (v3 binary format)
+VAL_NULL = 0x00
+VAL_BOOL = 0x01
+VAL_I8 = 0x02
+VAL_I16 = 0x03
+VAL_I32 = 0x04
+VAL_I64 = 0x05
+VAL_F32 = 0x06
+VAL_F64 = 0x07
+VAL_STRING = 0x08
+VAL_BYTES = 0x09
+VAL_ARRAY = 0x0A
+VAL_MAP = 0x0B
+
+# Signal type codes
+SIG_PARAM = 0
+SIG_EVENT = 1
+SIG_STREAM = 2
+SIG_GESTURE = 3
+SIG_TIMELINE = 4
 
 
 class ClaspError(Exception):
@@ -366,13 +411,14 @@ class Clasp:
         await self._ws.send(data)
 
     def _encode(self, msg: Dict[str, Any]) -> bytes:
-        """Encode message to frame"""
-        payload = msgpack.packb(msg)
+        """Encode message to v3 binary frame"""
+        payload = self._encode_message_v3(msg)
 
-        # Build frame header
+        # Build frame header with v3 version bit
+        flags = 0x01  # Version = 1 (v3 binary)
         header = bytes([
             0x53,  # Magic
-            0x00,  # Flags (QoS=0, no timestamp)
+            flags,
             (len(payload) >> 8) & 0xFF,
             len(payload) & 0xFF,
         ])
@@ -380,18 +426,422 @@ class Clasp:
         return header + payload
 
     def _decode(self, data: bytes) -> Dict[str, Any]:
-        """Decode frame to message"""
+        """Decode frame to message - auto-detects v2 vs v3"""
         if len(data) < 4 or data[0] != 0x53:
             raise ClaspError("Invalid frame")
 
         flags = data[1]
         payload_len = (data[2] << 8) | data[3]
         has_timestamp = (flags & 0x20) != 0
+        version = flags & 0x07
 
         offset = 12 if has_timestamp else 4
         payload = data[offset:offset + payload_len]
 
-        return msgpack.unpackb(payload, raw=False)
+        # Check if v2 MessagePack (first byte is fixmap 0x80-0x8F or map)
+        if len(payload) > 0:
+            first = payload[0]
+            if (first & 0xF0) == 0x80 or first in (0xDE, 0xDF):
+                # v2 MessagePack
+                return msgpack.unpackb(payload, raw=False)
+
+        # v3 binary format
+        return self._decode_message_v3(payload)
+
+    def _encode_message_v3(self, msg: Dict[str, Any]) -> bytes:
+        """Encode message to v3 binary format"""
+        msg_type = msg.get("type")
+        parts = []
+
+        if msg_type == "SET":
+            parts.append(struct.pack('B', MSG_SET))
+            # Flags: [has_rev:1][lock:1][unlock:1][rsv:1][vtype:4]
+            vtype = self._value_type(msg["value"])
+            flags = vtype & 0x0F
+            if msg.get("revision") is not None:
+                flags |= 0x80
+            if msg.get("lock"):
+                flags |= 0x40
+            if msg.get("unlock"):
+                flags |= 0x20
+            parts.append(struct.pack('B', flags))
+            parts.append(self._encode_string(msg["address"]))
+            parts.append(self._encode_value_data(msg["value"]))
+            if msg.get("revision") is not None:
+                parts.append(struct.pack('>Q', msg["revision"]))
+
+        elif msg_type == "PUBLISH":
+            parts.append(struct.pack('B', MSG_PUBLISH))
+            sig_code = self._signal_type_code(msg.get("signal", "event"))
+            phase_code = self._phase_code(msg.get("phase", "start"))
+            flags = (sig_code & 0x07) << 5
+            if msg.get("timestamp") is not None:
+                flags |= 0x10
+            if msg.get("id") is not None:
+                flags |= 0x08
+            flags |= phase_code & 0x07
+            parts.append(struct.pack('B', flags))
+            parts.append(self._encode_string(msg["address"]))
+
+            if msg.get("value") is not None:
+                parts.append(struct.pack('B', 1))
+                parts.append(struct.pack('B', self._value_type(msg["value"])))
+                parts.append(self._encode_value_data(msg["value"]))
+            elif msg.get("payload") is not None:
+                parts.append(struct.pack('B', 1))
+                parts.append(struct.pack('B', self._value_type(msg["payload"])))
+                parts.append(self._encode_value_data(msg["payload"]))
+            else:
+                parts.append(struct.pack('B', 0))
+
+            if msg.get("timestamp") is not None:
+                parts.append(struct.pack('>Q', msg["timestamp"]))
+            if msg.get("id") is not None:
+                parts.append(struct.pack('>I', msg["id"]))
+
+        elif msg_type == "HELLO":
+            parts.append(struct.pack('B', MSG_HELLO))
+            parts.append(struct.pack('B', msg.get("version", PROTOCOL_VERSION)))
+            features = 0
+            for f in msg.get("features", []):
+                if f == "param": features |= 0x80
+                if f == "event": features |= 0x40
+                if f == "stream": features |= 0x20
+                if f == "gesture": features |= 0x10
+                if f == "timeline": features |= 0x08
+            parts.append(struct.pack('B', features))
+            parts.append(self._encode_string(msg.get("name", "")))
+            parts.append(self._encode_string(msg.get("token") or ""))
+
+        elif msg_type == "SUBSCRIBE":
+            parts.append(struct.pack('B', MSG_SUBSCRIBE))
+            parts.append(struct.pack('>I', msg["id"]))
+            parts.append(self._encode_string(msg["pattern"]))
+            type_mask = 0xFF
+            types = msg.get("types", [])
+            if types:
+                type_mask = 0
+                for t in types:
+                    if t == "param": type_mask |= 0x01
+                    if t == "event": type_mask |= 0x02
+                    if t == "stream": type_mask |= 0x04
+            parts.append(struct.pack('B', type_mask))
+            opts = msg.get("options") or {}
+            opt_flags = 0
+            opt_parts = []
+            if opts.get("maxRate") is not None:
+                opt_flags |= 0x01
+                opt_parts.append(struct.pack('>I', opts["maxRate"]))
+            if opts.get("epsilon") is not None:
+                opt_flags |= 0x02
+                opt_parts.append(struct.pack('>d', opts["epsilon"]))
+            if opts.get("history") is not None:
+                opt_flags |= 0x04
+                opt_parts.append(struct.pack('>I', opts["history"]))
+            parts.append(struct.pack('B', opt_flags))
+            parts.extend(opt_parts)
+
+        elif msg_type == "UNSUBSCRIBE":
+            parts.append(struct.pack('B', MSG_UNSUBSCRIBE))
+            parts.append(struct.pack('>I', msg["id"]))
+
+        elif msg_type == "GET":
+            parts.append(struct.pack('B', MSG_GET))
+            parts.append(self._encode_string(msg["address"]))
+
+        elif msg_type == "PING":
+            parts.append(struct.pack('B', MSG_PING))
+
+        elif msg_type == "PONG":
+            parts.append(struct.pack('B', MSG_PONG))
+
+        else:
+            # Fall back to MessagePack for unsupported types
+            return msgpack.packb(msg)
+
+        return b''.join(parts)
+
+    def _decode_message_v3(self, data: bytes) -> Dict[str, Any]:
+        """Decode v3 binary message"""
+        if not data:
+            raise ClaspError("Empty message")
+
+        msg_type = data[0]
+        offset = 1
+
+        if msg_type == MSG_SET:
+            flags = data[offset]
+            offset += 1
+            vtype = flags & 0x0F
+            has_rev = (flags & 0x80) != 0
+            lock = (flags & 0x40) != 0
+            unlock = (flags & 0x20) != 0
+
+            address, offset = self._decode_string(data, offset)
+            value, offset = self._decode_value_data(data, offset, vtype)
+            revision = None
+            if has_rev:
+                revision = struct.unpack_from('>Q', data, offset)[0]
+
+            return {
+                "type": "SET",
+                "address": address,
+                "value": value,
+                "revision": revision,
+                "lock": lock,
+                "unlock": unlock,
+            }
+
+        elif msg_type == MSG_PUBLISH:
+            flags = data[offset]
+            offset += 1
+            sig_code = (flags >> 5) & 0x07
+            has_ts = (flags & 0x10) != 0
+            has_id = (flags & 0x08) != 0
+            phase_code = flags & 0x07
+
+            address, offset = self._decode_string(data, offset)
+            value_indicator = data[offset]
+            offset += 1
+            value = None
+            if value_indicator == 1:
+                vtype = data[offset]
+                offset += 1
+                value, offset = self._decode_value_data(data, offset, vtype)
+
+            timestamp = None
+            if has_ts:
+                timestamp = struct.unpack_from('>Q', data, offset)[0]
+                offset += 8
+
+            gesture_id = None
+            if has_id:
+                gesture_id = struct.unpack_from('>I', data, offset)[0]
+                offset += 4
+
+            return {
+                "type": "PUBLISH",
+                "address": address,
+                "signal": self._signal_type_from_code(sig_code),
+                "value": value,
+                "timestamp": timestamp,
+                "id": gesture_id,
+                "phase": self._phase_from_code(phase_code),
+            }
+
+        elif msg_type == MSG_WELCOME:
+            version = data[offset]
+            offset += 1
+            feature_flags = data[offset]
+            offset += 1
+            features = []
+            if feature_flags & 0x80: features.append("param")
+            if feature_flags & 0x40: features.append("event")
+            if feature_flags & 0x20: features.append("stream")
+            if feature_flags & 0x10: features.append("gesture")
+            if feature_flags & 0x08: features.append("timeline")
+
+            time_val = struct.unpack_from('>Q', data, offset)[0]
+            offset += 8
+            session, offset = self._decode_string(data, offset)
+            name, offset = self._decode_string(data, offset)
+            token, offset = self._decode_string(data, offset)
+
+            return {
+                "type": "WELCOME",
+                "version": version,
+                "session": session,
+                "name": name,
+                "features": features,
+                "time": time_val,
+                "token": token if token else None,
+            }
+
+        elif msg_type == MSG_SNAPSHOT:
+            count = struct.unpack_from('>H', data, offset)[0]
+            offset += 2
+            params = []
+            for _ in range(count):
+                address, offset = self._decode_string(data, offset)
+                vtype = data[offset]
+                offset += 1
+                value, offset = self._decode_value_data(data, offset, vtype)
+                revision = struct.unpack_from('>Q', data, offset)[0]
+                offset += 8
+                opt_flags = data[offset]
+                offset += 1
+                writer = None
+                timestamp = None
+                if opt_flags & 0x01:
+                    writer, offset = self._decode_string(data, offset)
+                if opt_flags & 0x02:
+                    timestamp = struct.unpack_from('>Q', data, offset)[0]
+                    offset += 8
+                params.append({
+                    "address": address,
+                    "value": value,
+                    "revision": revision,
+                    "writer": writer,
+                    "timestamp": timestamp,
+                })
+
+            return {"type": "SNAPSHOT", "params": params}
+
+        elif msg_type == MSG_PING:
+            return {"type": "PING"}
+
+        elif msg_type == MSG_PONG:
+            return {"type": "PONG"}
+
+        elif msg_type == MSG_ERROR:
+            code = struct.unpack_from('>H', data, offset)[0]
+            offset += 2
+            message, offset = self._decode_string(data, offset)
+            flags = data[offset]
+            offset += 1
+            address = None
+            if flags & 0x01:
+                address, offset = self._decode_string(data, offset)
+            return {"type": "ERROR", "code": code, "message": message, "address": address}
+
+        else:
+            raise ClaspError(f"Unknown message type: 0x{msg_type:02x}")
+
+    def _encode_string(self, s: str) -> bytes:
+        """Encode string with length prefix"""
+        encoded = s.encode('utf-8')
+        return struct.pack('>H', len(encoded)) + encoded
+
+    def _decode_string(self, data: bytes, offset: int) -> Tuple[str, int]:
+        """Decode length-prefixed string"""
+        length = struct.unpack_from('>H', data, offset)[0]
+        offset += 2
+        s = data[offset:offset + length].decode('utf-8')
+        return s, offset + length
+
+    def _encode_value_data(self, value: Value) -> bytes:
+        """Encode value data (without type code)"""
+        if value is None:
+            return b''
+        if isinstance(value, bool):
+            return struct.pack('B', 1 if value else 0)
+        if isinstance(value, int):
+            return struct.pack('>q', value)
+        if isinstance(value, float):
+            return struct.pack('>d', value)
+        if isinstance(value, str):
+            return self._encode_string(value)
+        if isinstance(value, bytes):
+            return struct.pack('>H', len(value)) + value
+        if isinstance(value, list):
+            parts = [struct.pack('>H', len(value))]
+            for item in value:
+                parts.append(struct.pack('B', self._value_type(item)))
+                parts.append(self._encode_value_data(item))
+            return b''.join(parts)
+        if isinstance(value, dict):
+            parts = [struct.pack('>H', len(value))]
+            for k, v in value.items():
+                parts.append(self._encode_string(k))
+                parts.append(struct.pack('B', self._value_type(v)))
+                parts.append(self._encode_value_data(v))
+            return b''.join(parts)
+        return b''
+
+    def _decode_value_data(self, data: bytes, offset: int, vtype: int) -> Tuple[Value, int]:
+        """Decode value data based on type code"""
+        if vtype == VAL_NULL:
+            return None, offset
+        if vtype == VAL_BOOL:
+            return data[offset] != 0, offset + 1
+        if vtype == VAL_I8:
+            return struct.unpack_from('b', data, offset)[0], offset + 1
+        if vtype == VAL_I16:
+            return struct.unpack_from('>h', data, offset)[0], offset + 2
+        if vtype == VAL_I32:
+            return struct.unpack_from('>i', data, offset)[0], offset + 4
+        if vtype == VAL_I64:
+            return struct.unpack_from('>q', data, offset)[0], offset + 8
+        if vtype == VAL_F32:
+            return struct.unpack_from('>f', data, offset)[0], offset + 4
+        if vtype == VAL_F64:
+            return struct.unpack_from('>d', data, offset)[0], offset + 8
+        if vtype == VAL_STRING:
+            return self._decode_string(data, offset)
+        if vtype == VAL_BYTES:
+            length = struct.unpack_from('>H', data, offset)[0]
+            offset += 2
+            return data[offset:offset + length], offset + length
+        if vtype == VAL_ARRAY:
+            count = struct.unpack_from('>H', data, offset)[0]
+            offset += 2
+            arr = []
+            for _ in range(count):
+                item_type = data[offset]
+                offset += 1
+                item, offset = self._decode_value_data(data, offset, item_type)
+                arr.append(item)
+            return arr, offset
+        if vtype == VAL_MAP:
+            count = struct.unpack_from('>H', data, offset)[0]
+            offset += 2
+            m = {}
+            for _ in range(count):
+                key, offset = self._decode_string(data, offset)
+                val_type = data[offset]
+                offset += 1
+                val, offset = self._decode_value_data(data, offset, val_type)
+                m[key] = val
+            return m, offset
+        return None, offset
+
+    def _value_type(self, value: Value) -> int:
+        """Get value type code"""
+        if value is None:
+            return VAL_NULL
+        if isinstance(value, bool):
+            return VAL_BOOL
+        if isinstance(value, int):
+            return VAL_I64
+        if isinstance(value, float):
+            return VAL_F64
+        if isinstance(value, str):
+            return VAL_STRING
+        if isinstance(value, bytes):
+            return VAL_BYTES
+        if isinstance(value, list):
+            return VAL_ARRAY
+        if isinstance(value, dict):
+            return VAL_MAP
+        return VAL_NULL
+
+    def _signal_type_code(self, sig: str) -> int:
+        """Get signal type code"""
+        return {
+            "param": SIG_PARAM,
+            "event": SIG_EVENT,
+            "stream": SIG_STREAM,
+            "gesture": SIG_GESTURE,
+            "timeline": SIG_TIMELINE,
+        }.get(sig, SIG_EVENT)
+
+    def _signal_type_from_code(self, code: int) -> str:
+        """Get signal type from code"""
+        return {
+            SIG_PARAM: "param",
+            SIG_EVENT: "event",
+            SIG_STREAM: "stream",
+            SIG_GESTURE: "gesture",
+            SIG_TIMELINE: "timeline",
+        }.get(code, "event")
+
+    def _phase_code(self, phase: str) -> int:
+        """Get gesture phase code"""
+        return {"start": 0, "move": 1, "end": 2, "cancel": 3}.get(phase, 0)
+
+    def _phase_from_code(self, code: int) -> str:
+        """Get gesture phase from code"""
+        return {0: "start", 1: "move", 2: "end", 3: "cancel"}.get(code, "start")
 
     async def _receive_loop(self) -> None:
         """Receive message loop"""

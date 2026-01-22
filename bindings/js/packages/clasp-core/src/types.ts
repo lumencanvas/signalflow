@@ -2,8 +2,8 @@
  * CLASP types
  */
 
-/** Protocol version */
-export const PROTOCOL_VERSION = 2;
+/** Protocol version (v3 = efficient binary encoding) */
+export const PROTOCOL_VERSION = 3;
 
 /** Default WebSocket port */
 export const DEFAULT_WS_PORT = 7330;
@@ -73,6 +73,8 @@ export interface FrameFlags {
   hasTimestamp: boolean;
   encrypted: boolean;
   compressed: boolean;
+  /** Encoding version: 0 = v2 (MessagePack), 1 = v3 (binary) */
+  version?: number;
 }
 
 /** HELLO message */

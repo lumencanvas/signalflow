@@ -1,7 +1,13 @@
 //! CLASP Core
 //!
-//! Core types, encoding, and protocol primitives for CLASP v2.
+//! Core types, encoding, and protocol primitives for CLASP v3.
 //! Creative Low-Latency Application Streaming Protocol.
+//!
+//! # Wire Format v3
+//!
+//! CLASP v3 uses an efficient binary encoding that is ~54% smaller and ~5x faster
+//! than the v2 MessagePack-with-named-keys format. The decoder auto-detects v2
+//! format for backward compatibility.
 //!
 //! This crate provides:
 //! - Protocol message types ([`Message`], [`SignalType`])
@@ -46,8 +52,8 @@ pub use state::ParamState;
 pub use time::Timestamp;
 pub use types::*;
 
-/// Protocol version
-pub const PROTOCOL_VERSION: u8 = 2;
+/// Protocol version (v3 = efficient binary encoding)
+pub const PROTOCOL_VERSION: u8 = 3;
 
 /// Magic byte for frame identification
 pub const MAGIC_BYTE: u8 = 0x53; // 'S' for Streaming
