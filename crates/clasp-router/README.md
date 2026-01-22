@@ -6,22 +6,29 @@ Message router and server for CLASP (Creative Low-Latency Application Streaming 
 
 - **Message Routing** - Route messages between connected clients
 - **Pattern Matching** - Wildcard subscriptions with `*` and `**`
-- **State Management** - Maintain parameter state with history
+- **State Management** - Parameter state with revision tracking
 - **Session Management** - Track client connections and subscriptions
+- **Multiple Transports** - WebSocket, QUIC, UDP
 
 ## Usage
 
 ```rust
-use clasp_router::Router;
-use std::net::SocketAddr;
+use clasp_router::{Router, RouterConfig};
+use clasp_core::SecurityMode;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let router = Router::new("CLASP Router");
+    let router = Router::new(RouterConfig {
+        name: "My Router".into(),
+        max_sessions: 100,
+        session_timeout: 60,
+        features: vec!["param".into(), "event".into()],
+        security_mode: SecurityMode::Open,
+        max_subscriptions_per_session: 100,
+    });
 
-    let addr: SocketAddr = "0.0.0.0:7330".parse()?;
-    router.serve(addr).await?;
-
+    // Serve on WebSocket
+    router.serve_websocket("0.0.0.0:7330").await?;
     Ok(())
 }
 ```
@@ -37,14 +44,20 @@ async fn main() -> anyhow::Result<()> {
                      │
               ┌──────▼──────┐
               │   Router    │
-              │  (clasp-    │
-              │   router)   │
+              │  - State    │
+              │  - Fanout   │
+              │  - Sessions │
               └─────────────┘
 ```
 
-## Documentation
+## Performance
 
-Visit **[clasp.to](https://clasp.to)** for full documentation.
+| Metric | Value |
+|--------|-------|
+| E2E throughput | 173k msg/s |
+| Fanout 100 subs | 175k deliveries/s |
+| Events (no state) | 259k msg/s |
+| Late-joiner replay | Yes (chunked snapshots) |
 
 ## License
 
@@ -52,4 +65,4 @@ Licensed under either of Apache License, Version 2.0 or MIT license at your opti
 
 ---
 
-Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026
+Maintained by [LumenCanvas](https://lumencanvas.studio)

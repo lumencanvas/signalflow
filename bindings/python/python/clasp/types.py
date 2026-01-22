@@ -10,7 +10,7 @@ from dataclasses import dataclass
 PROTOCOL_VERSION = 3
 DEFAULT_WS_PORT = 7330
 DEFAULT_DISCOVERY_PORT = 7331
-WS_SUBPROTOCOL = "clasp.v2"
+WS_SUBPROTOCOL = "clasp"
 
 # Type aliases
 Value = Union[None, bool, int, float, str, bytes, List[Any], Dict[str, Any]]

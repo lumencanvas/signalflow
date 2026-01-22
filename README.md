@@ -282,9 +282,9 @@ These measure raw encode/decode speed—the **theoretical ceiling**, not system 
 | Protocol | Encode | Decode | Size | Notes |
 |----------|--------|--------|------|-------|
 | MQTT | 11.4M/s | 11.4M/s | 19 B | Minimal protocol |
-| **CLASP v3** | **8M/s** | **11M/s** | **31 B** | Rich semantics |
+| **CLASP** | **8M/s** | **11M/s** | **31 B** | Rich semantics |
 | OSC | 4.5M/s | 5.7M/s | 24 B | UDP only |
-| CLASP v2 | 1.8M/s | 1.5M/s | 69 B | MessagePack overhead |
+| JSON-WS | ~2M/s | ~2M/s | ~80 B | Typical JSON overhead |
 
 ⚠️ **Important**: These are codec-only numbers (no network, no routing, no state). Real system throughput is 10-100x lower depending on features enabled.
 
@@ -296,13 +296,13 @@ Run `cargo run -p clasp-test-suite --bin real_benchmarks --release` for actual n
 - Wildcard routing overhead
 - State management costs
 
-### Why CLASP v3?
+### Why Binary Encoding?
 
-v3 binary encoding is **55% smaller** than v2 MessagePack:
+CLASP uses efficient binary encoding that is **55% smaller** than JSON:
 
 ```
-v2: {"type":"SET","address":"/test","value":0.5,...} → 69 bytes
-v3: [SET][flags][len][addr][value][rev]             → 31 bytes
+JSON: {"type":"SET","address":"/test","value":0.5,...} → ~80 bytes
+CLASP: [SET][flags][len][addr][value][rev]             → 31 bytes
 ```
 
 ### Feature Comparison

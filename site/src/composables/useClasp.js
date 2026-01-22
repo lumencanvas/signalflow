@@ -196,7 +196,7 @@ async function probeServer(host, port) {
 
     let ws
     try {
-      ws = new WebSocket(wsUrl, 'clasp.v2')
+      ws = new WebSocket(wsUrl, 'clasp')
       ws.binaryType = 'arraybuffer'
 
       ws.onopen = () => {

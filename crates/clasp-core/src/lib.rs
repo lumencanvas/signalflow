@@ -65,7 +65,7 @@ pub const DEFAULT_WS_PORT: u16 = 7330;
 pub const DEFAULT_DISCOVERY_PORT: u16 = 7331;
 
 /// WebSocket subprotocol identifier
-pub const WS_SUBPROTOCOL: &str = "clasp.v2";
+pub const WS_SUBPROTOCOL: &str = "clasp";
 
 /// mDNS service type
 pub const MDNS_SERVICE_TYPE: &str = "_clasp._tcp.local.";

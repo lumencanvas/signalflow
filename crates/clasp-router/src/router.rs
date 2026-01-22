@@ -29,7 +29,7 @@
 use bytes::Bytes;
 use clasp_core::{
     codec, AckMessage, Action, CpskValidator, ErrorMessage, Frame, Message, PublishMessage,
-    SecurityMode, SetMessage, SignalType, TokenValidator, ValidationResult, PROTOCOL_VERSION,
+    SecurityMode, SetMessage, SignalType, SnapshotMessage, TokenValidator, ValidationResult,
 };
 use clasp_transport::{TransportEvent, TransportReceiver, TransportSender, TransportServer};
 use dashmap::DashMap;
@@ -564,6 +564,51 @@ enum MessageResult {
     None,
 }
 
+/// Maximum params per snapshot chunk to stay under frame size limit.
+/// Frame max payload is 65535 bytes. With ~44 bytes per param average,
+/// we target 800 params per chunk (~35KB) to leave headroom.
+const MAX_SNAPSHOT_CHUNK_SIZE: usize = 800;
+
+/// Send a snapshot, chunking if too large for a single frame.
+async fn send_chunked_snapshot(sender: &Arc<dyn TransportSender>, snapshot: SnapshotMessage) {
+    let param_count = snapshot.params.len();
+
+    if param_count <= MAX_SNAPSHOT_CHUNK_SIZE {
+        // Small enough to send in one frame
+        let msg = Message::Snapshot(snapshot);
+        if let Ok(bytes) = codec::encode(&msg) {
+            let _ = sender.send(bytes).await;
+        } else {
+            warn!("Failed to encode snapshot ({} params)", param_count);
+        }
+        return;
+    }
+
+    // Chunk large snapshots
+    let chunks = snapshot.params.chunks(MAX_SNAPSHOT_CHUNK_SIZE);
+    let chunk_count = (param_count + MAX_SNAPSHOT_CHUNK_SIZE - 1) / MAX_SNAPSHOT_CHUNK_SIZE;
+
+    debug!("Chunking snapshot of {} params into {} chunks", param_count, chunk_count);
+
+    for (i, chunk) in chunks.enumerate() {
+        let chunk_snapshot = SnapshotMessage {
+            params: chunk.to_vec(),
+        };
+        let msg = Message::Snapshot(chunk_snapshot);
+        match codec::encode(&msg) {
+            Ok(bytes) => {
+                if let Err(e) = sender.send(bytes).await {
+                    warn!("Failed to send snapshot chunk {}/{}: {}", i + 1, chunk_count, e);
+                    break;
+                }
+            }
+            Err(e) => {
+                warn!("Failed to encode snapshot chunk {}/{}: {}", i + 1, chunk_count, e);
+            }
+        }
+    }
+}
+
 /// Handle an incoming message
 async fn handle_message(
     msg: &Message,
@@ -699,10 +744,9 @@ async fn handle_message(
             // Send welcome first
             let _ = sender.send(response).await;
 
-            // Send initial snapshot
-            let snapshot = Message::Snapshot(state.full_snapshot());
-            let snapshot_bytes = codec::encode(&snapshot).ok()?;
-            let _ = sender.send(snapshot_bytes).await;
+            // Send initial snapshot (chunked if too large)
+            let full_snapshot = state.full_snapshot();
+            send_chunked_snapshot(sender, full_snapshot).await;
 
             Some(MessageResult::NewSession(new_session))
         }
@@ -760,12 +804,10 @@ async fn handle_message(
 
                     debug!("Session {} subscribed to {}", session.id, sub.pattern);
 
-                    // Send matching current values
+                    // Send matching current values (chunked if large)
                     let snapshot = state.snapshot(&sub.pattern);
                     if !snapshot.params.is_empty() {
-                        let msg = Message::Snapshot(snapshot);
-                        let bytes = codec::encode(&msg).ok()?;
-                        return Some(MessageResult::Send(bytes));
+                        send_chunked_snapshot(sender, snapshot).await;
                     }
                 }
                 Err(e) => {

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 description = "Comprehensive integration and load tests for CLASP protocol"
 
+[features]
+default = ["embedded-server"]
+embedded-server = ["clasp-embedded/server"]
+
 [dependencies]
 # CLASP crates (workspace)
 clasp-core.workspace = true

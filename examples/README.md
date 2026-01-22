@@ -40,6 +40,45 @@ Features demonstrated:
 - Checking cached values (sync)
 - Unsubscribing
 
+### embedded-server.js
+
+Demonstrates integrating CLASP with your Node.js application.
+
+```bash
+# Start router first
+cargo run -p clasp-router-server -- --listen 0.0.0.0:7330
+
+# Then run the example
+cd examples/js
+npm install @clasp-to/core
+node embedded-server.js
+```
+
+Features demonstrated:
+- Connecting to CLASP from your app
+- Publishing application state (CPU, memory, sensors)
+- Subscribing to commands from other clients
+
+## Python Examples
+
+### embedded_server.py
+
+Demonstrates integrating CLASP with your Python application.
+
+```bash
+# Start router first
+cargo run -p clasp-router-server -- --listen 0.0.0.0:7330
+
+# Then run the example
+pip install clasp-to
+python examples/python/embedded_server.py
+```
+
+Features demonstrated:
+- Async connection to CLASP
+- Publishing sensor data periodically
+- Command handling via subscriptions
+
 ## Rust Examples
 
 ### basic-client.rs
@@ -50,14 +89,28 @@ Comprehensive Rust client example.
 cargo run --example basic-client
 ```
 
-Or add to your project:
+### embedded-server.rs
 
-```toml
-[dependencies]
-clasp-client = "0.1"
+Demonstrates embedding a CLASP server in your Rust application.
+
+```bash
+cargo run --example embedded-server
 ```
 
 Features demonstrated:
+- Running CLASP router alongside your business logic
+- Publishing data from your application to connected clients
+- Custom routing and state management
+
+Add to your project:
+
+```toml
+[dependencies]
+clasp-router = "0.1"  # For server
+clasp-client = "0.1"  # For client
+```
+
+Features demonstrated (basic-client):
 - Builder pattern for client creation
 - Setting parameters
 - Subscribing with callbacks

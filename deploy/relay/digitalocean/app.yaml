@@ -1,15 +1,16 @@
 # DigitalOcean App Platform Specification
+#
 # Deploy with: doctl apps create --spec deploy/relay/digitalocean/app.yaml
 #
-# Note: WebSocket support requires a paid plan with custom domains
-# The basic-xxs tier is $5/month
+# This uses the STANDALONE relay that pulls from crates.io.
+# No monorepo context required.
 
 name: clasp-relay
 
 services:
-  - name: router
-    dockerfile_path: deploy/relay/Dockerfile
-    source_dir: /
+  - name: relay
+    dockerfile_path: Dockerfile
+    source_dir: deploy/relay  # Standalone directory with its own Cargo.toml
     github:
       repo: lumencanvas/clasp
       branch: main
@@ -30,16 +31,17 @@ services:
       - key: RUST_LOG
         value: info
 
-    # Health check
+    # Health check - WebSocket accepts HTTP upgrade
     health_check:
       http_path: /
-      initial_delay_seconds: 10
+      initial_delay_seconds: 30  # Rust compile takes time
       period_seconds: 30
       timeout_seconds: 5
       success_threshold: 1
       failure_threshold: 3
 
 # Domain configuration (requires DNS setup)
+# Uncomment and configure for production:
 # domains:
 #   - domain: relay.clasp.to
 #     type: PRIMARY

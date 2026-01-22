@@ -282,11 +282,12 @@ async fn benchmark_wildcard_cost(pattern_type: &str) -> BenchmarkResult {
     };
     
     // Pattern and expected match count
+    // Based on 1000 msgs: zone = i % 100 (0-99), fixture = (i / 100) % 10 (0-9)
     let (pattern, expected_matches) = match pattern_type {
-        "exact" => ("/lights/zone50/fixture5/brightness", 10u64),      // 10 updates to same address
-        "single" => ("/lights/zone50/*/brightness", 100u64),           // zone50, all 10 fixtures, 10 updates each
+        "exact" => ("/lights/zone50/fixture5/brightness", 1u64),       // Only i=550 matches
+        "single" => ("/lights/zone50/*/brightness", 10u64),            // zone50, fixtures 0-9
         "globstar" => ("/lights/**", 1000u64),                         // All 1000 messages
-        "complex" => ("/lights/zone5*/fixture*/brightness", 100u64),   // zone50-59, all fixtures
+        "complex" => ("/lights/zone5*/fixture*/brightness", 110u64),   // zone5 + zone50-59 = 11 zones × 10 fixtures
         _ => ("/lights/**", 1000u64),
     };
     
@@ -518,18 +519,23 @@ impl BenchmarkResult {
         if let Some(ref err) = self.error {
             println!("❌ {} - ERROR: {}", self.name, err);
         } else {
-            let loss = if self.messages_sent > 0 {
-                100.0 * (1.0 - (self.messages_received as f64 / self.messages_sent as f64))
+            // Show delivery rate (received vs expected for wildcard tests, or sent vs received for throughput tests)
+            let status = if self.messages_received >= self.messages_sent {
+                "✓"
+            } else if self.messages_received > 0 {
+                "~" // Partial delivery
             } else {
-                0.0
+                "✗"
             };
             
             println!(
-                "✓ {} | {:.0} msg/s | {:.0}µs avg | {:.1}% loss | {:?}",
+                "{} {} | {:.0} msg/s | {:.0}µs avg | recv {}/{} | {:?}",
+                status,
                 self.name,
                 self.throughput,
                 self.latency_avg_us,
-                loss,
+                self.messages_received,
+                self.messages_sent,
                 self.elapsed
             );
         }

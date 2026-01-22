@@ -458,7 +458,7 @@ class Clasp {
         ? window.WebSocket
         : require('ws');
 
-      this.ws = new WebSocket(this.url, 'clasp.v2');
+      this.ws = new WebSocket(this.url, 'clasp');
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {

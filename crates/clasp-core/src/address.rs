@@ -73,8 +73,9 @@ impl Address {
     }
 
     /// Check if this address contains wildcards
+    /// Detects: standalone `*` or `**`, and embedded wildcards like `zone5*`
     pub fn is_pattern(&self) -> bool {
-        self.segments.iter().any(|s| s == "*" || s == "**")
+        self.segments.iter().any(|s| s.contains('*'))
     }
 
     /// Check if this address matches a pattern
@@ -166,14 +167,17 @@ impl Pattern {
     pub fn compile(s: &str) -> Result<Self> {
         let address = Address::parse(s)?;
 
-        // Build regex for efficient matching
+        // Build regex for efficient matching (only used for complex patterns)
+        // Note: We prefer glob_match for actual matching as it handles all cases correctly
         let regex = if address.is_pattern() {
+            // Build regex for potential use, but matches() uses glob_match directly
             // ** matches zero or more path segments (including slashes)
-            // * matches exactly one path segment (no slashes)
+            // * matches zero or more characters within a segment
             let regex_str = s
-                .replace("/**", "§§") // Temp placeholder for /**/
-                .replace('*', "[^/]+")
-                .replace("§§", "(/[^/]+)*"); // Match zero or more /segment
+                .replace("/**", "§§") // Temp placeholder for /**/ 
+                .replace("/**/", "§§/") // Handle mid-pattern /**/
+                .replace('*', "[^/]*") // * = zero or more non-slash chars
+                .replace("§§", "(/[^/]+)*"); // ** = zero or more /segment
             let regex_str = format!("^{}$", regex_str);
             Some(
                 regex_lite::Regex::new(&regex_str)
@@ -187,10 +191,13 @@ impl Pattern {
     }
 
     /// Check if an address matches this pattern
+    /// Uses glob_match for consistent behavior with client-side matching
     pub fn matches(&self, addr: &str) -> bool {
-        if let Some(regex) = &self.regex {
-            regex.is_match(addr)
+        if self.address.is_pattern() {
+            // Use glob_match for pattern matching (consistent with client)
+            glob_match::glob_match(self.address.as_str(), addr)
         } else {
+            // Exact match for non-patterns
             addr == self.address.as_str()
         }
     }

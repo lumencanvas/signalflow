@@ -12,7 +12,7 @@ export const DEFAULT_WS_PORT = 7330;
 export const DEFAULT_DISCOVERY_PORT = 7331;
 
 /** WebSocket subprotocol */
-export const WS_SUBPROTOCOL = 'clasp.v2';
+export const WS_SUBPROTOCOL = 'clasp';
 
 /** Message type codes */
 export enum MessageType {

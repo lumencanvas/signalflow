@@ -3,11 +3,13 @@ name = "clasp-embedded"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "CLASP embedded/no_std implementation"
+description = "CLASP embedded/no_std implementation - uses standard v3 protocol"
 
 [features]
-default = []
+default = ["client"]
 alloc = []
+client = []
+server = []
 
 [dependencies]
 # Minimal dependencies for no_std

@@ -4,16 +4,16 @@ Core types and encoding for the CLASP (Creative Low-Latency Application Streamin
 
 ## Features
 
-- **Message Types**: Set, Get, Subscribe, Unsubscribe, Batch operations
+- **Message Types**: Set, Publish, Subscribe, Bundle, Snapshot, etc.
 - **Value Types**: Int, Float, Bool, String, Bytes, Array, Map, Null
-- **Encoding**: MessagePack (binary) and JSON serialization
+- **Binary Encoding (v3)**: 55% smaller, 4x faster than JSON/MessagePack
 - **Address Patterns**: Hierarchical addressing with wildcards (`*`, `**`)
-- **no_std Support**: Optional `alloc` and `std` features
+- **Signal Types**: Param, Event, Stream, Gesture, Timeline
 
 ## Usage
 
 ```rust
-use clasp_core::{Message, SetMessage, Value};
+use clasp_core::{Message, SetMessage, Value, codec};
 
 // Create a set message
 let msg = Message::Set(SetMessage {
@@ -24,12 +24,22 @@ let msg = Message::Set(SetMessage {
     unlock: false,
 });
 
-// Encode to MessagePack
-let encoded = clasp_core::encode(&msg).unwrap();
+// Encode to v3 binary format
+let encoded = codec::encode(&msg).unwrap();
 
-// Decode from MessagePack
-let decoded: Message = clasp_core::decode(&encoded).unwrap();
+// Decode (auto-detects v2/v3)
+let (decoded, _frame) = codec::decode(&encoded).unwrap();
 ```
+
+## Binary Encoding
+
+CLASP binary encoding is 55% smaller and 4-7x faster than JSON/MessagePack:
+
+| Metric | JSON | CLASP Binary |
+|--------|------|--------------|
+| SET size | ~80 bytes | 31 bytes |
+| Encode | ~2M msg/s | 8M msg/s |
+| Decode | ~2M msg/s | 11M msg/s |
 
 ## Address Patterns
 
@@ -40,6 +50,7 @@ CLASP uses hierarchical addresses with wildcard support:
 | `/lights/front` | Exact match |
 | `/lights/*` | Single segment wildcard |
 | `/lights/**` | Multi-segment wildcard |
+| `/lights/zone5*` | Embedded wildcard |
 
 ## License
 
@@ -47,4 +58,4 @@ Licensed under either of Apache License, Version 2.0 or MIT license at your opti
 
 ---
 
-Maintained by [LumenCanvas](https://lumencanvas.studio) | 2026
+Maintained by [LumenCanvas](https://lumencanvas.studio)

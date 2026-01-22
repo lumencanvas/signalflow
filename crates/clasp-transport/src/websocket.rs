@@ -424,6 +424,6 @@ mod tests {
     #[tokio::test]
     async fn test_websocket_config() {
         let config = WebSocketConfig::default();
-        assert_eq!(config.subprotocol, "clasp.v2");
+        assert_eq!(config.subprotocol, "clasp");
     }
 }

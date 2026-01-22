@@ -1,167 +1,189 @@
 # CLASP Relay Server Deployment
 
-This directory contains deployment configurations for `relay.clasp.to`, a public CLASP relay server.
+This directory contains a **standalone** CLASP relay server that uses published crates from crates.io.
+
+## Quick Start
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Build
+cd deploy/relay
+docker build -t clasp-relay .
+
+# Run
+docker run -p 7330:7330 clasp-relay
+
+# Test
+wscat -c ws://localhost:7330 -s clasp
+```
+
+### Option 2: Cargo
+
+```bash
+cd deploy/relay
+cargo run --release
+```
+
+### Option 3: DigitalOcean App Platform
+
+```bash
+# Install doctl
+brew install doctl
+
+# Authenticate
+doctl auth init
+
+# Deploy
+doctl apps create --spec deploy/relay/digitalocean/app.yaml
+```
 
 ## Architecture
 
 ```
-Internet → TLS (443) → relay.clasp.to → clasp-router (7330)
+Internet → TLS (443) → DigitalOcean → clasp-relay (7330)
 ```
 
-The relay server runs `clasp-router` which provides:
-- Full CLASP v2 protocol over WebSocket
-- Binary MessagePack frames
-- HELLO/WELCOME handshake
+The relay runs a CLASP router that provides:
+- CLASP v3 binary protocol over WebSocket
 - State management with revisions
-- Pattern-based subscriptions
+- Pattern-based subscriptions (`*`, `**`)
+- No authentication (public relay)
 
-## Local Development
+## Development vs Production
 
-### Using Docker Compose
+| | Production | Development |
+|---|---|---|
+| **Dockerfile** | `Dockerfile` | `Dockerfile.dev` |
+| **Crates** | crates.io | Local workspace |
+| **Build from** | `deploy/relay/` | Repository root |
+
+### Development Build (using monorepo)
 
 ```bash
 # From repository root
-docker compose -f deploy/relay/docker-compose.yml up --build
-
-# Test connection
-wscat -c ws://localhost:7330 -s clasp.v2
-```
-
-### Using Cargo
-
-```bash
-# Build and run directly
-cargo run -p clasp-router-server -- --listen 0.0.0.0:7330 --name "Local Relay"
-
-# With verbose logging
-cargo run -p clasp-router-server -- --verbose
-```
-
-## Production Deployment
-
-### DigitalOcean App Platform
-
-1. Fork/clone the repository to your GitHub account
-2. Install the DigitalOcean CLI: `brew install doctl`
-3. Authenticate: `doctl auth init`
-4. Deploy:
-
-```bash
-doctl apps create --spec deploy/relay/digitalocean/app.yaml
-```
-
-5. Set up DNS: Point `relay.clasp.to` to your app's URL
-
-### Manual Docker Deployment
-
-```bash
-# Build image
-docker build -t clasp-relay -f deploy/relay/Dockerfile .
-
-# Run with TLS termination (use a reverse proxy like nginx/caddy)
-docker run -d \
-  --name clasp-relay \
-  -p 7330:7330 \
-  --restart unless-stopped \
-  clasp-relay
-
-# Or use with Caddy for automatic TLS
-# In Caddyfile:
-# relay.clasp.to {
-#     reverse_proxy localhost:7330
-# }
+docker build -f deploy/relay/Dockerfile.dev -t clasp-relay-dev .
 ```
 
 ## Configuration
 
-### Command Line Options
+### CLI Options
 
 ```
-clasp-router [OPTIONS]
+clasp-relay [OPTIONS]
 
 Options:
-  -l, --listen <LISTEN>  Listen address [default: 0.0.0.0:7330]
-  -n, --name <NAME>      Server name [default: CLASP Router]
-  -a, --announce         Enable mDNS discovery announcement
-  -c, --config <CONFIG>  Config file path
-  -v, --verbose          Enable verbose logging
-  -h, --help             Print help
-  -V, --version          Print version
+  -p, --port <PORT>    Listen port [default: 7330]
+      --host <HOST>    Listen host [default: 0.0.0.0]
+  -n, --name <NAME>    Server name [default: CLASP Relay]
+  -v, --verbose        Enable verbose logging
+  -h, --help           Print help
+  -V, --version        Print version
 ```
 
 ### Environment Variables
 
-- `RUST_LOG` - Logging level (error, warn, info, debug, trace)
+| Variable | Description |
+|----------|-------------|
+| `RUST_LOG` | Log level: error, warn, info, debug, trace |
 
-## Testing the Relay
+## Connecting
 
-### With wscat
-
-```bash
-# Install wscat
-npm install -g wscat
-
-# Connect with CLASP subprotocol
-wscat -c wss://relay.clasp.to -s clasp.v2
-```
-
-### With the Playground
-
-1. Open https://clasp.to/playground
-2. In the connection panel, enter `wss://relay.clasp.to`
-3. Click Connect
-4. Try the Chat or Sensors tabs
-
-### With JavaScript
+### JavaScript
 
 ```javascript
 import { ClaspBuilder } from '@clasp-to/core';
 
 const client = await new ClaspBuilder('wss://relay.clasp.to')
-  .name('Test Client')
+  .name('My App')
   .connect();
 
-// Set a value
-client.set('/test/hello', 'world');
-
-// Subscribe to changes
-client.on('/test/**', (value, address) => {
-  console.log(`${address} = ${value}`);
-});
+client.set('/hello', 'world');
+client.on('/hello', (value) => console.log(value));
 ```
+
+### Python
+
+```python
+from clasp import Clasp
+
+client = Clasp('wss://relay.clasp.to')
+client.connect()
+
+client.set('/hello', 'world')
+client.on('/hello', print)
+```
+
+### Rust
+
+```rust
+use clasp_client::Clasp;
+
+let client = Clasp::connect("wss://relay.clasp.to").await?;
+client.set("/hello", "world").await?;
+client.subscribe("/hello", |value, _| println!("{:?}", value)).await?;
+```
+
+### Embedded (ESP32)
+
+```rust
+use clasp_embedded::{Client, Value};
+
+let mut client = Client::new();
+
+// Prepare frame
+let frame = client.prepare_set("/sensor/temp", Value::Float(25.5));
+
+// Send via your transport (WebSocket, HTTP, etc.)
+websocket.send(frame);
+```
+
+## Cost Estimate
+
+| Provider | Tier | Monthly |
+|----------|------|---------|
+| DigitalOcean App Platform | basic-xxs | $5 |
+| DigitalOcean Droplet | $6/mo | $6 |
+| AWS Lightsail | $5 plan | $5 |
+| Fly.io | Free tier | $0 |
+
+## Security Notes
+
+⚠️ The public relay does NOT enforce authentication:
+- Anyone can connect and send/receive messages
+- Do not send sensitive data through public relay
+- For production, deploy your own relay with authentication
 
 ## Monitoring
 
 ### Health Check
 
-The server accepts any WebSocket connection as a health indicator. Use:
-
-```bash
-curl -I ws://localhost:7330
-```
+The server responds to any WebSocket connection attempt as healthy.
 
 ### Logs
 
 ```bash
-# Docker Compose
-docker compose -f deploy/relay/docker-compose.yml logs -f
+# Docker
+docker logs clasp-relay -f
 
 # DigitalOcean
 doctl apps logs <app-id> --follow
 ```
 
-## Cost Estimate
+## Troubleshooting
 
-| Provider | Tier | Monthly Cost |
-|----------|------|--------------|
-| DigitalOcean App Platform | basic-xxs | $5 |
-| DigitalOcean Droplet | Basic $6 | $6 |
-| AWS Lightsail | $5 plan | $5 |
-| Fly.io | Free tier | $0 (with limits) |
+### "Connection refused"
 
-## Security Notes
+1. Check the relay is running: `docker ps`
+2. Check the port is exposed: `docker port clasp-relay`
+3. Check firewall rules
 
-- The public relay does NOT enforce authentication
-- Anyone can connect and send/receive messages
-- Do not send sensitive data through the public relay
-- For production use, deploy your own relay with JWT authentication
+### "Upgrade failed"
+
+WebSocket requires HTTP Upgrade header. Ensure your client uses `ws://` or `wss://`.
+
+### Build fails on DigitalOcean
+
+1. Check `source_dir` in app.yaml points to `deploy/relay`
+2. Ensure Cargo.toml exists in deploy/relay/
+3. Check build logs: `doctl apps logs <app-id> --type build`

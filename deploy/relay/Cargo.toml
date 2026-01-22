@@ -1,0 +1,40 @@
+# Standalone CLASP Relay
+#
+# This uses published crates from crates.io for deployment.
+# For development, set CLASP_DEV=1 to use local workspace paths.
+
+# Exclude from parent workspace
+[workspace]
+
+[package]
+name = "clasp-relay"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "CLASP relay server using published crates"
+
+[[bin]]
+name = "clasp-relay"
+path = "src/main.rs"
+
+[features]
+default = ["websocket"]
+websocket = ["clasp-router/websocket"]
+
+[dependencies]
+# Published crates from crates.io
+clasp-core = "0.1"
+clasp-router = "0.1"
+
+# Runtime
+tokio = { version = "1", features = ["full"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"

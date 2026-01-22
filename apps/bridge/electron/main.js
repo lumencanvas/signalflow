@@ -389,7 +389,7 @@ async function createClaspMonitor(serverId, wsUrl, token = null) {
   }
 
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl, 'clasp.v2');
+    const ws = new WebSocket(wsUrl, 'clasp');
     ws.binaryType = 'nodebuffer';
     let connected = false;
     let welcomed = false;
@@ -1029,7 +1029,7 @@ async function probeServer(host, port) {
     }, 2000);
 
     try {
-      ws = new WebSocket(wsUrl, 'clasp.v2');
+      ws = new WebSocket(wsUrl, 'clasp');
 
       ws.on('open', () => {
         clearTimeout(timeout);
@@ -1164,7 +1164,7 @@ ipcMain.handle('test-connection', async (event, address) => {
     let timeout;
 
     try {
-      ws = new WebSocket(wsUrl, 'clasp.v2');
+      ws = new WebSocket(wsUrl, 'clasp');
 
       timeout = setTimeout(() => {
         if (ws) ws.terminate();

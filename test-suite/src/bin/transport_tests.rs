@@ -243,7 +243,7 @@ async fn test_websocket_subprotocol() -> TestResult {
 
     let result: Result<(), String> = async {
         // Verify subprotocol constant is correct
-        assert_eq_msg(&WS_SUBPROTOCOL, &"clasp.v2", "Subprotocol constant")?;
+        assert_eq_msg(&WS_SUBPROTOCOL, &"clasp", "Subprotocol constant")?;
 
         let router = TestRouter::start().await;
         let connect_result = WebSocketTransport::connect(&router.url()).await;

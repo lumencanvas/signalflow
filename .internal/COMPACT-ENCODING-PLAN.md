@@ -2,8 +2,10 @@
 
 **Version:** 2.0
 **Date:** 2026-01-22
-**Status:** PLANNED
+**Status:** ✅ COMPLETED
 **Author:** Claude (Opus 4.5)
+
+> **Note:** This plan has been fully implemented. See `clasp-core/src/codec.rs` for the implementation.
 
 ---
 
