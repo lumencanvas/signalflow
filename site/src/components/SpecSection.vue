@@ -714,8 +714,8 @@ const benchmarks = {
             </div>
 
             <p class="bench-note">
-              <b>Bottom line:</b> CLASP v3 compact encoding is competitive with raw protocols while offering state sync, typed signals, and multi-protocol bridging.
-              The ~125ns encode latency is imperceptible—well under a 60fps frame (16.6ms).
+              <b>Bottom line:</b> These are <em>codec-only</em> benchmarks (single core, in-memory, no routing/state/fanout). 
+              Real system throughput is 10-100x lower. Run <code>real_benchmarks</code> for actual end-to-end numbers.
             </p>
 
             <p class="bench-run">

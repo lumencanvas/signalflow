@@ -273,50 +273,56 @@ CLASP clients in different languages can seamlessly communicate:
 
 ## Performance
 
-We believe in transparent benchmarking. Here's how CLASP v3 compares to OSC and MQTT:
+We believe in transparent benchmarking with honest methodology.
 
-### Encoding/Decoding Speed (messages/second)
+### Codec Benchmarks (In-Memory, Single Core)
 
-| Protocol | Encoding | Decoding | Message Size |
-|----------|----------|----------|--------------|
-| **MQTT** | 11.4M | 11.4M | 19 B |
-| **CLASP v3** | **8M** | **11M** | **31 B** |
-| **OSC** | 4.5M | 5.7M | 24 B |
-| **CLASP v2** | 1.8M | 1.5M | 69 B |
+These measure raw encode/decode speed—the **theoretical ceiling**, not system throughput:
+
+| Protocol | Encode | Decode | Size | Notes |
+|----------|--------|--------|------|-------|
+| MQTT | 11.4M/s | 11.4M/s | 19 B | Minimal protocol |
+| **CLASP v3** | **8M/s** | **11M/s** | **31 B** | Rich semantics |
+| OSC | 4.5M/s | 5.7M/s | 24 B | UDP only |
+| CLASP v2 | 1.8M/s | 1.5M/s | 69 B | MessagePack overhead |
+
+⚠️ **Important**: These are codec-only numbers (no network, no routing, no state). Real system throughput is 10-100x lower depending on features enabled.
+
+### System Throughput (End-to-End)
+
+Run `cargo run -p clasp-test-suite --bin real_benchmarks --release` for actual numbers including:
+- End-to-end latency (pub → router → sub)
+- Fanout to multiple subscribers
+- Wildcard routing overhead
+- State management costs
 
 ### Why CLASP v3?
 
-CLASP v3 introduced efficient binary encoding that is **54% smaller** and **5-6x faster** than the v2 MessagePack format:
+v3 binary encoding is **55% smaller** than v2 MessagePack:
 
 ```
-v2 (MessagePack with named keys): {"type":"SET","address":"/test","value":0.5,...}
-    └── 69 bytes, 40 bytes of redundant field names!
-
-v3 (Binary encoding): [SET_TYPE][flags][addr_len][addr][value_type][value][rev]
-    └── 32 bytes, same semantics, zero waste
+v2: {"type":"SET","address":"/test","value":0.5,...} → 69 bytes
+v3: [SET][flags][len][addr][value][rev]             → 31 bytes
 ```
 
-### The Sweet Spot
-
-CLASP v3 achieves **near-MQTT performance** while providing rich features:
+### Feature Comparison
 
 | Feature | CLASP | OSC | MQTT |
 |---------|-------|-----|------|
 | State synchronization | ✅ | ❌ | ❌ |
 | Late-joiner support | ✅ | ❌ | ✅ |
 | Typed signals (Param/Event/Stream) | ✅ | ❌ | ❌ |
-| QoS levels | 3 | 0 | 3 |
-| JWT security with scopes | ✅ | ❌ | ✅ |
-| Multi-protocol bridging | ✅ | ❌ | ❌ |
-| Clock sync | ✅ | ✅ | ❌ |
 | Wildcard subscriptions | ✅ | ❌ | ✅ |
+| Clock sync | ✅ | ✅ | ❌ |
+| Multi-protocol bridging | ✅ | ❌ | ❌ |
 
-**Bottom line**: CLASP v3 is competitive with MQTT/OSC for raw speed while offering state sync, typed signals, and multi-protocol bridging. Sub-microsecond latencies (~900ns) are well under a 60fps frame (16.6ms).
+### Timing Guarantees
 
-Run the benchmarks yourself:
-```bash
-cargo run -p clasp-test-suite --bin proof-tests --release
-```
+- **LAN (wired)**: Target ±1ms clock sync accuracy
+- **WiFi**: Target ±5-10ms clock sync accuracy
+- **Not suitable for**: Hard realtime, safety-critical, industrial control systems
+
+CLASP is designed for **soft realtime** creative applications: VJ software, stage lighting, music production, interactive installations.
 
 ## Supported Protocols
 
