@@ -302,9 +302,11 @@ html, body {
 .device-protocol-badge.osc { background: #fef3c7; color: #92400e; }
 .device-protocol-badge.midi { background: #fce7f3; color: #9d174d; }
 .device-protocol-badge.artnet { background: #dbeafe; color: #1e40af; }
+.device-protocol-badge.sacn { background: #cffafe; color: #0e7490; }
 .device-protocol-badge.dmx { background: #e0e7ff; color: #3730a3; }
 .device-protocol-badge.mqtt { background: #dcfce7; color: #166534; }
 .device-protocol-badge.websocket { background: #fef9c3; color: #854d0e; }
+.device-protocol-badge.socketio { background: #fee2e2; color: #991b1b; }
 .device-protocol-badge.http { background: #f3e8ff; color: #6b21a8; }
 
 /* Server Fields */
@@ -1345,13 +1347,67 @@ html, body {
 }
 
 /* Server item with error state */
-.device-item[data-status="error"] {
+.device-item[data-status="error"],
+.device-item-error {
   border-color: var(--color-error);
   background: #fef2f2;
+  flex-wrap: wrap;
 }
 
-.device-item[data-status="error"] .device-name {
+.device-item[data-status="error"] .device-name,
+.device-item-error .device-name {
   color: var(--color-error);
+}
+
+.device-item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.device-error-msg {
+  width: 100%;
+  font-size: 9px;
+  color: var(--color-error);
+  padding: var(--space-xs) 0 0 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-device-restart {
+  background: var(--color-warning);
+  color: white;
+  border: none;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.1s;
+}
+
+.btn-device-restart:hover {
+  background: #d97706;
+  transform: rotate(90deg);
+}
+
+.device-item:hover .btn-device-restart {
+  opacity: 1;
+}
+
+.status-dot.connecting {
+  background: var(--color-warning);
+  animation: pulse-connecting 1s ease-in-out infinite;
+}
+
+@keyframes pulse-connecting {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* Bridge active status */
@@ -1647,6 +1703,55 @@ html, body {
 .log-message {
   flex: 1;
   word-break: break-word;
+}
+
+.log-message mark {
+  background: #fef08a;
+  color: #000;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Log entry color coding by level */
+.log-entry-error {
+  border-left: 3px solid var(--color-error);
+}
+
+.log-entry-warning {
+  border-left: 3px solid var(--color-warning);
+}
+
+/* Log Stats */
+.log-stats {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--stone-800);
+  border-bottom: 1px solid var(--stone-700);
+  font-size: 10px;
+}
+
+.log-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-stat-error {
+  color: var(--color-error);
+}
+
+.log-stat-warning {
+  color: var(--color-warning);
+}
+
+.log-stat-info {
+  color: var(--teal-400);
+}
+
+.log-stat-search {
+  color: #fef08a;
+  margin-left: auto;
 }
 
 .log-empty {

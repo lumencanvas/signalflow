@@ -304,14 +304,16 @@
             <div class="panel-toolbar">
               <h2 class="panel-title">System Logs</h2>
               <div class="toolbar-group">
+                <input type="text" class="input input-sm" id="log-search" placeholder="Search logs..." style="width: 180px;">
                 <select class="select select-sm" id="log-filter-level">
                   <option value="all">All Levels</option>
                   <option value="error">Errors Only</option>
                   <option value="warning">Warnings+</option>
                   <option value="info">Info+</option>
+                  <option value="debug">Debug+</option>
                 </select>
                 <select class="select select-sm" id="log-filter-server">
-                  <option value="all">All Servers</option>
+                  <option value="all">All Sources</option>
                 </select>
                 <button class="btn btn-sm btn-secondary" id="export-logs-btn">
                   <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -323,6 +325,7 @@
               </div>
             </div>
             <div class="panel-content panel-logs-content">
+              <div id="log-stats" class="log-stats"></div>
               <div id="log-viewer" class="log-viewer"></div>
             </div>
           </div>
@@ -784,6 +787,7 @@ function transform(input) {
               <option value="socketio">Socket.IO (Real-time Events)</option>
               <option value="http">HTTP REST API</option>
               <option value="artnet">Art-Net (DMX over Ethernet)</option>
+              <option value="sacn">sACN/E1.31 (Streaming ACN)</option>
               <option value="dmx">DMX (USB Serial Interface)</option>
             </select>
             <span class="form-hint" id="server-type-hint">Full CLASP protocol server - other apps can connect and exchange signals</span>
@@ -914,17 +918,61 @@ function transform(input) {
 
           <!-- MQTT Broker Fields -->
           <div id="server-mqtt-fields" class="server-fields hidden">
-            <div class="form-group">
-              <label class="form-label">Broker Host</label>
-              <input type="text" name="mqttHost" class="input" placeholder="localhost" value="localhost">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Broker Host</label>
+                <input type="text" name="mqttHost" class="input" placeholder="localhost" value="localhost">
+              </div>
+              <div class="form-group" style="flex: 0.4;">
+                <label class="form-label">Port</label>
+                <input type="number" name="mqttPort" class="input" placeholder="1883" value="1883" min="1" max="65535">
+              </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Port</label>
-              <input type="number" name="mqttPort" class="input" placeholder="1883" value="1883" min="1" max="65535">
+              <label class="form-label">Client ID</label>
+              <input type="text" name="mqttClientId" class="input" placeholder="clasp-bridge-001">
+              <span class="form-hint">Unique identifier for this MQTT client (auto-generated if empty)</span>
             </div>
             <div class="form-group">
               <label class="form-label">Subscribe Topics (comma separated)</label>
               <input type="text" name="mqttTopics" class="input" placeholder="#" value="#">
+              <span class="form-hint">Use # for all topics, or specific patterns like sensors/+/temperature</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">QoS Level</label>
+                <select name="mqttQos" class="select">
+                  <option value="0">0 - At most once (fire & forget)</option>
+                  <option value="1">1 - At least once (acknowledged)</option>
+                  <option value="2">2 - Exactly once (guaranteed)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Keep Alive (sec)</label>
+                <input type="number" name="mqttKeepAlive" class="input" placeholder="60" value="60" min="5" max="3600">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" name="mqttAuthEnabled" id="mqtt-auth-enabled"> Enable Authentication
+              </label>
+            </div>
+            <div id="mqtt-auth-fields" class="hidden">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Username</label>
+                  <input type="text" name="mqttUsername" class="input" placeholder="username">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Password</label>
+                  <input type="password" name="mqttPassword" class="input" placeholder="password">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">CLASP Namespace Prefix</label>
+              <input type="text" name="mqttNamespace" class="input" placeholder="/mqtt" value="/mqtt">
+              <span class="form-hint">MQTT topic "sensors/temp" → CLASP address "/mqtt/sensors/temp"</span>
             </div>
           </div>
 
@@ -932,7 +980,7 @@ function transform(input) {
           <div id="server-websocket-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Mode</label>
-              <select name="wsMode" class="select">
+              <select name="wsMode" class="select" id="ws-mode-select">
                 <option value="server">Server (accept connections)</option>
                 <option value="client">Client (connect to server)</option>
               </select>
@@ -940,6 +988,25 @@ function transform(input) {
             <div class="form-group">
               <label class="form-label">Address/URL</label>
               <input type="text" name="wsAddress" class="input" placeholder="0.0.0.0:8080" value="0.0.0.0:8080">
+              <span class="form-hint" id="ws-address-hint">For server: bind address. For client: ws://host:port URL</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Message Format</label>
+                <select name="wsFormat" class="select">
+                  <option value="json">JSON (human-readable)</option>
+                  <option value="msgpack">MsgPack (binary, compact)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ping Interval (sec)</label>
+                <input type="number" name="wsPingInterval" class="input" placeholder="30" value="30" min="0" max="300">
+                <span class="form-hint">0 to disable</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">CLASP Namespace</label>
+              <input type="text" name="wsNamespace" class="input" placeholder="/websocket" value="/websocket">
             </div>
           </div>
 
@@ -973,6 +1040,54 @@ function transform(input) {
             <div class="form-group">
               <label class="form-label">Universe</label>
               <input type="number" name="artnetUniverse" class="input" placeholder="0" value="0" min="0" max="15">
+            </div>
+          </div>
+
+          <!-- sACN/E1.31 Server Fields -->
+          <div id="server-sacn-fields" class="server-fields hidden">
+            <div class="form-group">
+              <label class="form-label">Mode</label>
+              <select name="sacnMode" class="select">
+                <option value="receiver">Receiver (receive sACN from network)</option>
+                <option value="sender">Sender (send sACN to network)</option>
+                <option value="bidirectional">Bidirectional (both)</option>
+              </select>
+              <span class="form-hint">Choose whether to receive, send, or both</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Universes (comma separated)</label>
+              <input type="text" name="sacnUniverses" class="input" placeholder="1, 2, 3" value="1">
+              <span class="form-hint">E1.31 universes to subscribe/publish (1-63999)</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Source Name</label>
+              <input type="text" name="sacnSourceName" class="input" placeholder="CLASP sACN Bridge" value="CLASP sACN Bridge">
+              <span class="form-hint">Name shown to other sACN devices on the network</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Priority</label>
+                <input type="number" name="sacnPriority" class="input" placeholder="100" value="100" min="0" max="200">
+                <span class="form-hint">0-200 (higher wins)</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  <input type="checkbox" name="sacnMulticast" checked> Use Multicast
+                </label>
+                <span class="form-hint">Uncheck for unicast mode</span>
+              </div>
+            </div>
+            <div id="sacn-unicast-fields" class="hidden">
+              <div class="form-group">
+                <label class="form-label">Unicast Destinations (comma separated)</label>
+                <input type="text" name="sacnUnicastDests" class="input" placeholder="192.168.1.100:5568, 192.168.1.101:5568">
+                <span class="form-hint">IP:Port pairs for unicast transmission</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bind Address (optional)</label>
+              <input type="text" name="sacnBindAddress" class="input" placeholder="0.0.0.0">
+              <span class="form-hint">Leave empty to use all network interfaces</span>
             </div>
           </div>
 

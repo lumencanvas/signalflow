@@ -66,10 +66,12 @@ const protocolNames = {
   osc: 'OSC',
   midi: 'MIDI',
   artnet: 'Art-Net',
+  sacn: 'sACN',
   dmx: 'DMX',
   clasp: 'CLASP',
   mqtt: 'MQTT',
   websocket: 'WS',
+  socketio: 'SIO',
   http: 'HTTP',
 };
 
@@ -415,11 +417,27 @@ function setupServerTypeFieldSwitching() {
   $('server-type')?.addEventListener('change', (e) => {
     updateServerTypeFields(e.target.value);
   });
+
+  // MQTT auth toggle
+  $('mqtt-auth-enabled')?.addEventListener('change', (e) => {
+    const authFields = $('mqtt-auth-fields');
+    if (authFields) {
+      authFields.classList.toggle('hidden', !e.target.checked);
+    }
+  });
+
+  // sACN multicast toggle (show unicast fields when unchecked)
+  document.querySelector('[name="sacnMulticast"]')?.addEventListener('change', (e) => {
+    const unicastFields = $('sacn-unicast-fields');
+    if (unicastFields) {
+      unicastFields.classList.toggle('hidden', e.target.checked);
+    }
+  });
 }
 
 function updateServerTypeFields(serverType) {
   // Hide all server fields
-  const allFields = ['clasp', 'osc', 'midi', 'mqtt', 'websocket', 'socketio', 'http', 'artnet', 'dmx'];
+  const allFields = ['clasp', 'osc', 'midi', 'mqtt', 'websocket', 'socketio', 'http', 'artnet', 'sacn', 'dmx'];
   allFields.forEach(type => {
     const fields = $(`server-${type}-fields`);
     if (fields) {
@@ -438,11 +456,12 @@ function updateServerTypeFields(serverType) {
     clasp: 'Full CLASP protocol server - other apps can connect and exchange signals',
     osc: 'Open Sound Control server - receive OSC messages from controllers and apps',
     midi: 'MIDI bridge - connect to MIDI devices and translate to/from CLASP signals',
-    mqtt: 'MQTT client - connect to an MQTT broker for IoT device communication',
-    websocket: 'WebSocket bridge - accept JSON messages from web apps',
+    mqtt: 'MQTT client - connect to an MQTT broker with full auth and QoS support',
+    websocket: 'WebSocket bridge - accept JSON or MsgPack messages from web apps',
     socketio: 'Socket.IO bridge - real-time bidirectional event-based communication',
     http: 'HTTP REST API - expose signals as HTTP endpoints for webhooks and integrations',
     artnet: 'Art-Net receiver - receive DMX512 data over Ethernet from lighting consoles',
+    sacn: 'sACN/E1.31 bridge - industry-standard streaming ACN for professional lighting',
     dmx: 'DMX interface - connect directly to DMX fixtures via USB adapter',
   };
   const hintEl = $('server-type-hint');
@@ -1300,7 +1319,7 @@ function setupEventListeners() {
   // Server form
   $('server-form')?.addEventListener('submit', handleAddServer);
 
-  // Server list actions (edit/delete)
+  // Server list actions (edit/delete/restart)
   $('server-list')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
@@ -1308,6 +1327,7 @@ function setupEventListeners() {
     const id = btn.dataset.id;
     if (action === 'edit-server') editServer(id);
     if (action === 'delete-server') deleteServer(id);
+    if (action === 'restart-server') restartServer(id);
   });
 
   // Add output button
@@ -1566,14 +1586,27 @@ async function handleAddServer(e) {
     case 'mqtt':
       serverConfig.host = data.get('mqttHost') || 'localhost';
       serverConfig.port = parseInt(data.get('mqttPort')) || 1883;
+      serverConfig.clientId = data.get('mqttClientId') || '';
       serverConfig.topics = (data.get('mqttTopics') || '#').split(',').map(t => t.trim());
+      serverConfig.qos = parseInt(data.get('mqttQos')) || 0;
+      serverConfig.keepAlive = parseInt(data.get('mqttKeepAlive')) || 60;
+      serverConfig.namespace = data.get('mqttNamespace') || '/mqtt';
+      // Authentication
+      serverConfig.authEnabled = data.get('mqttAuthEnabled') === 'on';
+      if (serverConfig.authEnabled) {
+        serverConfig.username = data.get('mqttUsername') || '';
+        serverConfig.password = data.get('mqttPassword') || '';
+      }
       serverConfig.address = `${serverConfig.host}:${serverConfig.port}`;
-      serverConfig.name = `MQTT Broker @ ${serverConfig.address}`;
+      serverConfig.name = `MQTT @ ${serverConfig.address}`;
       break;
 
     case 'websocket':
       serverConfig.mode = data.get('wsMode') || 'server';
       serverConfig.address = data.get('wsAddress') || '0.0.0.0:8080';
+      serverConfig.format = data.get('wsFormat') || 'json';
+      serverConfig.pingInterval = parseInt(data.get('wsPingInterval')) || 30;
+      serverConfig.namespace = data.get('wsNamespace') || '/websocket';
       serverConfig.name = `WebSocket ${serverConfig.mode === 'server' ? 'Server' : 'Client'} @ ${serverConfig.address}`;
       break;
 
@@ -1591,6 +1624,20 @@ async function handleAddServer(e) {
       serverConfig.universe = parseInt(data.get('artnetUniverse')) || 0;
       serverConfig.address = serverConfig.bind;
       serverConfig.name = `Art-Net @ ${serverConfig.address} (${serverConfig.subnet}:${serverConfig.universe})`;
+      break;
+
+    case 'sacn':
+      serverConfig.mode = data.get('sacnMode') || 'receiver';
+      serverConfig.universes = (data.get('sacnUniverses') || '1').split(',').map(u => parseInt(u.trim())).filter(u => u > 0 && u < 64000);
+      serverConfig.sourceName = data.get('sacnSourceName') || 'CLASP sACN Bridge';
+      serverConfig.priority = parseInt(data.get('sacnPriority')) || 100;
+      serverConfig.multicast = data.get('sacnMulticast') === 'on';
+      serverConfig.bindAddress = data.get('sacnBindAddress') || '';
+      if (!serverConfig.multicast) {
+        serverConfig.unicastDestinations = (data.get('sacnUnicastDests') || '').split(',').map(d => d.trim()).filter(Boolean);
+      }
+      serverConfig.address = `sACN ${serverConfig.mode} (U: ${serverConfig.universes.join(',')})`;
+      serverConfig.name = `sACN ${serverConfig.mode.charAt(0).toUpperCase() + serverConfig.mode.slice(1)} - Universes ${serverConfig.universes.join(', ')}`;
       break;
 
     case 'dmx':
@@ -1685,6 +1732,47 @@ async function deleteServer(id) {
   }
 }
 
+async function restartServer(id) {
+  const server = state.servers.find(s => s.id === id);
+  if (!server) return;
+
+  // Update status to show restarting
+  server.status = 'reconnecting';
+  server.error = null;
+  renderServers();
+  showNotification(`Restarting ${server.name}...`, 'info');
+
+  try {
+    // Stop the server first
+    if (window.clasp) {
+      await window.clasp.stopServer(id);
+    }
+
+    // Small delay before restart
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Restart with the same config
+    if (window.clasp) {
+      const result = await window.clasp.startServer(server);
+      server.id = result?.id || server.id;
+      server.status = 'connected';
+      server.error = null;
+      showNotification(`${server.name} restarted successfully`, 'success');
+    } else {
+      server.status = 'connected';
+    }
+  } catch (err) {
+    console.error('Failed to restart server:', err);
+    server.status = 'error';
+    server.error = err.message || 'Restart failed';
+    showNotification(`Failed to restart ${server.name}: ${err.message}`, 'error');
+  }
+
+  saveServersToStorage();
+  renderServers();
+  updateStatus();
+}
+
 function editServer(id) {
   const server = state.servers.find(s => s.id === id);
   if (!server) return;
@@ -1718,11 +1806,26 @@ function editServer(id) {
     case 'mqtt':
       form.elements.mqttHost.value = server.host || 'localhost';
       form.elements.mqttPort.value = server.port || 1883;
+      if (form.elements.mqttClientId) form.elements.mqttClientId.value = server.clientId || '';
       form.elements.mqttTopics.value = (server.topics || ['#']).join(', ');
+      if (form.elements.mqttQos) form.elements.mqttQos.value = server.qos || 0;
+      if (form.elements.mqttKeepAlive) form.elements.mqttKeepAlive.value = server.keepAlive || 60;
+      if (form.elements.mqttNamespace) form.elements.mqttNamespace.value = server.namespace || '/mqtt';
+      // Auth fields
+      if (form.elements.mqttAuthEnabled) {
+        form.elements.mqttAuthEnabled.checked = server.authEnabled || false;
+        const authFields = $('mqtt-auth-fields');
+        if (authFields) authFields.classList.toggle('hidden', !server.authEnabled);
+      }
+      if (form.elements.mqttUsername) form.elements.mqttUsername.value = server.username || '';
+      if (form.elements.mqttPassword) form.elements.mqttPassword.value = server.password || '';
       break;
     case 'websocket':
       form.elements.wsMode.value = server.mode || 'server';
       form.elements.wsAddress.value = server.address || '0.0.0.0:8080';
+      if (form.elements.wsFormat) form.elements.wsFormat.value = server.format || 'json';
+      if (form.elements.wsPingInterval) form.elements.wsPingInterval.value = server.pingInterval || 30;
+      if (form.elements.wsNamespace) form.elements.wsNamespace.value = server.namespace || '/websocket';
       break;
     case 'http':
       form.elements.httpBind.value = server.bind || '0.0.0.0:3000';
@@ -1733,6 +1836,19 @@ function editServer(id) {
       form.elements.artnetBind.value = server.bind || '0.0.0.0:6454';
       form.elements.artnetSubnet.value = server.subnet || 0;
       form.elements.artnetUniverse.value = server.universe || 0;
+      break;
+    case 'sacn':
+      if (form.elements.sacnMode) form.elements.sacnMode.value = server.mode || 'receiver';
+      if (form.elements.sacnUniverses) form.elements.sacnUniverses.value = (server.universes || [1]).join(', ');
+      if (form.elements.sacnSourceName) form.elements.sacnSourceName.value = server.sourceName || 'CLASP sACN Bridge';
+      if (form.elements.sacnPriority) form.elements.sacnPriority.value = server.priority || 100;
+      if (form.elements.sacnMulticast) {
+        form.elements.sacnMulticast.checked = server.multicast !== false;
+        const unicastFields = $('sacn-unicast-fields');
+        if (unicastFields) unicastFields.classList.toggle('hidden', server.multicast !== false);
+      }
+      if (form.elements.sacnUnicastDests) form.elements.sacnUnicastDests.value = (server.unicastDestinations || []).join(', ');
+      if (form.elements.sacnBindAddress) form.elements.sacnBindAddress.value = server.bindAddress || '';
       break;
     case 'dmx':
       form.elements.dmxPort.value = server.serialPort || '/dev/ttyUSB0';
@@ -2556,12 +2672,26 @@ function renderServers() {
       </div>
     `;
   } else {
-    list.innerHTML = state.servers.map(server => `
-      <div class="device-item" data-id="${server.id}">
-        <span class="status-dot ${server.status || 'available'}"></span>
-        <span class="device-protocol-badge ${server.protocol || 'clasp'}">${protocolNames[server.protocol] || server.protocol || 'CLASP'}</span>
-        <span class="device-name">${server.name}</span>
+    list.innerHTML = state.servers.map(server => {
+      const statusClass = getServerStatusClass(server.status);
+      const statusTitle = getServerStatusTitle(server);
+      const hasError = server.status === 'error' || server.error;
+      const serverType = server.type || server.protocol || 'clasp';
+      
+      return `
+      <div class="device-item ${hasError ? 'device-item-error' : ''}" data-id="${server.id}" title="${statusTitle}">
+        <div class="device-item-main">
+          <span class="status-dot ${statusClass}" title="${statusTitle}"></span>
+          <span class="device-protocol-badge ${serverType}">${protocolNames[serverType] || serverType.toUpperCase()}</span>
+          <span class="device-name">${server.name}</span>
+        </div>
+        ${hasError ? `<div class="device-error-msg">${escapeHtml(server.error || 'Connection error')}</div>` : ''}
         <div class="device-actions">
+          ${hasError ? `
+          <button class="btn-device-restart" data-action="restart-server" data-id="${server.id}" title="Restart server">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.24"/><path d="M21 3v6h-6"/></svg>
+          </button>
+          ` : ''}
           <button class="btn-device-edit" data-action="edit-server" data-id="${server.id}" title="Edit server">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -2570,12 +2700,48 @@ function renderServers() {
           </button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Update badge
   const badge = $('server-badge');
   if (badge) badge.textContent = state.servers.length;
+}
+
+function getServerStatusClass(status) {
+  switch (status) {
+    case 'connected':
+    case 'running':
+      return 'connected';
+    case 'starting':
+    case 'reconnecting':
+      return 'connecting';
+    case 'error':
+    case 'disconnected':
+      return 'error';
+    default:
+      return 'available';
+  }
+}
+
+function getServerStatusTitle(server) {
+  if (server.error) return `Error: ${server.error}`;
+  switch (server.status) {
+    case 'connected':
+    case 'running':
+      return 'Running';
+    case 'starting':
+      return 'Starting...';
+    case 'reconnecting':
+      return 'Reconnecting...';
+    case 'error':
+      return 'Error';
+    case 'disconnected':
+      return 'Disconnected';
+    default:
+      return 'Unknown';
+  }
 }
 
 function renderDevices() {
@@ -3542,14 +3708,23 @@ function setupLogViewer() {
 
   $('log-filter-level')?.addEventListener('change', renderLogs);
   $('log-filter-server')?.addEventListener('change', renderLogs);
+
+  // Debounced search input
+  let searchTimeout;
+  $('log-search')?.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(renderLogs, 150);
+  });
 }
 
 function renderLogs() {
   const viewer = $('log-viewer');
+  const statsEl = $('log-stats');
   if (!viewer) return;
 
   const levelFilter = $('log-filter-level')?.value || 'all';
   const serverFilter = $('log-filter-server')?.value || 'all';
+  const searchQuery = ($('log-search')?.value || '').toLowerCase().trim();
 
   // Combine system logs and server logs
   let allLogs = [...state.systemLogs];
@@ -3566,33 +3741,73 @@ function renderLogs() {
   // Sort by timestamp descending
   allLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  // Apply filters
+  // Count by level for stats (before filtering)
+  const totalCounts = {
+    error: allLogs.filter(l => l.level === 'error').length,
+    warning: allLogs.filter(l => l.level === 'warning').length,
+    info: allLogs.filter(l => l.level === 'info').length,
+    debug: allLogs.filter(l => l.level === 'debug').length,
+  };
+
+  // Apply level filter
   if (levelFilter !== 'all') {
     const levels = {
       'error': ['error'],
       'warning': ['error', 'warning'],
       'info': ['error', 'warning', 'info'],
+      'debug': ['error', 'warning', 'info', 'debug'],
     };
     allLogs = allLogs.filter(log => levels[levelFilter]?.includes(log.level));
   }
 
+  // Apply server filter
   if (serverFilter !== 'all') {
     allLogs = allLogs.filter(log => log.source === serverFilter);
   }
 
+  // Apply search filter
+  if (searchQuery) {
+    allLogs = allLogs.filter(log => 
+      log.message?.toLowerCase().includes(searchQuery) ||
+      log.source?.toLowerCase().includes(searchQuery) ||
+      log.level?.toLowerCase().includes(searchQuery)
+    );
+  }
+
+  // Update stats
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <span class="log-stat log-stat-error" title="Errors">${totalCounts.error} errors</span>
+      <span class="log-stat log-stat-warning" title="Warnings">${totalCounts.warning} warnings</span>
+      <span class="log-stat log-stat-info" title="Info">${totalCounts.info} info</span>
+      ${searchQuery ? `<span class="log-stat log-stat-search">${allLogs.length} matches</span>` : ''}
+    `;
+  }
+
   if (allLogs.length === 0) {
-    viewer.innerHTML = '<div class="log-empty">No logs to display</div>';
+    viewer.innerHTML = searchQuery 
+      ? '<div class="log-empty">No logs match your search</div>'
+      : '<div class="log-empty">No logs to display</div>';
     return;
   }
 
+  // Render logs with search highlighting
   viewer.innerHTML = allLogs.slice(0, 500).map(log => {
     const time = new Date(log.timestamp).toLocaleTimeString();
+    let message = escapeHtml(log.message);
+    
+    // Highlight search matches
+    if (searchQuery) {
+      const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
+      message = message.replace(regex, '<mark>$1</mark>');
+    }
+    
     return `
-      <div class="log-entry">
+      <div class="log-entry log-entry-${log.level}">
         <span class="log-timestamp">${time}</span>
         <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
         <span class="log-source">${log.source || 'System'}</span>
-        <span class="log-message">${escapeHtml(log.message)}</span>
+        <span class="log-message">${message}</span>
       </div>
     `;
   }).join('');
@@ -3606,7 +3821,7 @@ function renderLogs() {
       if (!servers.includes(s.id)) servers.push(s.id);
     });
 
-    serverSelect.innerHTML = '<option value="all">All Servers</option>' +
+    serverSelect.innerHTML = '<option value="all">All Sources</option>' +
       servers.map(s => {
         const server = state.servers.find(srv => srv.id === s);
         const name = server?.name || s;
@@ -3615,6 +3830,10 @@ function renderLogs() {
 
     serverSelect.value = currentVal;
   }
+}
+
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 async function exportLogs() {
