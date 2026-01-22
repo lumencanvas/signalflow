@@ -269,23 +269,7 @@ async fn benchmark_wildcard_cost(pattern_type: &str) -> BenchmarkResult {
     let name = format!("Wildcard routing ({})", pattern_type);
     let router = TestRouter::start().await;
     
-    // Populate some addresses first
-    let setter = match Clasp::connect_to(&router.url()).await {
-        Ok(c) => c,
-        Err(e) => {
-            router.stop();
-            return BenchmarkResult::error(&name, format!("Connect failed: {}", e));
-        }
-    };
-    
-    // Create 1000 addresses under /lights/
-    for i in 0..100 {
-        for j in 0..10 {
-            let _ = setter.set(&format!("/lights/zone{}/fixture{}/brightness", i, j), 0.5).await;
-        }
-    }
-    
-    // Create subscriber with specific pattern
+    // Create subscriber with specific pattern FIRST
     let received = Arc::new(AtomicU64::new(0));
     let counter = received.clone();
     
@@ -297,12 +281,13 @@ async fn benchmark_wildcard_cost(pattern_type: &str) -> BenchmarkResult {
         }
     };
     
-    let pattern = match pattern_type {
-        "exact" => "/lights/zone50/fixture5/brightness",
-        "single" => "/lights/*/fixture5/brightness",
-        "globstar" => "/lights/**",
-        "complex" => "/lights/zone*/fixture*/brightness",
-        _ => "/lights/**",
+    // Pattern and expected match count
+    let (pattern, expected_matches) = match pattern_type {
+        "exact" => ("/lights/zone50/fixture5/brightness", 10u64),      // 10 updates to same address
+        "single" => ("/lights/zone50/*/brightness", 100u64),           // zone50, all 10 fixtures, 10 updates each
+        "globstar" => ("/lights/**", 1000u64),                         // All 1000 messages
+        "complex" => ("/lights/zone5*/fixture*/brightness", 100u64),   // zone50-59, all fixtures
+        _ => ("/lights/**", 1000u64),
     };
     
     let _ = subscriber.subscribe(pattern, move |_, _| {
@@ -310,24 +295,31 @@ async fn benchmark_wildcard_cost(pattern_type: &str) -> BenchmarkResult {
     }).await;
     
     tokio::time::sleep(Duration::from_millis(100)).await;
-    received.store(0, Ordering::SeqCst);
+    
+    // Publisher
+    let sender = match Clasp::connect_to(&router.url()).await {
+        Ok(c) => c,
+        Err(e) => {
+            router.stop();
+            return BenchmarkResult::error(&name, format!("Connect failed: {}", e));
+        }
+    };
     
     // Benchmark message delivery
     let msg_count = 1000u64;
     let start = Instant::now();
     
+    // Send to 100 zones x 10 fixtures = 1000 unique addresses
     for i in 0..msg_count {
-        // Send to an address that matches the pattern
         let zone = i % 100;
         let fixture = (i / 100) % 10;
-        let _ = setter.set(&format!("/lights/zone{}/fixture{}/brightness", zone, fixture), i as f64).await;
+        let _ = sender.set(&format!("/lights/zone{}/fixture{}/brightness", zone, fixture), i as f64).await;
     }
     
-    // Wait for delivery
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        // Don't wait for all - some patterns won't match all messages
+    // Wait for expected deliveries (or timeout)
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while received.load(Ordering::Relaxed) < expected_matches && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
     
     let elapsed = start.elapsed();
@@ -336,9 +328,9 @@ async fn benchmark_wildcard_cost(pattern_type: &str) -> BenchmarkResult {
     router.stop();
     
     BenchmarkResult {
-        name,
-        throughput: msg_count as f64 / elapsed.as_secs_f64(),
-        latency_avg_us: (elapsed.as_micros() as f64) / (msg_count as f64),
+        name: format!("{} (expect {})", name, expected_matches),
+        throughput: delivered as f64 / elapsed.as_secs_f64(),
+        latency_avg_us: (elapsed.as_micros() as f64) / (delivered.max(1) as f64),
         messages_sent: msg_count,
         messages_received: delivered,
         elapsed,
@@ -418,7 +410,11 @@ async fn benchmark_state_overhead(signal_type: &str) -> BenchmarkResult {
 // ============================================================================
 
 async fn benchmark_late_joiner(param_count: usize) -> BenchmarkResult {
-    let name = format!("Late joiner replay ({}k params)", param_count / 1000);
+    let name = if param_count >= 1000 {
+        format!("Late joiner replay ({}k params)", param_count / 1000)
+    } else {
+        format!("Late joiner replay ({} params)", param_count)
+    };
     let router = TestRouter::start().await;
     
     let setter = match Clasp::connect_to(&router.url()).await {
@@ -434,7 +430,9 @@ async fn benchmark_late_joiner(param_count: usize) -> BenchmarkResult {
         let _ = setter.set(&format!("/state/{}", i), i as f64).await;
     }
     
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Give router time to process all state
+    let settle_time = if param_count > 1000 { 500 } else { 100 };
+    tokio::time::sleep(Duration::from_millis(settle_time)).await;
     
     // Late joiner connects and subscribes
     let received = Arc::new(AtomicU64::new(0));
@@ -454,10 +452,15 @@ async fn benchmark_late_joiner(param_count: usize) -> BenchmarkResult {
         counter.fetch_add(1, Ordering::Relaxed);
     }).await;
     
-    // Wait for snapshot
-    let deadline = Instant::now() + Duration::from_secs(10);
+    // Wait for snapshot with reasonable timeout
+    let timeout_secs = if param_count > 5000 { 30 } else { 10 };
+    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
+    
+    // Check more frequently for small param counts
+    let check_interval = if param_count < 100 { 5 } else { 10 };
+    
     while received.load(Ordering::Relaxed) < param_count as u64 && Instant::now() < deadline {
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(check_interval)).await;
     }
     
     let elapsed = start.elapsed();
@@ -465,10 +468,17 @@ async fn benchmark_late_joiner(param_count: usize) -> BenchmarkResult {
     
     router.stop();
     
+    // Determine if this is a timeout or success
+    let timed_out = delivered < param_count as u64 && elapsed.as_secs() >= timeout_secs;
+    
     BenchmarkResult {
-        name,
+        name: if timed_out { 
+            format!("{} (TIMEOUT after {}s)", name, timeout_secs)
+        } else { 
+            name 
+        },
         throughput: delivered as f64 / elapsed.as_secs_f64(),
-        latency_avg_us: elapsed.as_micros() as f64,
+        latency_avg_us: if delivered > 0 { elapsed.as_micros() as f64 / delivered as f64 } else { 0.0 },
         messages_sent: param_count as u64,
         messages_received: delivered,
         elapsed,
@@ -575,7 +585,7 @@ async fn main() {
     
     // Scenario F: Late Joiner
     println!("═══ Scenario F: Late Joiner Replay ═══");
-    for n in [100, 1_000, 10_000] {
+    for n in [10, 100, 500, 1_000] {
         benchmark_late_joiner(n).await.print();
     }
     println!();
