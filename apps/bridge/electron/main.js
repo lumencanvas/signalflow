@@ -178,7 +178,8 @@ function classifyError(error) {
   const message = (error.message || '').toLowerCase();
 
   // Timeout errors
-  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || message.includes('timeout')) {
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' ||
+      message.includes('timeout') || message.includes('timed out')) {
     return ErrorType.TIMEOUT;
   }
 
