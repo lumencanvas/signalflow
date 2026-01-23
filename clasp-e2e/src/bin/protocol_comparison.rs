@@ -35,9 +35,9 @@ fn percentile(sorted: &[u64], p: f64) -> u64 {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum MessageSize {
-    Small,   // 32 bytes payload
-    Medium,  // 256 bytes payload
-    Large,   // 4096 bytes payload
+    Small,  // 32 bytes payload
+    Medium, // 256 bytes payload
+    Large,  // 4096 bytes payload
 }
 
 impl MessageSize {
@@ -129,14 +129,21 @@ async fn benchmark_clasp(port: u16, size: MessageSize, count: usize) -> Benchmar
 async fn benchmark_clasp_pubsub(port: u16, size: MessageSize, count: usize) -> BenchmarkResult {
     let url = format!("ws://127.0.0.1:{}", port);
 
-    let publisher = Clasp::connect_to(&url).await.expect("Publisher connect failed");
-    let subscriber = Clasp::connect_to(&url).await.expect("Subscriber connect failed");
+    let publisher = Clasp::connect_to(&url)
+        .await
+        .expect("Publisher connect failed");
+    let subscriber = Clasp::connect_to(&url)
+        .await
+        .expect("Subscriber connect failed");
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Instant>(count);
 
-    subscriber.subscribe("/pubsub/**", move |_, _| {
-        // Measure receipt time
-    }).await.expect("Subscribe failed");
+    subscriber
+        .subscribe("/pubsub/**", move |_, _| {
+            // Measure receipt time
+        })
+        .await
+        .expect("Subscribe failed");
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -170,7 +177,10 @@ async fn benchmark_mqtt(_size: MessageSize, count: usize) -> Option<BenchmarkRes
     // MQTT benchmarking would require paho-mqtt or rumqttc
     // This is a placeholder for fair comparison methodology
 
-    println!("  Note: MQTT benchmark requires external broker at {}", mqtt_url);
+    println!(
+        "  Note: MQTT benchmark requires external broker at {}",
+        mqtt_url
+    );
     println!("        Install mosquitto and set MQTT_BROKER_URL=tcp://localhost:1883");
 
     None
@@ -186,15 +196,22 @@ async fn benchmark_osc(_size: MessageSize, count: usize) -> Option<BenchmarkResu
     // OSC benchmarking would require rosc crate
     // This is a placeholder for fair comparison methodology
 
-    println!("  Note: OSC benchmark requires OSC server on port {}", osc_port);
+    println!(
+        "  Note: OSC benchmark requires OSC server on port {}",
+        osc_port
+    );
 
     None
 }
 
 fn print_comparison_table(results: &[BenchmarkResult]) {
     println!("\n  ═══ FAIR COMPARISON TABLE ═══\n");
-    println!("  Protocol   │ Message Size    │ p50      │ p95      │ p99      │ p99.9     │ Throughput");
-    println!("  ───────────┼─────────────────┼──────────┼──────────┼──────────┼───────────┼────────────");
+    println!(
+        "  Protocol   │ Message Size    │ p50      │ p95      │ p99      │ p99.9     │ Throughput"
+    );
+    println!(
+        "  ───────────┼─────────────────┼──────────┼──────────┼──────────┼───────────┼────────────"
+    );
 
     for result in results {
         result.print();

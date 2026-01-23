@@ -206,9 +206,8 @@ impl TimelineData {
 
     /// Get the timeline duration
     pub fn duration(&self) -> u64 {
-        self.duration.unwrap_or_else(|| {
-            self.keyframes.last().map(|kf| kf.time).unwrap_or(0)
-        })
+        self.duration
+            .unwrap_or_else(|| self.keyframes.last().map(|kf| kf.time).unwrap_or(0))
     }
 }
 

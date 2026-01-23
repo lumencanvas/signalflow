@@ -133,7 +133,10 @@ async fn test_graceful_disconnect() {
 
     client.close().await;
 
-    assert!(!client.is_connected(), "Should not be connected after close");
+    assert!(
+        !client.is_connected(),
+        "Should not be connected after close"
+    );
 }
 
 #[tokio::test]
@@ -178,10 +181,7 @@ async fn test_set_parameter() {
         .await
         .expect("Connect failed");
 
-    client
-        .set("/test/value", 42.0)
-        .await
-        .expect("Set failed");
+    client.set("/test/value", 42.0).await.expect("Set failed");
 
     client.close().await;
 }
@@ -250,17 +250,32 @@ async fn test_subscribe_pattern_wildcard() {
 
     // Send to matching addresses
     client.set("/sensors/temp", 25.0).await.expect("Set failed");
-    client.set("/sensors/humidity", 60.0).await.expect("Set failed");
-    client.set("/sensors/pressure", 1013.25).await.expect("Set failed");
+    client
+        .set("/sensors/humidity", 60.0)
+        .await
+        .expect("Set failed");
+    client
+        .set("/sensors/pressure", 1013.25)
+        .await
+        .expect("Set failed");
 
     // Wait for all three
     let received = collector.wait_for_count(3, Duration::from_secs(2)).await;
     assert!(received, "Did not receive all 3 values");
 
     // Verify all addresses received
-    assert!(collector.has_address("/sensors/temp"), "Missing /sensors/temp");
-    assert!(collector.has_address("/sensors/humidity"), "Missing /sensors/humidity");
-    assert!(collector.has_address("/sensors/pressure"), "Missing /sensors/pressure");
+    assert!(
+        collector.has_address("/sensors/temp"),
+        "Missing /sensors/temp"
+    );
+    assert!(
+        collector.has_address("/sensors/humidity"),
+        "Missing /sensors/humidity"
+    );
+    assert!(
+        collector.has_address("/sensors/pressure"),
+        "Missing /sensors/pressure"
+    );
 
     client.close().await;
 }
@@ -281,7 +296,10 @@ async fn test_subscribe_pattern_globstar() {
         .expect("Subscribe failed");
 
     client.set("/app/level1", 1.0).await.expect("Set failed");
-    client.set("/app/level1/level2", 2.0).await.expect("Set failed");
+    client
+        .set("/app/level1/level2", 2.0)
+        .await
+        .expect("Set failed");
     client.set("/app/a/b/c/d", 4.0).await.expect("Set failed");
 
     let received = collector.wait_for_count(3, Duration::from_secs(2)).await;
@@ -391,8 +409,12 @@ async fn test_emit_and_receive() {
     let router = TestRouter::start().await;
 
     // Two clients: one emits, one receives
-    let receiver = Clasp::connect_to(&router.url()).await.expect("Connect failed");
-    let emitter = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let receiver = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
+    let emitter = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
 
@@ -411,7 +433,10 @@ async fn test_emit_and_receive() {
     let received = collector.wait_for_count(1, Duration::from_secs(2)).await;
     assert!(received, "Event not received");
 
-    assert!(collector.has_address("/events/trigger"), "Wrong event address");
+    assert!(
+        collector.has_address("/events/trigger"),
+        "Wrong event address"
+    );
 
     receiver.close().await;
     emitter.close().await;
@@ -470,10 +495,7 @@ async fn test_bundle() {
         }),
     ];
 
-    client
-        .bundle(messages)
-        .await
-        .expect("Bundle failed");
+    client.bundle(messages).await.expect("Bundle failed");
 
     client.close().await;
 }
@@ -482,8 +504,12 @@ async fn test_bundle() {
 async fn test_bundle_atomicity() {
     let router = TestRouter::start().await;
 
-    let sender = Clasp::connect_to(&router.url()).await.expect("Connect failed");
-    let receiver = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let sender = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
+    let receiver = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
     receiver
@@ -575,7 +601,9 @@ async fn test_clock_sync() {
 #[tokio::test]
 async fn test_value_type_int() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
     client
@@ -584,9 +612,18 @@ async fn test_value_type_int() {
         .expect("Subscribe failed");
 
     client.set("/types/int", 42i64).await.expect("Set failed");
-    client.set("/types/int_neg", -100i64).await.expect("Set failed");
-    client.set("/types/int_zero", 0i64).await.expect("Set failed");
-    client.set("/types/int_max", i64::MAX).await.expect("Set failed");
+    client
+        .set("/types/int_neg", -100i64)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/int_zero", 0i64)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/int_max", i64::MAX)
+        .await
+        .expect("Set failed");
 
     collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -596,7 +633,9 @@ async fn test_value_type_int() {
 #[tokio::test]
 async fn test_value_type_float() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
     client
@@ -604,10 +643,22 @@ async fn test_value_type_float() {
         .await
         .expect("Subscribe failed");
 
-    client.set("/types/float", 3.14159f64).await.expect("Set failed");
-    client.set("/types/float_neg", -273.15f64).await.expect("Set failed");
-    client.set("/types/float_zero", 0.0f64).await.expect("Set failed");
-    client.set("/types/float_tiny", 1e-100f64).await.expect("Set failed");
+    client
+        .set("/types/float", 3.14159f64)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/float_neg", -273.15f64)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/float_zero", 0.0f64)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/float_tiny", 1e-100f64)
+        .await
+        .expect("Set failed");
 
     collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -617,7 +668,9 @@ async fn test_value_type_float() {
 #[tokio::test]
 async fn test_value_type_bool() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
     client
@@ -625,8 +678,14 @@ async fn test_value_type_bool() {
         .await
         .expect("Subscribe failed");
 
-    client.set("/types/bool_true", true).await.expect("Set failed");
-    client.set("/types/bool_false", false).await.expect("Set failed");
+    client
+        .set("/types/bool_true", true)
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/bool_false", false)
+        .await
+        .expect("Set failed");
 
     let received = collector.wait_for_count(2, Duration::from_secs(2)).await;
     assert!(received, "Did not receive bool values");
@@ -637,7 +696,9 @@ async fn test_value_type_bool() {
 #[tokio::test]
 async fn test_value_type_string() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
     client
@@ -645,10 +706,22 @@ async fn test_value_type_string() {
         .await
         .expect("Subscribe failed");
 
-    client.set("/types/str", "hello world").await.expect("Set failed");
-    client.set("/types/str_empty", "").await.expect("Set failed");
-    client.set("/types/str_unicode", "Hello, \u{1F30D}!").await.expect("Set failed");
-    client.set("/types/str_long", "x".repeat(1000)).await.expect("Set failed");
+    client
+        .set("/types/str", "hello world")
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/str_empty", "")
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/str_unicode", "Hello, \u{1F30D}!")
+        .await
+        .expect("Set failed");
+    client
+        .set("/types/str_long", "x".repeat(1000))
+        .await
+        .expect("Set failed");
 
     collector.wait_for_count(4, Duration::from_secs(2)).await;
 
@@ -658,7 +731,9 @@ async fn test_value_type_string() {
 #[tokio::test]
 async fn test_value_type_bytes() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     client
         .set(
@@ -678,7 +753,9 @@ async fn test_value_type_bytes() {
 #[tokio::test]
 async fn test_value_type_array() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     client
         .set(
@@ -711,7 +788,9 @@ async fn test_value_type_array() {
 #[tokio::test]
 async fn test_value_type_null() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     client
         .set("/types/null", Value::Null)
@@ -729,8 +808,12 @@ async fn test_value_type_null() {
 async fn test_two_client_set_receive() {
     let router = TestRouter::start().await;
 
-    let client1 = Clasp::connect_to(&router.url()).await.expect("Connect failed");
-    let client2 = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client1 = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
+    let client2 = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector = ValueCollector::new();
 
@@ -741,7 +824,10 @@ async fn test_two_client_set_receive() {
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    client2.set("/shared/value", 42.0).await.expect("Set failed");
+    client2
+        .set("/shared/value", 42.0)
+        .await
+        .expect("Set failed");
 
     let received = collector.wait_for_count(1, Duration::from_secs(2)).await;
     assert!(received, "Client 1 did not receive value from Client 2");
@@ -754,8 +840,12 @@ async fn test_two_client_set_receive() {
 async fn test_bidirectional_communication() {
     let router = TestRouter::start().await;
 
-    let client1 = Clasp::connect_to(&router.url()).await.expect("Connect failed");
-    let client2 = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client1 = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
+    let client2 = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     let collector1 = ValueCollector::new();
     let collector2 = ValueCollector::new();
@@ -772,8 +862,14 @@ async fn test_bidirectional_communication() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Bidirectional sends
-    client1.set("/from1/message", 100.0).await.expect("Set failed");
-    client2.set("/from2/message", 200.0).await.expect("Set failed");
+    client1
+        .set("/from1/message", 100.0)
+        .await
+        .expect("Set failed");
+    client2
+        .set("/from2/message", 200.0)
+        .await
+        .expect("Set failed");
 
     let recv1 = collector1.wait_for_count(1, Duration::from_secs(2)).await;
     let recv2 = collector2.wait_for_count(1, Duration::from_secs(2)).await;
@@ -830,7 +926,9 @@ async fn test_concurrent_operations() {
 #[tokio::test]
 async fn test_rapid_subscribe_unsubscribe() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     for i in 0..20 {
         let collector = ValueCollector::new();
@@ -838,7 +936,10 @@ async fn test_rapid_subscribe_unsubscribe() {
             .subscribe(&format!("/rapid/{}", i), collector.callback_ref())
             .await
             .expect("Subscribe failed");
-        client.unsubscribe(sub_id).await.expect("Unsubscribe failed");
+        client
+            .unsubscribe(sub_id)
+            .await
+            .expect("Unsubscribe failed");
     }
 
     client.close().await;
@@ -866,7 +967,9 @@ async fn test_operations_before_connect() {
 #[tokio::test]
 async fn test_operations_after_close() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     client.close().await;
 
@@ -879,7 +982,9 @@ async fn test_operations_after_close() {
 #[tokio::test]
 async fn test_double_close() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     client.close().await;
     client.close().await; // Should not panic
@@ -890,15 +995,23 @@ async fn test_double_close() {
 #[tokio::test]
 async fn test_special_characters_in_address() {
     let router = TestRouter::start().await;
-    let client = Clasp::connect_to(&router.url()).await.expect("Connect failed");
+    let client = Clasp::connect_to(&router.url())
+        .await
+        .expect("Connect failed");
 
     // Various address formats
     client.set("/simple", 1.0).await.expect("Set failed");
     client.set("/with-dash", 2.0).await.expect("Set failed");
-    client.set("/with_underscore", 3.0).await.expect("Set failed");
+    client
+        .set("/with_underscore", 3.0)
+        .await
+        .expect("Set failed");
     client.set("/with.dot", 4.0).await.expect("Set failed");
     client.set("/CamelCase", 5.0).await.expect("Set failed");
-    client.set("/with123numbers", 6.0).await.expect("Set failed");
+    client
+        .set("/with123numbers", 6.0)
+        .await
+        .expect("Set failed");
 
     client.close().await;
 }

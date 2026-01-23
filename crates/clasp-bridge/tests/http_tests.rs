@@ -46,7 +46,8 @@ impl TestEnv {
         };
 
         let mut bridge = HttpBridge::new(config);
-        let mut rx: mpsc::Receiver<BridgeEvent> = bridge.start().await.expect("Failed to start HTTP bridge");
+        let mut rx: mpsc::Receiver<BridgeEvent> =
+            bridge.start().await.expect("Failed to start HTTP bridge");
 
         // Wait for the HTTP server to be ready (Connected event)
         let timeout = tokio::time::timeout(Duration::from_secs(5), async {
@@ -91,7 +92,12 @@ async fn test_http_put_sets_clasp_signal() {
     let url = format!("{}/api/http/foo/bar", env.base_url);
     let body = serde_json::json!({ "value": 0.75 });
 
-    let resp = client.put(&url).json(&body).send().await.expect("PUT request failed");
+    let resp = client
+        .put(&url)
+        .json(&body)
+        .send()
+        .await
+        .expect("PUT request failed");
     assert!(
         resp.status().is_success(),
         "Unexpected status: {}",
@@ -103,7 +109,11 @@ async fn test_http_put_sets_clasp_signal() {
     // prefix twice ("/http/http/foo/bar"), so we query that path here to reflect
     // actual behavior.
     let get_url = format!("{}/api/http/http/foo/bar", env.base_url);
-    let get_resp = client.get(&get_url).send().await.expect("GET request failed");
+    let get_resp = client
+        .get(&get_url)
+        .send()
+        .await
+        .expect("GET request failed");
     let status = get_resp.status();
     let body_text = get_resp.text().await.expect("Failed to read response body");
     assert!(
@@ -120,11 +130,7 @@ async fn test_http_put_sets_clasp_signal() {
         .and_then(|v| v.as_f64())
         .expect("Missing or non-f64 value field");
 
-    assert!(
-        (val - 0.75).abs() < 1e-6,
-        "Expected 0.75, got {}",
-        val
-    );
+    assert!((val - 0.75).abs() < 1e-6, "Expected 0.75, got {}", val);
 
     env.stop().await;
 }
@@ -140,7 +146,12 @@ async fn test_http_post_publishes_event() {
     let url = format!("{}/api/http/events/cue", env.base_url);
     let body = serde_json::json!({ "id": "intro" });
 
-    let resp = client.post(&url).json(&body).send().await.expect("POST request failed");
+    let resp = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .expect("POST request failed");
     assert!(
         resp.status().is_success(),
         "Unexpected status: {}",

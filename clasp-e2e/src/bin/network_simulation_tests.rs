@@ -63,7 +63,10 @@ async fn main() {
 
     println!();
     println!("═══════════════════════════════════════════════════════════════");
-    println!("NETWORK SIMULATION RESULTS: {} passed, {} failed", passed, failed);
+    println!(
+        "NETWORK SIMULATION RESULTS: {} passed, {} failed",
+        passed, failed
+    );
     println!("═══════════════════════════════════════════════════════════════");
 
     if failed > 0 {
@@ -91,7 +94,11 @@ async fn test_baseline_latency() -> bool {
 
     for i in 0..iterations {
         let start = Instant::now();
-        if client.set("/baseline/test", Value::Int(i as i64)).await.is_ok() {
+        if client
+            .set("/baseline/test", Value::Int(i as i64))
+            .await
+            .is_ok()
+        {
             latencies.push(start.elapsed().as_micros() as u64);
         }
     }
@@ -135,7 +142,11 @@ async fn test_high_latency_tolerance() -> bool {
         sleep(simulated_latency).await;
 
         let start = Instant::now();
-        if client.set("/highlatency/test", Value::Int(i as i64)).await.is_ok() {
+        if client
+            .set("/highlatency/test", Value::Int(i as i64))
+            .await
+            .is_ok()
+        {
             success_count += 1;
             let actual_latency = start.elapsed();
             // The operation should complete despite simulated delays
@@ -147,10 +158,17 @@ async fn test_high_latency_tolerance() -> bool {
     }
 
     if success_count >= iterations * 9 / 10 {
-        println!("  ✓ High latency tolerance: {} of {} operations succeeded", success_count, iterations);
+        println!(
+            "  ✓ High latency tolerance: {} of {} operations succeeded",
+            success_count, iterations
+        );
         true
     } else {
-        println!("  ✗ Too many failures: {} of {}", iterations - success_count, iterations);
+        println!(
+            "  ✗ Too many failures: {} of {}",
+            iterations - success_count,
+            iterations
+        );
         false
     }
 }
@@ -179,13 +197,20 @@ async fn test_intermittent_delays() -> bool {
             sleep(Duration::from_millis(50)).await;
         }
 
-        if client.set("/intermittent/test", Value::Int(i as i64)).await.is_ok() {
+        if client
+            .set("/intermittent/test", Value::Int(i as i64))
+            .await
+            .is_ok()
+        {
             success_count += 1;
         }
     }
 
     if success_count >= iterations * 9 / 10 {
-        println!("  ✓ Intermittent delays: {} of {} operations succeeded", success_count, iterations);
+        println!(
+            "  ✓ Intermittent delays: {} of {} operations succeeded",
+            success_count, iterations
+        );
         true
     } else {
         println!("  ✗ Too many failures under intermittent delays");

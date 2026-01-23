@@ -152,12 +152,7 @@ async fn test_osc_receive_multiple_args() {
             assert_eq!(m.args.len(), 4, "Expected 4 args, got {}", m.args.len());
             // Verify each argument type
             match (&m.args[0], &m.args[1], &m.args[2], &m.args[3]) {
-                (
-                    OscType::Float(_),
-                    OscType::Int(_),
-                    OscType::String(_),
-                    OscType::Bool(_),
-                ) => {}
+                (OscType::Float(_), OscType::Int(_), OscType::String(_), OscType::Bool(_)) => {}
                 _ => panic!("Argument types don't match"),
             }
         }
@@ -171,8 +166,7 @@ async fn test_osc_send_to_external() {
     let port = find_available_udp_port();
 
     // Set up receiver socket (simulates external OSC app)
-    let receiver =
-        UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind receiver");
+    let receiver = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind receiver");
     receiver
         .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("Failed to set timeout");
@@ -236,10 +230,7 @@ async fn test_osc_bundle_with_timestamp() {
                 "Expected 2 messages in bundle, got {}",
                 b.content.len()
             );
-            assert_eq!(
-                b.timetag.seconds, 1704067200,
-                "Timestamp not preserved"
-            );
+            assert_eq!(b.timetag.seconds, 1704067200, "Timestamp not preserved");
         }
         _ => panic!("Expected bundle"),
     }
@@ -311,8 +302,7 @@ async fn test_osc_high_rate() {
             args: vec![OscType::Float(i as f32 / count as f32)],
         };
         let packet = OscPacket::Message(msg);
-        let encoded =
-            encoder::encode(&packet).expect(&format!("Failed to encode message {}", i));
+        let encoded = encoder::encode(&packet).expect(&format!("Failed to encode message {}", i));
         encoded_messages.push(encoded);
     }
 

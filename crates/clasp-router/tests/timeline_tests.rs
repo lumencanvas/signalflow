@@ -46,11 +46,7 @@ async fn test_timeline_linear() {
         Value::Float(v) => v,
         _ => panic!("Expected float at t=0"),
     };
-    assert!(
-        (v0 - 0.0).abs() <= 0.1,
-        "Expected 0.0 at t=0, got {}",
-        v0
-    );
+    assert!((v0 - 0.0).abs() <= 0.1, "Expected 0.0 at t=0, got {}", v0);
 
     // Test at t=0.5s
     let val = player.sample(500_000).unwrap();
@@ -105,11 +101,7 @@ async fn test_timeline_ease_in() {
         _ => panic!("Expected float"),
     };
 
-    assert!(
-        v50 < 50.0,
-        "EaseIn at t=0.5 should be < 50, got {}",
-        v50
-    );
+    assert!(v50 < 50.0, "EaseIn at t=0.5 should be < 50, got {}", v50);
 }
 
 /// Test: EaseOut curve
@@ -140,11 +132,7 @@ async fn test_timeline_ease_out() {
         _ => panic!("Expected float"),
     };
 
-    assert!(
-        v50 > 50.0,
-        "EaseOut at t=0.5 should be > 50, got {}",
-        v50
-    );
+    assert!(v50 > 50.0, "EaseOut at t=0.5 should be > 50, got {}", v50);
 }
 
 /// Test: Looping timeline

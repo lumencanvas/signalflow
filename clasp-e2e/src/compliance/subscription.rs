@@ -115,10 +115,7 @@ async fn test_single_wildcard(config: &ConformanceConfig, report: &mut Conforman
 
         if got_messages.is_err() {
             let count = received.load(Ordering::SeqCst);
-            return Err(anyhow::anyhow!(
-                "Expected 2 messages, received {}",
-                count
-            ));
+            return Err(anyhow::anyhow!("Expected 2 messages, received {}", count));
         }
 
         Ok(())
@@ -243,9 +240,7 @@ async fn test_unsubscribe(config: &ConformanceConfig, report: &mut ConformanceRe
         let after_count = received.load(Ordering::SeqCst);
 
         if after_count > before_count {
-            return Err(anyhow::anyhow!(
-                "Received message after unsubscribe"
-            ));
+            return Err(anyhow::anyhow!("Received message after unsubscribe"));
         }
 
         Ok(())
@@ -299,9 +294,7 @@ async fn test_subscription_snapshot(config: &ConformanceConfig, report: &mut Con
         .await;
 
         if got_snapshot.is_err() {
-            return Err(anyhow::anyhow!(
-                "Did not receive subscription snapshot"
-            ));
+            return Err(anyhow::anyhow!("Did not receive subscription snapshot"));
         }
 
         Ok(())

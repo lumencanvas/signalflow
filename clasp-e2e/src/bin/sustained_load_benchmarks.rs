@@ -80,14 +80,18 @@ async fn run_sustained_load_test(
     let interval_duration = Duration::from_secs(10); // Report every 10 seconds
 
     // Set up publisher
-    let publisher = Clasp::connect_to(&url).await.expect("Publisher connect failed");
+    let publisher = Clasp::connect_to(&url)
+        .await
+        .expect("Publisher connect failed");
 
     // Set up subscribers
     let received_count = Arc::new(AtomicU64::new(0));
     let mut subscribers = Vec::with_capacity(client_count);
 
     for _ in 0..client_count {
-        let sub = Clasp::connect_to(&url).await.expect("Subscriber connect failed");
+        let sub = Clasp::connect_to(&url)
+            .await
+            .expect("Subscriber connect failed");
         let counter = received_count.clone();
         sub.subscribe("/sustain/**", move |_, _| {
             counter.fetch_add(1, Ordering::Relaxed);
@@ -104,7 +108,8 @@ async fn run_sustained_load_test(
     let mut interval_stats = Vec::new();
     let mut interval_num = 0;
     let mut total_sent: u64 = 0;
-    let delay_between_messages = Duration::from_micros(1_000_000 / messages_per_second_target as u64);
+    let delay_between_messages =
+        Duration::from_micros(1_000_000 / messages_per_second_target as u64);
 
     println!("\n  Starting sustained load test:");
     println!("  - Duration: {} seconds", duration_secs);
@@ -204,15 +209,15 @@ fn analyze_degradation(stats: &[IntervalStats]) {
 
     println!("\n  ═══ DEGRADATION ANALYSIS ═══");
     println!();
-    println!("  Throughput: {:.1}% of initial ({:.0} -> {:.0} msg/s)",
+    println!(
+        "  Throughput: {:.1}% of initial ({:.0} -> {:.0} msg/s)",
         throughput_ratio * 100.0,
         first.throughput_per_sec,
         last.throughput_per_sec
     );
-    println!("  P99 Latency: {:.1}x initial ({}µs -> {}µs)",
-        latency_ratio,
-        first_p99,
-        last_p99
+    println!(
+        "  P99 Latency: {:.1}x initial ({}µs -> {}µs)",
+        latency_ratio, first_p99, last_p99
     );
     println!();
 

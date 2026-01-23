@@ -21,10 +21,7 @@ pub async fn run_tests(config: &ConformanceConfig, report: &mut ConformanceRepor
     test_expired_token_rejected(config, report).await;
 }
 
-async fn test_connection_without_token(
-    config: &ConformanceConfig,
-    report: &mut ConformanceReport,
-) {
+async fn test_connection_without_token(config: &ConformanceConfig, report: &mut ConformanceReport) {
     let start = Instant::now();
     let test_name = "Connection without token";
 

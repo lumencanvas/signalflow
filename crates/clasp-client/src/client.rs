@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use clasp_core::{
-    codec, time::ClockSync, BundleMessage, ErrorMessage, GetMessage, GesturePhase, HelloMessage,
+    codec, time::ClockSync, BundleMessage, ErrorMessage, GesturePhase, GetMessage, HelloMessage,
     Message, PublishMessage, SetMessage, SignalDefinition, SignalType, SubscribeMessage,
     SubscribeOptions, TimelineData, UnsubscribeMessage, Value, PROTOCOL_VERSION,
 };
@@ -81,7 +81,7 @@ pub struct Clasp {
     /// P2P config (optional, feature-gated)
     #[cfg(feature = "p2p")]
     p2p_config: Option<P2PConfig>,
-    
+
     /// P2P manager (optional, feature-gated, created after connection)
     #[cfg(feature = "p2p")]
     p2p_manager: Option<Arc<p2p::P2PManager>>,
@@ -124,7 +124,7 @@ impl Clasp {
             p2p_manager: None,
         }
     }
-    
+
     /// Set P2P configuration (internal, called by builder)
     #[cfg(feature = "p2p")]
     pub(crate) fn set_p2p_config(&mut self, config: P2PConfig) {
@@ -205,9 +205,10 @@ impl Clasp {
                                     let session_id = welcome.session.clone();
                                     // Create channel for P2P signaling
                                     let (signal_tx, mut signal_rx) = mpsc::channel(100);
-                                    let p2p_manager = Arc::new(p2p::P2PManager::new(p2p_config, signal_tx));
+                                    let p2p_manager =
+                                        Arc::new(p2p::P2PManager::new(p2p_config, signal_tx));
                                     p2p_manager.set_session_id(session_id.clone());
-                                    
+
                                     // Spawn task to forward P2P signals through client
                                     let sender = self.sender.read().clone();
                                     let p2p_manager_for_task = Arc::clone(&p2p_manager);
@@ -215,21 +216,26 @@ impl Clasp {
                                         tokio::spawn(async move {
                                             while let Some(msg) = signal_rx.recv().await {
                                                 if let Some(encoded) = codec::encode(&msg).ok() {
-                                                    if let Err(e) = sender_tx.send(encoded.into()).await {
-                                                        tracing::warn!("Failed to send P2P signal: {}", e);
+                                                    if let Err(e) =
+                                                        sender_tx.send(encoded.into()).await
+                                                    {
+                                                        tracing::warn!(
+                                                            "Failed to send P2P signal: {}",
+                                                            e
+                                                        );
                                                         break;
                                                     }
                                                 }
                                             }
                                         });
                                     }
-                                    
+
                                     // Store P2P manager first
                                     self.p2p_manager = Some(Arc::clone(&p2p_manager));
-                                    
+
                                     // Announce P2P capability
                                     let _ = p2p_manager.announce().await;
-                                    
+
                                     // Set up P2P subscriptions (after manager is stored)
                                     let _ = self.setup_p2p_subscriptions(&session_id).await;
                                 }
@@ -870,23 +876,27 @@ impl Clasp {
         if let Some(ref p2p_manager) = self.p2p_manager {
             let signal_address = format!("{}{}", P2P_SIGNAL_PREFIX, session_id);
             let p2p_manager_signal = Arc::clone(p2p_manager);
-            
+
             // Subscribe to P2P signals
-            let _ = self.subscribe(&signal_address, move |value, address| {
-                let p2p = Arc::clone(&p2p_manager_signal);
-                let address = address.to_string(); // Clone the address string
-                tokio::spawn(async move {
-                    if let Err(e) = p2p.handle_signal(&address, &value).await {
-                        tracing::debug!("P2P signal handling error: {}", e);
-                    }
-                });
-            }).await?;
-            
+            let _ = self
+                .subscribe(&signal_address, move |value, address| {
+                    let p2p = Arc::clone(&p2p_manager_signal);
+                    let address = address.to_string(); // Clone the address string
+                    tokio::spawn(async move {
+                        if let Err(e) = p2p.handle_signal(&address, &value).await {
+                            tracing::debug!("P2P signal handling error: {}", e);
+                        }
+                    });
+                })
+                .await?;
+
             // Subscribe to P2P announce
             let p2p_manager_announce = Arc::clone(p2p_manager);
-            let _ = self.subscribe(clasp_core::P2P_ANNOUNCE, move |value, _| {
-                p2p_manager_announce.handle_announce(&value);
-            }).await?;
+            let _ = self
+                .subscribe(clasp_core::P2P_ANNOUNCE, move |value, _| {
+                    p2p_manager_announce.handle_announce(&value);
+                })
+                .await?;
         }
         Ok(())
     }
@@ -897,7 +907,9 @@ impl Clasp {
         if let Some(ref p2p_manager) = self.p2p_manager {
             p2p_manager.connect_to_peer(peer_session_id).await
         } else {
-            Err(ClientError::Other("P2P not configured. Use builder.p2p_config() to enable.".to_string()))
+            Err(ClientError::Other(
+                "P2P not configured. Use builder.p2p_config() to enable.".to_string(),
+            ))
         }
     }
 
@@ -975,7 +987,7 @@ fn handle_message(
                     // P2P announce will be handled by subscription callback
                 }
             }
-            
+
             // Notify subscribers
             let value = pub_msg
                 .value

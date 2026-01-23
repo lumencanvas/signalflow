@@ -420,18 +420,25 @@ async fn test_midi_virtual_ports() {
         (Ok(midi_in), Ok(midi_out)) => {
             let in_ports = midi_in.port_count();
             let out_ports = midi_out.port_count();
-            println!("MIDI available: {} input ports, {} output ports", in_ports, out_ports);
+            println!(
+                "MIDI available: {} input ports, {} output ports",
+                in_ports, out_ports
+            );
 
             // Verify we can enumerate ports without crashing
             for i in 0..in_ports.min(5) {
                 if let Some(port) = midi_in.ports().get(i) {
-                    let name = midi_in.port_name(port).unwrap_or_else(|_| "Unknown".to_string());
+                    let name = midi_in
+                        .port_name(port)
+                        .unwrap_or_else(|_| "Unknown".to_string());
                     println!("  Input {}: {}", i, name);
                 }
             }
             for i in 0..out_ports.min(5) {
                 if let Some(port) = midi_out.ports().get(i) {
-                    let name = midi_out.port_name(port).unwrap_or_else(|_| "Unknown".to_string());
+                    let name = midi_out
+                        .port_name(port)
+                        .unwrap_or_else(|_| "Unknown".to_string());
                     println!("  Output {}: {}", i, name);
                 }
             }
@@ -469,7 +476,11 @@ async fn test_midi_note_on_to_clasp_address() {
     let msg = parse_midi(&midi_data).expect("Should parse Note On");
 
     match msg {
-        MidiMessage::NoteOn { channel: ch, note: n, velocity: v } => {
+        MidiMessage::NoteOn {
+            channel: ch,
+            note: n,
+            velocity: v,
+        } => {
             // Verify all components are correct
             assert_eq!(ch, channel, "Channel mismatch");
             assert_eq!(n, note, "Note mismatch");
@@ -501,10 +512,15 @@ async fn test_midi_cc_to_clasp_address() {
         let value = 64u8;
 
         let midi_data = [0xB0 | channel, cc_num, value];
-        let msg = parse_midi(&midi_data).expect(&format!("Should parse CC {} ({})", cc_num, description));
+        let msg =
+            parse_midi(&midi_data).expect(&format!("Should parse CC {} ({})", cc_num, description));
 
         match msg {
-            MidiMessage::ControlChange { channel: ch, control, value: v } => {
+            MidiMessage::ControlChange {
+                channel: ch,
+                control,
+                value: v,
+            } => {
                 assert_eq!(ch, channel, "Channel mismatch for CC {}", cc_num);
                 assert_eq!(control, cc_num, "CC number mismatch");
                 assert_eq!(v, value, "Value mismatch for CC {}", cc_num);
@@ -528,14 +544,15 @@ async fn test_midi_pitch_bend_14bit_value() {
 
     // Test various pitch bend values
     let test_cases = vec![
-        ([0xE0, 0x00, 0x00], 0, "minimum"),      // -8192
-        ([0xE0, 0x00, 0x40], 8192, "center"),    // 0
-        ([0xE0, 0x7F, 0x7F], 16383, "maximum"),  // +8191
-        ([0xE0, 0x00, 0x20], 4096, "quarter"),   // -4096
+        ([0xE0, 0x00, 0x00], 0, "minimum"),     // -8192
+        ([0xE0, 0x00, 0x40], 8192, "center"),   // 0
+        ([0xE0, 0x7F, 0x7F], 16383, "maximum"), // +8191
+        ([0xE0, 0x00, 0x20], 4096, "quarter"),  // -4096
     ];
 
     for (midi_data, expected_value, description) in test_cases {
-        let msg = parse_midi(&midi_data).expect(&format!("Should parse pitch bend ({})", description));
+        let msg =
+            parse_midi(&midi_data).expect(&format!("Should parse pitch bend ({})", description));
 
         match msg {
             MidiMessage::PitchBend { channel: ch, value } => {
@@ -560,7 +577,8 @@ async fn test_all_midi_channels() {
     for channel in 0..16u8 {
         // Note On on each channel
         let note_data = [0x90 | channel, 60, 100];
-        let msg = parse_midi(&note_data).expect(&format!("Should parse Note On on channel {}", channel));
+        let msg =
+            parse_midi(&note_data).expect(&format!("Should parse Note On on channel {}", channel));
 
         match msg {
             MidiMessage::NoteOn { channel: ch, .. } => {
@@ -587,13 +605,38 @@ async fn test_all_midi_channels() {
 async fn test_midi_encode_decode_roundtrip() {
     // Test all message types for perfect roundtrip
     let test_messages = vec![
-        MidiMessage::NoteOn { channel: 5, note: 72, velocity: 127 },
-        MidiMessage::NoteOff { channel: 3, note: 60, velocity: 64 },
-        MidiMessage::ControlChange { channel: 0, control: 74, value: 100 },
-        MidiMessage::ProgramChange { channel: 9, program: 42 },
-        MidiMessage::PitchBend { channel: 1, value: 8192 },
-        MidiMessage::ChannelPressure { channel: 2, pressure: 80 },
-        MidiMessage::PolyPressure { channel: 4, note: 48, pressure: 90 },
+        MidiMessage::NoteOn {
+            channel: 5,
+            note: 72,
+            velocity: 127,
+        },
+        MidiMessage::NoteOff {
+            channel: 3,
+            note: 60,
+            velocity: 64,
+        },
+        MidiMessage::ControlChange {
+            channel: 0,
+            control: 74,
+            value: 100,
+        },
+        MidiMessage::ProgramChange {
+            channel: 9,
+            program: 42,
+        },
+        MidiMessage::PitchBend {
+            channel: 1,
+            value: 8192,
+        },
+        MidiMessage::ChannelPressure {
+            channel: 2,
+            pressure: 80,
+        },
+        MidiMessage::PolyPressure {
+            channel: 4,
+            note: 48,
+            pressure: 90,
+        },
     ];
 
     for original in test_messages {
@@ -618,10 +661,10 @@ async fn test_midi_invalid_data_handling() {
 
     // Truncated messages
     let truncated_cases = vec![
-        vec![0x90],           // Note On needs 3 bytes
-        vec![0x90, 60],       // Note On needs 3 bytes
-        vec![0xB0],           // CC needs 3 bytes
-        vec![0xE0, 0x00],     // Pitch Bend needs 3 bytes
+        vec![0x90],       // Note On needs 3 bytes
+        vec![0x90, 60],   // Note On needs 3 bytes
+        vec![0xB0],       // CC needs 3 bytes
+        vec![0xE0, 0x00], // Pitch Bend needs 3 bytes
     ];
 
     for truncated in truncated_cases {

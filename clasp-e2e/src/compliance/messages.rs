@@ -30,7 +30,9 @@ async fn test_set_message(config: &ConformanceConfig, report: &mut ConformanceRe
         // Test SET with different value types
         client.set("/msg/test/int", Value::Int(42)).await?;
         client.set("/msg/test/float", Value::Float(3.14)).await?;
-        client.set("/msg/test/string", Value::String("hello".to_string())).await?;
+        client
+            .set("/msg/test/string", Value::String("hello".to_string()))
+            .await?;
         client.set("/msg/test/bool", Value::Bool(true)).await?;
 
         Ok::<_, anyhow::Error>(())
@@ -40,8 +42,7 @@ async fn test_set_message(config: &ConformanceConfig, report: &mut ConformanceRe
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.4"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.4"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())
@@ -79,8 +80,7 @@ async fn test_get_message(config: &ConformanceConfig, report: &mut ConformanceRe
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.5"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.5"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())
@@ -106,8 +106,7 @@ async fn test_subscribe_message(config: &ConformanceConfig, report: &mut Conform
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.6"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.6"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())
@@ -124,7 +123,9 @@ async fn test_publish_message(config: &ConformanceConfig, report: &mut Conforman
         let client = Clasp::connect_to(&config.router_url).await?;
 
         // Emit an event (publish)
-        client.emit("/msg/pub/event", Value::String("happened".to_string())).await?;
+        client
+            .emit("/msg/pub/event", Value::String("happened".to_string()))
+            .await?;
 
         Ok::<_, anyhow::Error>(())
     }
@@ -133,8 +134,7 @@ async fn test_publish_message(config: &ConformanceConfig, report: &mut Conforman
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.7"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.7"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())
@@ -159,8 +159,7 @@ async fn test_ack_message(config: &ConformanceConfig, report: &mut ConformanceRe
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.10"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.10"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())
@@ -180,8 +179,7 @@ async fn test_error_message(config: &ConformanceConfig, report: &mut Conformance
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Messages", duration)
-                .with_spec_reference("CLASP 3.11"),
+            TestResult::pass(test_name, "Messages", duration).with_spec_reference("CLASP 3.11"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Messages", duration, &e.to_string())

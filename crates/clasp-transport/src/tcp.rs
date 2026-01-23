@@ -91,7 +91,15 @@ impl TcpTransport {
         // Spawn reader/writer task
         tokio::spawn(async move {
             let (reader, writer) = stream.into_split();
-            run_tcp_io_loop(reader, writer, outgoing_rx, incoming_tx, max_size, connected_clone).await;
+            run_tcp_io_loop(
+                reader,
+                writer,
+                outgoing_rx,
+                incoming_tx,
+                max_size,
+                connected_clone,
+            )
+            .await;
         });
 
         info!("TCP connected to {}", addr);
@@ -276,10 +284,18 @@ impl TransportServer for TcpServer {
         let connected_clone = connected.clone();
 
         // Spawn reader/writer task
-        let stream: TcpStream = stream;  // Ensure type is known
+        let stream: TcpStream = stream; // Ensure type is known
         tokio::spawn(async move {
             let (reader, writer) = stream.into_split();
-            run_tcp_io_loop(reader, writer, outgoing_rx, incoming_tx, max_size, connected_clone).await;
+            run_tcp_io_loop(
+                reader,
+                writer,
+                outgoing_rx,
+                incoming_tx,
+                max_size,
+                connected_clone,
+            )
+            .await;
         });
 
         Ok((sender, receiver, peer_addr))
@@ -341,7 +357,8 @@ mod tests {
 
         // Connect client
         let transport = TcpTransport::new();
-        let (client_sender, mut client_receiver) = transport.connect(&addr.to_string()).await.unwrap();
+        let (client_sender, mut client_receiver) =
+            transport.connect(&addr.to_string()).await.unwrap();
 
         // Send data
         let test_data = Bytes::from("hello tcp");

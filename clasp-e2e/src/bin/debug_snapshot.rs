@@ -5,7 +5,7 @@ use std::time::Instant;
 
 fn main() {
     println!("=== Snapshot Encoding Test ===\n");
-    
+
     for count in [10, 100, 500, 1000, 2000, 5000] {
         // Create snapshot with N params
         let params: Vec<ParamValue> = (0..count)
@@ -17,9 +17,9 @@ fn main() {
                 timestamp: Some(1000000u64 + i as u64),
             })
             .collect();
-        
+
         let snapshot = Message::Snapshot(SnapshotMessage { params });
-        
+
         // Measure encoding
         let start = Instant::now();
         match codec::encode(&snapshot) {
@@ -32,14 +32,18 @@ fn main() {
                     encode_time,
                     bytes.len() as f64 / 1024.0
                 );
-                
+
                 // Verify decoding
                 let decode_start = Instant::now();
                 match codec::decode(&bytes) {
                     Ok((msg, _frame)) => {
                         let decode_time = decode_start.elapsed();
                         if let Message::Snapshot(s) = msg {
-                            println!("         decoded {} params in {:?}", s.params.len(), decode_time);
+                            println!(
+                                "         decoded {} params in {:?}",
+                                s.params.len(),
+                                decode_time
+                            );
                         }
                     }
                     Err(e) => {

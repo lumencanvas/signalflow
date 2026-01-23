@@ -10,11 +10,9 @@ pub mod tests;
 
 // Re-export test utilities from clasp-test-utils
 pub use clasp_test_utils::{
-    assert_approx_eq, assert_err, assert_ok, assert_some, assert_that,
-    find_available_port, find_available_udp_port,
-    wait_for, wait_for_count, wait_for_flag, wait_with_notify,
-    TestRouter, ValueCollector,
-    DEFAULT_CHECK_INTERVAL, DEFAULT_TIMEOUT,
+    assert_approx_eq, assert_err, assert_ok, assert_some, assert_that, find_available_port,
+    find_available_udp_port, wait_for, wait_for_count, wait_for_flag, wait_with_notify, TestRouter,
+    ValueCollector, DEFAULT_CHECK_INTERVAL, DEFAULT_TIMEOUT,
 };
 
 /// Result of a single test

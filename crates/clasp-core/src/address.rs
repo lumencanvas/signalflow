@@ -174,7 +174,7 @@ impl Pattern {
             // ** matches zero or more path segments (including slashes)
             // * matches zero or more characters within a segment
             let regex_str = s
-                .replace("/**", "§§") // Temp placeholder for /**/ 
+                .replace("/**", "§§") // Temp placeholder for /**/
                 .replace("/**/", "§§/") // Handle mid-pattern /**/
                 .replace('*', "[^/]*") // * = zero or more non-slash chars
                 .replace("§§", "(/[^/]+)*"); // ** = zero or more /segment

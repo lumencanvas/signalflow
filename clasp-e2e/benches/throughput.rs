@@ -1,6 +1,8 @@
 //! Throughput Benchmarks for CLASP Protocol
 
-use clasp_core::{decode, encode, BundleMessage, Message, PublishMessage, SetMessage, SignalType, Value};
+use clasp_core::{
+    decode, encode, BundleMessage, Message, PublishMessage, SetMessage, SignalType, Value,
+};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 fn bench_encode_set(c: &mut Criterion) {

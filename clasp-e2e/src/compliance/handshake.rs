@@ -10,7 +10,9 @@ use super::{ConformanceConfig, ConformanceReport, TestResult};
 use anyhow;
 use clasp_client::Clasp;
 use clasp_core::{codec, HelloMessage, Message, PROTOCOL_VERSION};
-use clasp_transport::{TransportEvent, WebSocketTransport, Transport, TransportSender, TransportReceiver};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
@@ -65,9 +67,11 @@ async fn test_hello_must_be_first(config: &ConformanceConfig, report: &mut Confo
         match response {
             Ok(Ok(Message::Error(_))) => Ok(()), // Error response - good
             Ok(Ok(Message::Ack(_))) => Err(anyhow::anyhow!("Server ACKed message before HELLO")),
-            Ok(Ok(Message::Welcome(_))) => Err(anyhow::anyhow!("Server sent WELCOME without HELLO")),
+            Ok(Ok(Message::Welcome(_))) => {
+                Err(anyhow::anyhow!("Server sent WELCOME without HELLO"))
+            }
             Ok(Err(_)) => Ok(()), // Disconnect is acceptable
-            Err(_) => Ok(()), // Timeout is acceptable - server ignores invalid messages
+            Err(_) => Ok(()),     // Timeout is acceptable - server ignores invalid messages
             _ => Ok(()),
         }
     }
@@ -76,8 +80,7 @@ async fn test_hello_must_be_first(config: &ConformanceConfig, report: &mut Confo
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.1"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.1"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())
@@ -86,7 +89,10 @@ async fn test_hello_must_be_first(config: &ConformanceConfig, report: &mut Confo
     }
 }
 
-async fn test_welcome_contains_session_id(config: &ConformanceConfig, report: &mut ConformanceReport) {
+async fn test_welcome_contains_session_id(
+    config: &ConformanceConfig,
+    report: &mut ConformanceReport,
+) {
     let start = Instant::now();
     let test_name = "WELCOME contains session ID";
 
@@ -106,8 +112,7 @@ async fn test_welcome_contains_session_id(config: &ConformanceConfig, report: &m
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.2"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.2"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())
@@ -158,7 +163,11 @@ async fn test_version_negotiation(config: &ConformanceConfig, report: &mut Confo
                 }
                 Ok(())
             }
-            Message::Error(e) => Err(anyhow::anyhow!("Server rejected: {} - {}", e.code, e.message)),
+            Message::Error(e) => Err(anyhow::anyhow!(
+                "Server rejected: {} - {}",
+                e.code,
+                e.message
+            )),
             _ => Err(anyhow::anyhow!("Expected WELCOME, got different message")),
         }
     }
@@ -167,8 +176,7 @@ async fn test_version_negotiation(config: &ConformanceConfig, report: &mut Confo
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.3"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.3"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())
@@ -183,7 +191,11 @@ async fn test_feature_negotiation(config: &ConformanceConfig, report: &mut Confo
 
     let result = async {
         let client = Clasp::builder(&config.router_url)
-            .features(vec!["param".to_string(), "event".to_string(), "stream".to_string()])
+            .features(vec![
+                "param".to_string(),
+                "event".to_string(),
+                "stream".to_string(),
+            ])
             .connect()
             .await?;
 
@@ -199,8 +211,7 @@ async fn test_feature_negotiation(config: &ConformanceConfig, report: &mut Confo
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.4"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.4"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())
@@ -276,8 +287,8 @@ async fn test_duplicate_hello_rejected(config: &ConformanceConfig, report: &mut 
         match response {
             Ok(Ok(Message::Welcome(_))) => Err(anyhow::anyhow!("Server sent second WELCOME")),
             Ok(Ok(Message::Error(_))) => Ok(()), // Error is acceptable
-            Ok(Err(_)) => Ok(()), // Disconnect is acceptable
-            Err(_) => Ok(()), // Timeout (ignored) is acceptable
+            Ok(Err(_)) => Ok(()),                // Disconnect is acceptable
+            Err(_) => Ok(()),                    // Timeout (ignored) is acceptable
             _ => Ok(()),
         }
     }
@@ -286,8 +297,7 @@ async fn test_duplicate_hello_rejected(config: &ConformanceConfig, report: &mut 
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.5"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.5"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())
@@ -316,8 +326,7 @@ async fn test_handshake_timeout(config: &ConformanceConfig, report: &mut Conform
     let duration = start.elapsed().as_millis() as u64;
     match result {
         Ok(_) => report.add_result(
-            TestResult::pass(test_name, "Handshake", duration)
-                .with_spec_reference("CLASP 4.1.6"),
+            TestResult::pass(test_name, "Handshake", duration).with_spec_reference("CLASP 4.1.6"),
         ),
         Err(e) => report.add_result(
             TestResult::fail(test_name, "Handshake", duration, &e.to_string())

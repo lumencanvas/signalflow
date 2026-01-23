@@ -312,8 +312,8 @@ impl Router {
                 let to_flush = registry.flush_stale();
                 for pub_msg in to_flush {
                     let msg = Message::Publish(pub_msg.clone());
-                    let subscribers = subscriptions
-                        .find_subscribers(&pub_msg.address, Some(SignalType::Gesture));
+                    let subscribers =
+                        subscriptions.find_subscribers(&pub_msg.address, Some(SignalType::Gesture));
 
                     if let Ok(bytes) = codec::encode(&msg) {
                         for sub_session_id in subscribers {
@@ -711,7 +711,10 @@ async fn send_chunked_snapshot(sender: &Arc<dyn TransportSender>, snapshot: Snap
     let chunks = snapshot.params.chunks(MAX_SNAPSHOT_CHUNK_SIZE);
     let chunk_count = (param_count + MAX_SNAPSHOT_CHUNK_SIZE - 1) / MAX_SNAPSHOT_CHUNK_SIZE;
 
-    debug!("Chunking snapshot of {} params into {} chunks", param_count, chunk_count);
+    debug!(
+        "Chunking snapshot of {} params into {} chunks",
+        param_count, chunk_count
+    );
 
     for (i, chunk) in chunks.enumerate() {
         let chunk_snapshot = SnapshotMessage {
@@ -721,12 +724,22 @@ async fn send_chunked_snapshot(sender: &Arc<dyn TransportSender>, snapshot: Snap
         match codec::encode(&msg) {
             Ok(bytes) => {
                 if let Err(e) = sender.send(bytes).await {
-                    warn!("Failed to send snapshot chunk {}/{}: {}", i + 1, chunk_count, e);
+                    warn!(
+                        "Failed to send snapshot chunk {}/{}: {}",
+                        i + 1,
+                        chunk_count,
+                        e
+                    );
                     break;
                 }
             }
             Err(e) => {
-                warn!("Failed to encode snapshot chunk {}/{}: {}", i + 1, chunk_count, e);
+                warn!(
+                    "Failed to encode snapshot chunk {}/{}: {}",
+                    i + 1,
+                    chunk_count,
+                    e
+                );
             }
         }
     }
@@ -1149,8 +1162,7 @@ async fn handle_message(
                                 if let Ok(bytes) = codec::encode(&msg_to_send) {
                                     for sub_session_id in subscribers {
                                         if sub_session_id != session.id {
-                                            if let Some(sub_session) =
-                                                sessions.get(&sub_session_id)
+                                            if let Some(sub_session) = sessions.get(&sub_session_id)
                                             {
                                                 let _ = sub_session.send(bytes.clone()).await;
                                             }

@@ -97,7 +97,7 @@ fn estimate_message_size(msg: &Message) -> usize {
         Message::Subscribe(m) => 6 + m.pattern.len() + 16,
         Message::Bundle(m) => 12 + m.messages.len() * 48,
         Message::Ping | Message::Pong => 5, // Just frame header
-        _ => 64, // Default for less common messages
+        _ => 64,                            // Default for less common messages
     }
 }
 
@@ -1387,7 +1387,10 @@ fn decode_value_data(buf: &mut &[u8], vtype: u8) -> Result<Value> {
             }
             Ok(Value::Map(map))
         }
-        _ => Err(Error::DecodeError(format!("unknown value type: 0x{:02x}", vtype))),
+        _ => Err(Error::DecodeError(format!(
+            "unknown value type: 0x{:02x}",
+            vtype
+        ))),
     }
 }
 
@@ -1515,7 +1518,11 @@ mod tests {
         // Binary encoding should be at least 40% smaller
         let savings = 100 - (binary_payload.len() * 100 / msgpack_payload.len());
         println!("Size reduction: {}%", savings);
-        assert!(savings >= 40, "Expected at least 40% size reduction, got {}%", savings);
+        assert!(
+            savings >= 40,
+            "Expected at least 40% size reduction, got {}%",
+            savings
+        );
     }
 
     #[test]

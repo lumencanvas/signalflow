@@ -65,9 +65,9 @@ async fn test_bundle_atomic_execution() {
     for i in 0..5 {
         let expected_addr = format!("/atomic/value{}", i);
         assert!(
-            values
-                .iter()
-                .any(|(addr, val)| { addr == &expected_addr && matches!(val, Value::Int(v) if *v == i as i64) }),
+            values.iter().any(|(addr, val)| {
+                addr == &expected_addr && matches!(val, Value::Int(v) if *v == i as i64)
+            }),
             "Should have correct value for /atomic/value{}",
             i
         );
@@ -118,7 +118,9 @@ async fn test_bundle_scheduled_execution() {
 
     // Wait for scheduled time plus buffer
     assert!(
-        collector.wait_for_count(1, Duration::from_millis(400)).await,
+        collector
+            .wait_for_count(1, Duration::from_millis(400))
+            .await,
         "Should receive scheduled bundle"
     );
 
@@ -188,7 +190,9 @@ async fn test_bundle_mixed_message_types() {
 
     // Wait for both
     assert!(
-        set_collector.wait_for_count(1, Duration::from_secs(2)).await,
+        set_collector
+            .wait_for_count(1, Duration::from_secs(2))
+            .await,
         "Should receive SET message"
     );
     assert!(
@@ -208,7 +212,10 @@ async fn test_bundle_mixed_message_types() {
     // Check SET value
     match set_values.first() {
         Some((_, Value::Float(f))) => {
-            assert!((f - 3.14).abs() < 0.01, "SET value should be approximately 3.14");
+            assert!(
+                (f - 3.14).abs() < 0.01,
+                "SET value should be approximately 3.14"
+            );
         }
         _ => panic!("SET value type incorrect"),
     }
@@ -284,9 +291,9 @@ async fn test_bundle_large_bundle() {
     for i in 0..message_count {
         let expected_addr = format!("/large/item{}", i);
         assert!(
-            values
-                .iter()
-                .any(|(addr, val)| { addr == &expected_addr && matches!(val, Value::Int(v) if *v == i as i64) }),
+            values.iter().any(|(addr, val)| {
+                addr == &expected_addr && matches!(val, Value::Int(v) if *v == i as i64)
+            }),
             "Should have value for {}",
             expected_addr
         );
@@ -337,7 +344,9 @@ async fn test_bundle_timestamp_precision() {
 
     // Should receive at approximately the right time
     assert!(
-        collector.wait_for_count(1, Duration::from_millis(300)).await,
+        collector
+            .wait_for_count(1, Duration::from_millis(300))
+            .await,
         "Should receive scheduled bundle"
     );
 

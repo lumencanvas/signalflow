@@ -83,8 +83,8 @@ impl TestRouter {
             ],
             security_mode: SecurityMode::Open,
             max_subscriptions_per_session: 1000,
-        gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+            gesture_coalescing: true,
+            gesture_coalesce_interval_ms: 16,
         });
 
         let handle = tokio::spawn(async move {

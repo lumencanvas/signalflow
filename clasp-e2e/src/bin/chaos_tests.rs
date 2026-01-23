@@ -80,7 +80,9 @@ async fn test_disconnect_storm() -> bool {
         match Clasp::connect_to(&router.url()).await {
             Ok(client) => {
                 // Set some state
-                let _ = client.set(&format!("/storm/client/{}", i), Value::Int(i as i64)).await;
+                let _ = client
+                    .set(&format!("/storm/client/{}", i), Value::Int(i as i64))
+                    .await;
                 clients.push(client);
             }
             Err(e) => {
@@ -104,7 +106,10 @@ async fn test_disconnect_storm() -> bool {
             // Should be able to use the router normally
             if client.set("/storm/after", Value::Int(1)).await.is_ok() {
                 let elapsed = start.elapsed();
-                println!("  ✓ Disconnect storm: router survived ({:.2}ms)", elapsed.as_secs_f64() * 1000.0);
+                println!(
+                    "  ✓ Disconnect storm: router survived ({:.2}ms)",
+                    elapsed.as_secs_f64() * 1000.0
+                );
                 true
             } else {
                 println!("  ✗ Router unresponsive after disconnect storm");
@@ -157,7 +162,11 @@ async fn test_memory_pressure() -> bool {
     println!();
 
     let creation_time = start.elapsed();
-    println!("  Created {} addresses in {:.2}s", success_count, creation_time.as_secs_f64());
+    println!(
+        "  Created {} addresses in {:.2}s",
+        success_count,
+        creation_time.as_secs_f64()
+    );
 
     // Router should still respond quickly
     let response_start = Instant::now();
@@ -200,7 +209,11 @@ async fn test_connection_churn() -> bool {
         match Clasp::connect_to(&router.url()).await {
             Ok(client) => {
                 // Quick operation
-                if client.set("/churn/test", Value::Int(i as i64)).await.is_ok() {
+                if client
+                    .set("/churn/test", Value::Int(i as i64))
+                    .await
+                    .is_ok()
+                {
                     success_count += 1;
                 }
                 // Drop client (disconnect)
@@ -301,11 +314,7 @@ async fn test_message_flood() -> bool {
 
     // Flood with messages
     for i in 0..message_count {
-        if client
-            .set("/flood/msg", Value::Int(i as i64))
-            .await
-            .is_ok()
-        {
+        if client.set("/flood/msg", Value::Int(i as i64)).await.is_ok() {
             success_count += 1;
         }
     }

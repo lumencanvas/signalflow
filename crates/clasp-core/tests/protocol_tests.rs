@@ -335,7 +335,13 @@ async fn test_artnet_loopback() {
     let (len, from) = server.recv_from(&mut buf).expect("Server receive failed");
 
     // Validate received packet
-    assert_eq!(len, art_dmx.len(), "Size mismatch: {} vs {}", len, art_dmx.len());
+    assert_eq!(
+        len,
+        art_dmx.len(),
+        "Size mismatch: {} vs {}",
+        len,
+        art_dmx.len()
+    );
     assert_eq!(&buf[0..8], b"Art-Net\0", "Corrupted Art-Net header");
 
     let seq = buf[12];
@@ -393,7 +399,11 @@ async fn test_artnet_poll_reply() {
     let (_reply_len, _) = client.recv_from(&mut buf).expect("Reply receive failed");
 
     let reply_opcode = u16::from_le_bytes([buf[8], buf[9]]);
-    assert_eq!(reply_opcode, 0x2100, "Wrong reply opcode: 0x{:04X}", reply_opcode);
+    assert_eq!(
+        reply_opcode, 0x2100,
+        "Wrong reply opcode: 0x{:04X}",
+        reply_opcode
+    );
 }
 
 #[tokio::test]
@@ -468,7 +478,7 @@ async fn test_midi_virtual_port_available() {
             lower.contains("virtual") ||       // Generic virtual
             lower.contains("loop") ||          // Loopback
             lower.contains("midi through") ||  // Linux MIDI Through
-            lower.contains("virmidi")          // Linux snd-virmidi
+            lower.contains("virmidi") // Linux snd-virmidi
         })
         .collect();
 
@@ -483,7 +493,11 @@ async fn test_midi_virtual_port_available() {
     if !virtual_ports.is_empty() {
         println!("Found virtual ports: {:?}", virtual_ports);
     } else if !port_names.is_empty() {
-        println!("Found {} MIDI ports (no virtual): {:?}", port_names.len(), port_names);
+        println!(
+            "Found {} MIDI ports (no virtual): {:?}",
+            port_names.len(),
+            port_names
+        );
     } else {
         println!("No MIDI ports (OK in CI/headless environments)");
     }
@@ -525,7 +539,8 @@ async fn test_midi_channel_mapping() {
         let note_on = 0x90 | ch;
         let extracted_channel = note_on & 0x0F;
         assert_eq!(
-            extracted_channel, ch,
+            extracted_channel,
+            ch,
             "Channel {} extraction failed",
             ch + 1
         );
@@ -547,7 +562,8 @@ async fn test_midi_channel_mapping() {
             let byte = status | ch;
             let msg_type = byte & 0xF0;
             assert_eq!(
-                msg_type, status,
+                msg_type,
+                status,
                 "{} status extraction failed on ch {}",
                 name_str,
                 ch + 1

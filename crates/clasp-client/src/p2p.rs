@@ -260,7 +260,8 @@ impl P2PManager {
                             Err(e) => {
                                 // P2P send failed, fall back if allowed
                                 warn!("P2P send to {} failed: {}", peer_session_id, e);
-                                if self.config.auto_fallback && routing_mode != RoutingMode::P2POnly {
+                                if self.config.auto_fallback && routing_mode != RoutingMode::P2POnly
+                                {
                                     drop(connection);
                                     self.mark_p2p_failed(peer_session_id, &e.to_string());
                                     // Continue to relay fallback below
@@ -367,9 +368,15 @@ impl P2PManager {
         // Set up connection monitoring for offerer (before storing transport)
         let p2p_manager = Arc::clone(self);
         let peer_id = peer_session_id.to_string();
-        info!("Setting up connection callback for offerer to peer {}", peer_id);
+        info!(
+            "Setting up connection callback for offerer to peer {}",
+            peer_id
+        );
         transport.on_connection_ready(move || {
-            info!("Connection callback invoked for offerer to peer {}", peer_id);
+            info!(
+                "Connection callback invoked for offerer to peer {}",
+                peer_id
+            );
             let p2p = Arc::clone(&p2p_manager);
             let peer = peer_id.clone();
             tokio::spawn(async move {
@@ -387,7 +394,10 @@ impl P2PManager {
         let peer_id_ice = peer_session_id.to_string();
         let correlation_id_ice = correlation_id.clone();
         transport.on_ice_candidate(move |candidate_json| {
-            debug!("ICE candidate generated for offerer to peer {}: {}", peer_id_ice, candidate_json);
+            debug!(
+                "ICE candidate generated for offerer to peer {}: {}",
+                peer_id_ice, candidate_json
+            );
             let p2p = Arc::clone(&p2p_manager_ice);
             let peer = peer_id_ice.clone();
             let candidate = candidate_json.clone();
@@ -575,7 +585,12 @@ impl P2PManager {
     // =========================================================================
 
     #[cfg(feature = "p2p")]
-    async fn handle_offer(self: &Arc<Self>, from: &str, sdp: &str, correlation_id: &str) -> Result<()> {
+    async fn handle_offer(
+        self: &Arc<Self>,
+        from: &str,
+        sdp: &str,
+        correlation_id: &str,
+    ) -> Result<()> {
         let our_session_id = self.session_id().ok_or(ClientError::NotConnected)?;
 
         info!("Received P2P offer from {}", from);
@@ -594,9 +609,15 @@ impl P2PManager {
         // Set up connection monitoring for answerer (before storing transport)
         let p2p_manager = Arc::clone(self);
         let peer_id = from.to_string();
-        info!("Setting up connection callback for answerer from peer {}", peer_id);
+        info!(
+            "Setting up connection callback for answerer from peer {}",
+            peer_id
+        );
         transport.on_connection_ready(move || {
-            info!("Connection callback invoked for answerer from peer {}", peer_id);
+            info!(
+                "Connection callback invoked for answerer from peer {}",
+                peer_id
+            );
             let p2p = Arc::clone(&p2p_manager);
             let peer = peer_id.clone();
             tokio::spawn(async move {
@@ -614,7 +635,10 @@ impl P2PManager {
         let peer_id_ice = from.to_string();
         let correlation_id_ice = correlation_id.to_string();
         transport.on_ice_candidate(move |candidate_json| {
-            debug!("ICE candidate generated for answerer from peer {}: {}", peer_id_ice, candidate_json);
+            debug!(
+                "ICE candidate generated for answerer from peer {}: {}",
+                peer_id_ice, candidate_json
+            );
             let p2p = Arc::clone(&p2p_manager_ice);
             let peer = peer_id_ice.clone();
             let candidate = candidate_json.clone();

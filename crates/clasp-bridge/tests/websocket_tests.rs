@@ -4,7 +4,9 @@
 //! - WebSocket -> CLASP message translation (JSON text)
 //! - CLASP -> WebSocket JSON messages
 
-use clasp_bridge::{Bridge, BridgeEvent, WebSocketBridge, WebSocketBridgeConfig, WsMessageFormat, WsMode};
+use clasp_bridge::{
+    Bridge, BridgeEvent, WebSocketBridge, WebSocketBridgeConfig, WsMessageFormat, WsMode,
+};
 use clasp_core::{Message, SetMessage, Value};
 use clasp_test_utils::find_available_port;
 use futures::{SinkExt, StreamExt};
@@ -34,7 +36,9 @@ async fn test_websocket_text_to_clasp_set() {
 
     // Connect WebSocket client
     let url = format!("ws://{}", addr);
-    let (mut ws_stream, _) = connect_async(&url).await.expect("Failed to connect WebSocket client");
+    let (mut ws_stream, _) = connect_async(&url)
+        .await
+        .expect("Failed to connect WebSocket client");
 
     // Send JSON message
     let json = serde_json::json!({
@@ -64,7 +68,11 @@ async fn test_websocket_text_to_clasp_set() {
     bridge.stop().await.expect("Failed to stop bridge");
 
     let set = received_set.expect("Did not receive SET from WebSocket bridge");
-    assert_eq!(set.address, "/ws/test/value", "Wrong address: {}", set.address);
+    assert_eq!(
+        set.address, "/ws/test/value",
+        "Wrong address: {}",
+        set.address
+    );
 
     match set.value {
         Value::Int(v) => {
@@ -96,7 +104,9 @@ async fn test_clasp_set_to_websocket_json() {
     sleep(Duration::from_millis(100)).await;
 
     let url = format!("ws://{}", addr);
-    let (mut ws_stream, _) = connect_async(&url).await.expect("Failed to connect WebSocket client");
+    let (mut ws_stream, _) = connect_async(&url)
+        .await
+        .expect("Failed to connect WebSocket client");
 
     // Drain initial Connected event from bridge
     if let Some(_ev) = rx.recv().await {
@@ -112,7 +122,10 @@ async fn test_clasp_set_to_websocket_json() {
         unlock: false,
     });
 
-    bridge.send(msg).await.expect("Failed to send CLASP message");
+    bridge
+        .send(msg)
+        .await
+        .expect("Failed to send CLASP message");
 
     // Wait for WebSocket message
     let deadline = Instant::now() + Duration::from_secs(2);

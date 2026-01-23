@@ -155,7 +155,8 @@ async fn test_quic_client_server_connect() {
     let (cert, key) = generate_self_signed_cert();
 
     // Create server
-    let server = QuicTransport::new_server(addr, cert, key).expect("Server creation should succeed");
+    let server =
+        QuicTransport::new_server(addr, cert, key).expect("Server creation should succeed");
 
     // Create client
     let client = QuicTransport::new_client().expect("Client creation should succeed");
@@ -202,7 +203,8 @@ async fn test_quic_bidirectional_stream() {
 
     let (cert, key) = generate_self_signed_cert();
 
-    let server = QuicTransport::new_server(addr, cert, key).expect("Server creation should succeed");
+    let server =
+        QuicTransport::new_server(addr, cert, key).expect("Server creation should succeed");
 
     let client = QuicTransport::new_client().expect("Client creation should succeed");
 

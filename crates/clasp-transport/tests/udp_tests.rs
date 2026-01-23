@@ -22,9 +22,7 @@ async fn test_udp_bind_default() {
         .await
         .expect("Bind should succeed");
 
-    let addr = transport
-        .local_addr()
-        .expect("Should get local address");
+    let addr = transport.local_addr().expect("Should get local address");
 
     assert!(addr.port() > 0, "Port should be > 0");
 }
@@ -49,9 +47,7 @@ async fn test_udp_bind_with_config() {
 #[tokio::test]
 async fn test_udp_bind_specific_port() {
     // Find an available port
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
 
@@ -59,9 +55,7 @@ async fn test_udp_bind_specific_port() {
         .await
         .expect("Bind to specific port should succeed");
 
-    let addr = transport
-        .local_addr()
-        .expect("Should get local address");
+    let addr = transport.local_addr().expect("Should get local address");
 
     assert_eq!(addr.port(), port, "Should bind to the specified port");
 }

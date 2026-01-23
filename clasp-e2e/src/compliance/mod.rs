@@ -13,12 +13,12 @@
 //! - **Security**: Token validation, scope enforcement
 //! - **Encoding**: Binary frame format validation
 
+pub mod encoding;
 pub mod handshake;
 pub mod messages;
+pub mod security;
 pub mod state;
 pub mod subscription;
-pub mod security;
-pub mod encoding;
 
 use std::time::Duration;
 
@@ -116,10 +116,21 @@ impl ConformanceReport {
         println!();
 
         // Print by category
-        let categories = ["Handshake", "Messages", "State", "Subscription", "Security", "Encoding"];
+        let categories = [
+            "Handshake",
+            "Messages",
+            "State",
+            "Subscription",
+            "Security",
+            "Encoding",
+        ];
 
         for category in categories {
-            let cat_results: Vec<_> = self.results.iter().filter(|r| r.category == category).collect();
+            let cat_results: Vec<_> = self
+                .results
+                .iter()
+                .filter(|r| r.category == category)
+                .collect();
             if cat_results.is_empty() {
                 continue;
             }
@@ -131,7 +142,11 @@ impl ConformanceReport {
 
             for result in cat_results {
                 let status = if result.passed { "✓" } else { "✗" };
-                let error_msg = result.error.as_ref().map(|e| format!(" - {}", e)).unwrap_or_default();
+                let error_msg = result
+                    .error
+                    .as_ref()
+                    .map(|e| format!(" - {}", e))
+                    .unwrap_or_default();
                 println!("  {} {}{}", status, result.name, error_msg);
             }
             println!();
@@ -146,7 +161,10 @@ impl ConformanceReport {
                     "  ✗ [{}] {} - {}",
                     result.category,
                     result.name,
-                    result.error.as_ref().unwrap_or(&"Unknown error".to_string())
+                    result
+                        .error
+                        .as_ref()
+                        .unwrap_or(&"Unknown error".to_string())
                 );
             }
             println!();

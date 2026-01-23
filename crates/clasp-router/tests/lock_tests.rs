@@ -62,7 +62,10 @@ async fn test_lock_acquisition_and_denial() {
     sleep(Duration::from_millis(200)).await;
 
     let values = collector.values();
-    assert!(!values.is_empty(), "Should have observed values on /locks/value");
+    assert!(
+        !values.is_empty(),
+        "Should have observed values on /locks/value"
+    );
 
     let (_, last_val) = values.last().unwrap();
     match last_val {
@@ -267,7 +270,10 @@ async fn test_lock_race_condition() {
 
     // The value should be stable (either 1 or 2, but not changing)
     let values = collector.values();
-    assert!(!values.is_empty(), "Should have received at least one value");
+    assert!(
+        !values.is_empty(),
+        "Should have received at least one value"
+    );
 
     let (_, final_val) = values.last().unwrap();
     match final_val {
@@ -330,7 +336,10 @@ async fn test_lock_prevents_modification_by_others() {
     for i in 0..5 {
         // These should all fail or be ignored
         let _ = intruder
-            .set(&format!("/lock_test/param{}", i), Value::Int(100 + i as i64))
+            .set(
+                &format!("/lock_test/param{}", i),
+                Value::Int(100 + i as i64),
+            )
             .await;
     }
 

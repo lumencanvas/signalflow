@@ -89,10 +89,7 @@ async fn main() {
 
         // Exit with non-zero status if tests failed
         if report.failed > 0 {
-            println!(
-                "\n⚠️  {} test(s) failed - see details above",
-                report.failed
-            );
+            println!("\n⚠️  {} test(s) failed - see details above", report.failed);
             std::process::exit(1);
         } else {
             println!("\n✓ All conformance tests passed!");

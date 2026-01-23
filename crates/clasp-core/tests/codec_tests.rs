@@ -190,8 +190,8 @@ fn test_v3_set_message_size() {
     });
 
     let encoded = codec::encode(&msg).expect("encode failed");
-    
-        // Binary SET format: type(1) + flags(1) + addr_len(2) + addr(25) + value(9) = 38 bytes
+
+    // Binary SET format: type(1) + flags(1) + addr_len(2) + addr(25) + value(9) = 38 bytes
     // v2 MessagePack: ~69 bytes due to named keys
     // Target: < 50 bytes for typical SET message
     assert!(
@@ -311,14 +311,14 @@ fn test_v3_benchmark_set_encoding() {
 
     let iterations = 100_000;
     let start = Instant::now();
-    
+
     for _ in 0..iterations {
         let _ = codec::encode(&msg).expect("encode failed");
     }
-    
+
     let elapsed = start.elapsed();
     let per_msg_ns = elapsed.as_nanos() / iterations as u128;
-    
+
     // Target: < 2000ns per message (0.5M msg/s) in debug builds
     // Release builds should achieve < 200ns (5M+ msg/s)
     assert!(
@@ -326,7 +326,7 @@ fn test_v3_benchmark_set_encoding() {
         "Binary SET encoding should be < 2000ns (debug), got {}ns",
         per_msg_ns
     );
-    
+
     let msgs_per_sec = 1_000_000_000 / per_msg_ns;
     println!(
         "Binary SET encoding: {}ns/msg = {:.2} million msg/s",
@@ -337,11 +337,11 @@ fn test_v3_benchmark_set_encoding() {
     // Decode benchmark
     let encoded = codec::encode(&msg).expect("encode failed");
     let start = Instant::now();
-    
+
     for _ in 0..iterations {
         let _ = codec::decode(&encoded).expect("decode failed");
     }
-    
+
     let elapsed = start.elapsed();
     let per_msg_ns = elapsed.as_nanos() / iterations as u128;
     let msgs_per_sec = 1_000_000_000 / per_msg_ns;
@@ -521,7 +521,12 @@ fn test_gesture_all_phases_roundtrip() {
 
         match decoded {
             Message::Publish(pub_msg) => {
-                assert_eq!(pub_msg.phase, Some(*phase), "Phase mismatch for {:?}", phase);
+                assert_eq!(
+                    pub_msg.phase,
+                    Some(*phase),
+                    "Phase mismatch for {:?}",
+                    phase
+                );
                 assert_eq!(pub_msg.id, Some(42));
             }
             _ => panic!("Expected Publish message"),
@@ -551,7 +556,12 @@ fn test_gesture_different_ids() {
 
         match decoded {
             Message::Publish(pub_msg) => {
-                assert_eq!(pub_msg.id, Some(gesture_id), "ID mismatch for {}", gesture_id);
+                assert_eq!(
+                    pub_msg.id,
+                    Some(gesture_id),
+                    "ID mismatch for {}",
+                    gesture_id
+                );
             }
             _ => panic!("Expected Publish message"),
         }
@@ -665,7 +675,7 @@ fn test_encode_decode_timeline_publish() {
         Message::Publish(pub_msg) => {
             assert_eq!(pub_msg.address, "/lights/dimmer");
             assert_eq!(pub_msg.signal, Some(SignalType::Timeline));
-            // Note: timeline data is encoded in payload via MessagePack, 
+            // Note: timeline data is encoded in payload via MessagePack,
             // so we check timestamp is preserved
             assert_eq!(pub_msg.timestamp, Some(1704067200));
         }

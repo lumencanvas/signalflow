@@ -71,16 +71,8 @@ async fn test_artnet_dmx_packet_generation() {
     assert_eq!(&bytes[0..8], b"Art-Net\0", "Invalid Art-Net header");
 
     // OpCode for ArtDmx is 0x5000 (little-endian: 0x00, 0x50)
-    assert_eq!(
-        bytes[8], 0x00,
-        "Invalid OpCode low byte: {:02X}",
-        bytes[8]
-    );
-    assert_eq!(
-        bytes[9], 0x50,
-        "Invalid OpCode high byte: {:02X}",
-        bytes[9]
-    );
+    assert_eq!(bytes[8], 0x00, "Invalid OpCode low byte: {:02X}", bytes[8]);
+    assert_eq!(bytes[9], 0x50, "Invalid OpCode high byte: {:02X}", bytes[9]);
 }
 
 /// Test: Art-Net Poll request
@@ -88,9 +80,7 @@ async fn test_artnet_dmx_packet_generation() {
 async fn test_artnet_poll_request() {
     let poll = Poll::default();
     let command = ArtCommand::Poll(poll);
-    let bytes = command
-        .into_buffer()
-        .expect("Failed to serialize ArtPoll");
+    let bytes = command.into_buffer().expect("Failed to serialize ArtPoll");
 
     // Parse it back
     let parsed = ArtCommand::from_buffer(&bytes).expect("Failed to parse ArtPoll");
@@ -255,8 +245,7 @@ async fn test_artnet_roundtrip() {
     let port = find_available_udp_port();
 
     // Create receiver
-    let receiver =
-        UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind receiver");
+    let receiver = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind receiver");
     receiver
         .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("Failed to set timeout");
@@ -287,24 +276,14 @@ async fn test_artnet_roundtrip() {
     let mut buf = [0u8; 2048];
     let (len, _) = receiver.recv_from(&mut buf).expect("Failed to receive");
 
-    let parsed =
-        ArtCommand::from_buffer(&buf[..len]).expect("Failed to parse received packet");
+    let parsed = ArtCommand::from_buffer(&buf[..len]).expect("Failed to parse received packet");
 
     match parsed {
         ArtCommand::Output(out) => {
             let data: &[u8] = &out.data;
-            assert_eq!(
-                data[0], 255,
-                "Channel 1 not preserved"
-            );
-            assert_eq!(
-                data[255], 128,
-                "Channel 256 not preserved"
-            );
-            assert_eq!(
-                data[511], 64,
-                "Channel 512 not preserved"
-            );
+            assert_eq!(data[0], 255, "Channel 1 not preserved");
+            assert_eq!(data[255], 128, "Channel 256 not preserved");
+            assert_eq!(data[511], 64, "Channel 512 not preserved");
         }
         _ => panic!("Expected Output command"),
     }

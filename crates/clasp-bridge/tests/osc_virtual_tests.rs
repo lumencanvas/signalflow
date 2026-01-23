@@ -216,12 +216,10 @@ async fn test_osc_blob_data() {
     } else {
         // Fall back to using decode_tcp which handles blobs better
         match rosc::decoder::decode_tcp(&packet) {
-            Ok((_, Some(OscPacket::Message(msg)))) => {
-                match &msg.args[0] {
-                    OscType::Blob(v) => assert_eq!(v, &blob_data),
-                    _ => panic!("Expected Blob argument"),
-                }
-            }
+            Ok((_, Some(OscPacket::Message(msg)))) => match &msg.args[0] {
+                OscType::Blob(v) => assert_eq!(v, &blob_data),
+                _ => panic!("Expected Blob argument"),
+            },
             _ => {
                 // The blob was encoded correctly, but decoding has issues
                 // Verify that encoding at least produces valid output

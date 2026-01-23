@@ -181,11 +181,7 @@ async fn test_multitouch_gestures() {
 
     let count = gesture_count.load(Ordering::SeqCst);
     // 3 touches * 3 phases = 9 gestures
-    assert!(
-        count >= 8,
-        "Only received {}/9 gesture messages",
-        count
-    );
+    assert!(count >= 8, "Only received {}/9 gesture messages", count);
 }
 
 /// Test: Gesture cancellation
@@ -228,11 +224,7 @@ async fn test_gesture_cancel() {
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let count = received_cancel.load(Ordering::SeqCst);
-    assert!(
-        count >= 3,
-        "Only received {}/3 messages",
-        count
-    );
+    assert!(count >= 3, "Only received {}/3 messages", count);
 }
 
 /// Test: High-frequency gesture moves

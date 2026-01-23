@@ -125,7 +125,7 @@ impl WebRtcTransport {
             // Check if channel is already open
             use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
             let is_already_open = reliable.ready_state() == RTCDataChannelState::Open;
-            
+
             if is_already_open {
                 // Channel already open, call callback immediately if set
                 if let Some(ref cb) = *callback.lock() {
@@ -235,19 +235,19 @@ impl WebRtcTransport {
             let is_reliable = label == "clasp-reliable";
             let callback = callback_clone.clone();
             let label_for_open = label.clone();
-            
+
             // Check if channel is already open
             use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
             let channel_for_check = channel.clone();
             let is_already_open = channel_for_check.ready_state() == RTCDataChannelState::Open;
-            
+
             if is_already_open && is_reliable {
                 // Channel already open, call callback immediately if set
                 if let Some(ref cb) = *callback.lock() {
                     cb();
                 }
             }
-            
+
             let channel_for_open = channel.clone();
             channel_for_open.on_open(Box::new(move || {
                 let tx = tx_open.clone();
@@ -278,7 +278,7 @@ impl WebRtcTransport {
                     let _ = tx.send(TransportEvent::Disconnected { reason: None }).await;
                 })
             }));
-            
+
             Box::pin(async {})
         }));
 
@@ -335,7 +335,7 @@ impl WebRtcTransport {
         F: Fn() + Send + Sync + 'static,
     {
         *self.connection_callback.lock() = Some(Box::new(callback));
-        
+
         // Check if reliable channel is already open and call callback immediately
         use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
         if let Some(ref channel) = *self.reliable_channel.lock() {
@@ -400,9 +400,9 @@ impl WebRtcTransport {
     pub async fn send_unreliable(&self, data: Bytes) -> Result<()> {
         let channel = self.unreliable_channel.lock();
         if let Some(ref dc) = *channel {
-            dc.send(&data)
-                .await
-                .map_err(|e| TransportError::SendFailed(format!("Unreliable send failed: {}", e)))?;
+            dc.send(&data).await.map_err(|e| {
+                TransportError::SendFailed(format!("Unreliable send failed: {}", e))
+            })?;
             Ok(())
         } else {
             Err(TransportError::NotConnected)

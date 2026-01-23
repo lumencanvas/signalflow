@@ -17,14 +17,22 @@
 //! - 505: Protocol Version Not Supported
 
 use bytes::Bytes;
-use clasp_core::{codec, ErrorMessage, HelloMessage, Message, SetMessage, SubscribeMessage, Value, PROTOCOL_VERSION};
+use clasp_core::{
+    codec, ErrorMessage, HelloMessage, Message, SetMessage, SubscribeMessage, Value,
+    PROTOCOL_VERSION,
+};
 use clasp_test_utils::TestRouter;
-use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
+use clasp_transport::{
+    Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
+};
 use std::time::Duration;
 use tokio::time::timeout;
 
 /// Helper to receive the next data message, skipping Connected events
-async fn recv_message(receiver: &mut impl TransportReceiver, max_wait: Duration) -> Option<Message> {
+async fn recv_message(
+    receiver: &mut impl TransportReceiver,
+    max_wait: Duration,
+) -> Option<Message> {
     let deadline = tokio::time::Instant::now() + max_wait;
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
@@ -639,7 +647,7 @@ async fn test_unauthorized_write_to_locked_address_returns_error_403() {
         address: "/locked/value".to_string(),
         value: Value::Int(100),
         revision: None,
-        lock: true,  // Acquire lock
+        lock: true, // Acquire lock
         unlock: false,
     });
     owner_sender
@@ -697,7 +705,10 @@ async fn test_unauthorized_write_to_locked_address_returns_error_403() {
             eprintln!("Note: Server silently ignored write to locked address");
         }
         Some(other) => {
-            panic!("Unexpected response to locked address write: {:?}", std::mem::discriminant(&other));
+            panic!(
+                "Unexpected response to locked address write: {:?}",
+                std::mem::discriminant(&other)
+            );
         }
     }
 }
@@ -718,8 +729,8 @@ async fn test_subscribe_invalid_pattern_returns_error_400() {
 
     // Try to subscribe with invalid patterns
     let invalid_patterns = vec![
-        "",                    // Empty pattern
-        "no/leading/slash",    // Missing leading slash
+        "",                 // Empty pattern
+        "no/leading/slash", // Missing leading slash
     ];
 
     for pattern in invalid_patterns {
@@ -746,7 +757,10 @@ async fn test_subscribe_invalid_pattern_returns_error_400() {
             }
             Some(Message::Ack(_)) => {
                 // Some servers may accept unusual patterns (permissive mode)
-                eprintln!("Note: Server accepted pattern '{}' (permissive mode)", pattern);
+                eprintln!(
+                    "Note: Server accepted pattern '{}' (permissive mode)",
+                    pattern
+                );
             }
             None => {
                 // Timeout - acceptable

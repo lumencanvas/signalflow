@@ -165,11 +165,7 @@ async fn test_value_int_encoding(_config: &ConformanceConfig, report: &mut Confo
                 Message::Set(s) => match s.value {
                     Value::Int(v) => {
                         if v != val {
-                            return Err(anyhow::anyhow!(
-                                "Int {} encoded/decoded as {}",
-                                val,
-                                v
-                            ));
+                            return Err(anyhow::anyhow!("Int {} encoded/decoded as {}", val, v));
                         }
                     }
                     _ => return Err(anyhow::anyhow!("Int became different type")),
@@ -224,11 +220,7 @@ async fn test_value_float_encoding(_config: &ConformanceConfig, report: &mut Con
                 Message::Set(s) => match s.value {
                     Value::Float(v) => {
                         if (v - val).abs() > f64::EPSILON {
-                            return Err(anyhow::anyhow!(
-                                "Float {} encoded/decoded as {}",
-                                val,
-                                v
-                            ));
+                            return Err(anyhow::anyhow!("Float {} encoded/decoded as {}", val, v));
                         }
                     }
                     _ => return Err(anyhow::anyhow!("Float became different type")),
@@ -331,11 +323,7 @@ async fn test_value_bool_encoding(_config: &ConformanceConfig, report: &mut Conf
                 Message::Set(s) => match s.value {
                     Value::Bool(v) => {
                         if v != val {
-                            return Err(anyhow::anyhow!(
-                                "Bool {} encoded/decoded as {}",
-                                val,
-                                v
-                            ));
+                            return Err(anyhow::anyhow!("Bool {} encoded/decoded as {}", val, v));
                         }
                     }
                     _ => return Err(anyhow::anyhow!("Bool became different type")),

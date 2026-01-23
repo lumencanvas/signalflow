@@ -82,14 +82,25 @@ mod tests {
         let client = RendezvousClient::new(&format!("http://{}", addr));
 
         // Register devices with different tags
-        client.register(make_test_device("Studio1", "studio")).await.unwrap();
-        client.register(make_test_device("Live1", "live")).await.unwrap();
-        client.register(make_test_device("Studio2", "studio")).await.unwrap();
+        client
+            .register(make_test_device("Studio1", "studio"))
+            .await
+            .unwrap();
+        client
+            .register(make_test_device("Live1", "live"))
+            .await
+            .unwrap();
+        client
+            .register(make_test_device("Studio2", "studio"))
+            .await
+            .unwrap();
 
         // Discover by tag
         let studio_devices = client.discover(Some("studio")).await.unwrap();
         assert_eq!(studio_devices.len(), 2);
-        assert!(studio_devices.iter().all(|d| d.tags.contains(&"studio".to_string())));
+        assert!(studio_devices
+            .iter()
+            .all(|d| d.tags.contains(&"studio".to_string())));
 
         let live_devices = client.discover(Some("live")).await.unwrap();
         assert_eq!(live_devices.len(), 1);
@@ -115,7 +126,10 @@ mod tests {
         let client = RendezvousClient::new(&format!("http://{}", addr));
 
         // Register
-        let response = client.register(make_test_device("Device1", "test")).await.unwrap();
+        let response = client
+            .register(make_test_device("Device1", "test"))
+            .await
+            .unwrap();
         let device_id = response.id;
 
         // Should be discoverable
@@ -154,7 +168,10 @@ mod tests {
         let client = RendezvousClient::new(&format!("http://{}", addr));
 
         // Register
-        let response = client.register(make_test_device("Device1", "test")).await.unwrap();
+        let response = client
+            .register(make_test_device("Device1", "test"))
+            .await
+            .unwrap();
         let device_id = response.id;
 
         // Refresh
@@ -193,9 +210,7 @@ mod tests {
         for i in 0..10 {
             let client = RendezvousClient::new(&format!("http://{}", addr));
             let device = make_test_device(&format!("Device{}", i), "test");
-            handles.push(tokio::spawn(async move {
-                client.register(device).await
-            }));
+            handles.push(tokio::spawn(async move { client.register(device).await }));
         }
 
         let results = futures::future::join_all(handles).await;
@@ -233,7 +248,10 @@ mod tests {
         let client = RendezvousClient::new(&format!("http://{}", addr));
 
         // Register
-        client.register(make_test_device("Device1", "test")).await.unwrap();
+        client
+            .register(make_test_device("Device1", "test"))
+            .await
+            .unwrap();
 
         // Should be discoverable immediately
         let devices = client.discover(None).await.unwrap();
@@ -272,7 +290,10 @@ mod tests {
 
         // Register 10 devices (exceeds limit of 5)
         for i in 0..10 {
-            client.register(make_test_device(&format!("Device{}", i), "test")).await.unwrap();
+            client
+                .register(make_test_device(&format!("Device{}", i), "test"))
+                .await
+                .unwrap();
         }
 
         // Should only have 5 devices (oldest removed)
@@ -358,7 +379,10 @@ mod tests {
 
         // Register 10 devices
         for i in 0..10 {
-            client.register(make_test_device(&format!("Device{}", i), "test")).await.unwrap();
+            client
+                .register(make_test_device(&format!("Device{}", i), "test"))
+                .await
+                .unwrap();
         }
 
         // Discover with limit via query param
@@ -393,16 +417,17 @@ mod tests {
         // Register some devices
         let client = RendezvousClient::new(&format!("http://{}", addr));
         for i in 0..5 {
-            client.register(make_test_device(&format!("Device{}", i), "test")).await.unwrap();
+            client
+                .register(make_test_device(&format!("Device{}", i), "test"))
+                .await
+                .unwrap();
         }
 
         // Multiple clients discovering concurrently
         let mut handles = vec![];
         for _ in 0..10 {
             let client = RendezvousClient::new(&format!("http://{}", addr));
-            handles.push(tokio::spawn(async move {
-                client.discover(None).await
-            }));
+            handles.push(tokio::spawn(async move { client.discover(None).await }));
         }
 
         let results = futures::future::join_all(handles).await;
@@ -432,16 +457,26 @@ mod tests {
 
         // Register with metadata
         let mut registration = make_test_device("Device1", "test");
-        registration.metadata.insert("version".to_string(), "1.0.0".to_string());
-        registration.metadata.insert("platform".to_string(), "macos".to_string());
+        registration
+            .metadata
+            .insert("version".to_string(), "1.0.0".to_string());
+        registration
+            .metadata
+            .insert("platform".to_string(), "macos".to_string());
 
         client.register(registration).await.unwrap();
 
         // Discover and verify metadata
         let devices = client.discover(None).await.unwrap();
         assert_eq!(devices.len(), 1);
-        assert_eq!(devices[0].metadata.get("version"), Some(&"1.0.0".to_string()));
-        assert_eq!(devices[0].metadata.get("platform"), Some(&"macos".to_string()));
+        assert_eq!(
+            devices[0].metadata.get("version"),
+            Some(&"1.0.0".to_string())
+        );
+        assert_eq!(
+            devices[0].metadata.get("platform"),
+            Some(&"macos".to_string())
+        );
 
         server_handle.abort();
     }

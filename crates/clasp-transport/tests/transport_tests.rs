@@ -185,10 +185,7 @@ async fn test_roundtrip_encode_decode() {
                 assert_eq!(o.address, d.address, "SET address mismatch");
             }
             _ => {
-                panic!(
-                    "Message type mismatch: {:?} vs {:?}",
-                    original, decoded
-                );
+                panic!("Message type mismatch: {:?} vs {:?}", original, decoded);
             }
         }
     }

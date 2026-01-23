@@ -35,20 +35,20 @@ async fn main() {
     {
         // Test 1: P2P connection establishment
         test_p2p_connection_establishment().await;
-        
+
         // Test 2: ICE candidate exchange
         test_ice_candidate_exchange().await;
-        
+
         // Test 3: Connection state transitions
         test_connection_state_transitions().await;
-        
+
         // Test 4: Multiple P2P connections
         test_multiple_p2p_connections().await;
-        
+
         // Test 5: STUN server configuration
         test_stun_configuration().await;
     }
-    
+
     #[cfg(not(feature = "p2p"))]
     {
         println!("⚠️  P2P feature not enabled!");
@@ -64,10 +64,10 @@ async fn test_p2p_connection_establishment() {
     println!("┌──────────────────────────────────────────────────────────────────┐");
     println!("│ Test 1: P2P Connection Establishment                            │");
     println!("└──────────────────────────────────────────────────────────────────┘");
-    
+
     let port = find_port().await;
     let addr = format!("127.0.0.1:{}", port);
-    
+
     let router = Router::new(RouterConfig::default());
     let router_handle = {
         let addr = addr.clone();
@@ -75,11 +75,11 @@ async fn test_p2p_connection_establishment() {
             let _ = router.serve_websocket(&addr).await;
         })
     };
-    
+
     sleep(Duration::from_millis(100)).await;
-    
+
     let url = format!("ws://{}", addr);
-    
+
     // Connect two clients with P2P enabled
     let p2p_config = P2PConfig {
         ice_servers: vec![
@@ -88,7 +88,7 @@ async fn test_p2p_connection_establishment() {
         ],
         ..Default::default()
     };
-    
+
     let client_a = match Clasp::builder(&url)
         .name("ClientA")
         .p2p_config(p2p_config.clone())
@@ -102,7 +102,7 @@ async fn test_p2p_connection_establishment() {
             return;
         }
     };
-    
+
     let client_b = match Clasp::builder(&url)
         .name("ClientB")
         .p2p_config(p2p_config)
@@ -116,43 +116,44 @@ async fn test_p2p_connection_establishment() {
             return;
         }
     };
-    
+
     let session_a = client_a.session_id().unwrap();
     let session_b = client_b.session_id().unwrap();
-    
+
     println!("  Client A session: {}", session_a);
     println!("  Client B session: {}", session_b);
-    
+
     // Track connection state
     let connected = Arc::new(AtomicBool::new(false));
     let connection_failed = Arc::new(AtomicBool::new(false));
     let connected_clone = connected.clone();
     let failed_clone = connection_failed.clone();
-    
+
     // Set up P2P event handler for client B
-    client_b.on_p2p_event(move |event| {
-        match event {
-            P2PEvent::Connected { peer_session_id } => {
-                if peer_session_id == session_a {
-                    connected_clone.store(true, Ordering::SeqCst);
-                }
+    client_b.on_p2p_event(move |event| match event {
+        P2PEvent::Connected { peer_session_id } => {
+            if peer_session_id == session_a {
+                connected_clone.store(true, Ordering::SeqCst);
             }
-            P2PEvent::ConnectionFailed { peer_session_id, reason } => {
-                if peer_session_id == session_a {
-                    eprintln!("  Connection failed: {}", reason);
-                    failed_clone.store(true, Ordering::SeqCst);
-                }
-            }
-            _ => {}
         }
+        P2PEvent::ConnectionFailed {
+            peer_session_id,
+            reason,
+        } => {
+            if peer_session_id == session_a {
+                eprintln!("  Connection failed: {}", reason);
+                failed_clone.store(true, Ordering::SeqCst);
+            }
+        }
+        _ => {}
     });
-    
+
     // Wait for P2P announcements to propagate
     sleep(Duration::from_millis(200)).await;
-    
+
     // Client A initiates P2P connection
     let start = Instant::now();
-    
+
     match client_a.connect_to_peer(&session_b).await {
         Ok(_) => {
             println!("  ✅ P2P connection initiated");
@@ -163,7 +164,7 @@ async fn test_p2p_connection_establishment() {
             return;
         }
     }
-    
+
     // Wait for connection to be established (up to 10 seconds)
     let deadline = start + Duration::from_secs(10);
     while Instant::now() < deadline {
@@ -181,7 +182,9 @@ async fn test_p2p_connection_establishment() {
             println!("  Client B sees A as connected: {}", b_sees_a);
 
             if !a_sees_b || !b_sees_a {
-                println!("  ⚠️  Warning: is_peer_connected() did not report both peers as connected");
+                println!(
+                    "  ⚠️  Warning: is_peer_connected() did not report both peers as connected"
+                );
             }
 
             router_handle.abort();
@@ -195,7 +198,7 @@ async fn test_p2p_connection_establishment() {
         }
         sleep(Duration::from_millis(100)).await;
     }
-    
+
     router_handle.abort();
     println!("  ❌ FAIL: P2P connection timeout (10s)");
     println!("  ⚠️  This may indicate:");
@@ -222,10 +225,10 @@ async fn test_connection_state_transitions() {
     println!("┌──────────────────────────────────────────────────────────────────┐");
     println!("│ Test 3: Connection State Transitions                             │");
     println!("└──────────────────────────────────────────────────────────────────┘");
-    
+
     let port = find_port().await;
     let addr = format!("127.0.0.1:{}", port);
-    
+
     let router = Router::new(RouterConfig::default());
     let router_handle = {
         let addr = addr.clone();
@@ -233,69 +236,68 @@ async fn test_connection_state_transitions() {
             let _ = router.serve_websocket(&addr).await;
         })
     };
-    
+
     sleep(Duration::from_millis(100)).await;
-    
+
     let url = format!("ws://{}", addr);
-    
+
     let p2p_config = P2PConfig {
-        ice_servers: vec![
-            "stun:stun.l.google.com:19302".to_string(),
-        ],
+        ice_servers: vec!["stun:stun.l.google.com:19302".to_string()],
         ..Default::default()
     };
-    
+
     let client_a = Clasp::builder(&url)
         .name("ClientA")
         .p2p_config(p2p_config.clone())
         .connect()
         .await
         .unwrap();
-    
+
     let client_b = Clasp::builder(&url)
         .name("ClientB")
         .p2p_config(p2p_config)
         .connect()
         .await
         .unwrap();
-    
+
     let session_b = client_b.session_id().unwrap();
-    
+
     // Track state transitions
     let states_seen = Arc::new(std::sync::Mutex::new(Vec::new()));
     let states_clone = states_seen.clone();
-    
-    client_b.on_p2p_event(move |event| {
-        match event {
-            P2PEvent::Connected { .. } => {
-                states_clone.lock().unwrap().push("Connected".to_string());
-            }
-            P2PEvent::ConnectionFailed { .. } => {
-                states_clone.lock().unwrap().push("Failed".to_string());
-            }
-            P2PEvent::Disconnected { .. } => {
-                states_clone.lock().unwrap().push("Disconnected".to_string());
-            }
-            _ => {}
+
+    client_b.on_p2p_event(move |event| match event {
+        P2PEvent::Connected { .. } => {
+            states_clone.lock().unwrap().push("Connected".to_string());
         }
+        P2PEvent::ConnectionFailed { .. } => {
+            states_clone.lock().unwrap().push("Failed".to_string());
+        }
+        P2PEvent::Disconnected { .. } => {
+            states_clone
+                .lock()
+                .unwrap()
+                .push("Disconnected".to_string());
+        }
+        _ => {}
     });
-    
+
     sleep(Duration::from_millis(200)).await;
-    
+
     client_a.connect_to_peer(&session_b).await.unwrap();
-    
+
     // Wait for connection
     sleep(Duration::from_secs(5)).await;
-    
+
     let states = states_seen.lock().unwrap();
     println!("  States seen: {:?}", *states);
-    
+
     if states.contains(&"Connected".to_string()) {
         println!("  ✅ PASS: Connection state transitions working");
     } else {
         println!("  ⚠️  No Connected state seen (connection may have failed)");
     }
-    
+
     router_handle.abort();
     println!();
 }
@@ -306,10 +308,10 @@ async fn test_multiple_p2p_connections() {
     println!("┌──────────────────────────────────────────────────────────────────┐");
     println!("│ Test 4: Multiple P2P Connections                                 │");
     println!("└──────────────────────────────────────────────────────────────────┘");
-    
+
     let port = find_port().await;
     let addr = format!("127.0.0.1:{}", port);
-    
+
     let router = Router::new(RouterConfig::default());
     let router_handle = {
         let addr = addr.clone();
@@ -317,18 +319,16 @@ async fn test_multiple_p2p_connections() {
             let _ = router.serve_websocket(&addr).await;
         })
     };
-    
+
     sleep(Duration::from_millis(100)).await;
-    
+
     let url = format!("ws://{}", addr);
-    
+
     let p2p_config = P2PConfig {
-        ice_servers: vec![
-            "stun:stun.l.google.com:19302".to_string(),
-        ],
+        ice_servers: vec!["stun:stun.l.google.com:19302".to_string()],
         ..Default::default()
     };
-    
+
     // Create 3 clients
     let client_a = Clasp::builder(&url)
         .name("ClientA")
@@ -336,28 +336,28 @@ async fn test_multiple_p2p_connections() {
         .connect()
         .await
         .unwrap();
-    
+
     let client_b = Clasp::builder(&url)
         .name("ClientB")
         .p2p_config(p2p_config.clone())
         .connect()
         .await
         .unwrap();
-    
+
     let client_c = Clasp::builder(&url)
         .name("ClientC")
         .p2p_config(p2p_config)
         .connect()
         .await
         .unwrap();
-    
+
     let session_b = client_b.session_id().unwrap();
     let session_c = client_c.session_id().unwrap();
-    
+
     // Track connections
     let connections = Arc::new(AtomicU64::new(0));
     let conn_clone = connections.clone();
-    
+
     client_b.on_p2p_event({
         let conn_clone = conn_clone.clone();
         move |event| {
@@ -366,7 +366,7 @@ async fn test_multiple_p2p_connections() {
             }
         }
     });
-    
+
     client_c.on_p2p_event({
         let conn_clone = conn_clone.clone();
         move |event| {
@@ -375,25 +375,28 @@ async fn test_multiple_p2p_connections() {
             }
         }
     });
-    
+
     sleep(Duration::from_millis(200)).await;
-    
+
     // Client A connects to both B and C
     client_a.connect_to_peer(&session_b).await.unwrap();
     client_a.connect_to_peer(&session_c).await.unwrap();
-    
+
     // Wait for connections
     sleep(Duration::from_secs(5)).await;
-    
+
     let conn_count = connections.load(Ordering::SeqCst);
     println!("  Connections established: {}", conn_count);
-    
+
     if conn_count >= 2 {
         println!("  ✅ PASS: Multiple P2P connections working");
     } else {
-        println!("  ⚠️  Only {} connections established (expected 2)", conn_count);
+        println!(
+            "  ⚠️  Only {} connections established (expected 2)",
+            conn_count
+        );
     }
-    
+
     router_handle.abort();
     println!();
 }
@@ -404,7 +407,7 @@ async fn test_stun_configuration() {
     println!("┌──────────────────────────────────────────────────────────────────┐");
     println!("│ Test 5: STUN Server Configuration                                │");
     println!("└──────────────────────────────────────────────────────────────────┘");
-    
+
     let p2p_config = P2PConfig {
         ice_servers: vec![
             "stun:stun.l.google.com:19302".to_string(),
@@ -412,11 +415,14 @@ async fn test_stun_configuration() {
         ],
         ..Default::default()
     };
-    
-    println!("  STUN servers configured: {}", p2p_config.ice_servers.len());
+
+    println!(
+        "  STUN servers configured: {}",
+        p2p_config.ice_servers.len()
+    );
     for server in &p2p_config.ice_servers {
         println!("    - {}", server);
     }
-    
+
     println!("  ✅ PASS: STUN configuration verified\n");
 }

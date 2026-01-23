@@ -32,11 +32,8 @@ fn is_broker_available() -> bool {
     env::var("CLASP_TEST_BROKERS")
         .map(|v| v == "1" || v.to_lowercase() == "true")
         .unwrap_or(false)
-        || TcpStream::connect_timeout(
-            &"127.0.0.1:1883".parse().unwrap(),
-            Duration::from_secs(2),
-        )
-        .is_ok()
+        || TcpStream::connect_timeout(&"127.0.0.1:1883".parse().unwrap(), Duration::from_secs(2))
+            .is_ok()
 }
 
 /// Test environment that sets up router and MQTT bridge

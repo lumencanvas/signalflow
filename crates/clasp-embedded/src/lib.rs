@@ -150,24 +150,32 @@ impl Value {
 pub fn encode_value(buf: &mut [u8], value: &Value) -> usize {
     match value {
         Value::Null => {
-            if buf.is_empty() { return 0; }
+            if buf.is_empty() {
+                return 0;
+            }
             buf[0] = val::NULL;
             1
         }
         Value::Bool(b) => {
-            if buf.len() < 2 { return 0; }
+            if buf.len() < 2 {
+                return 0;
+            }
             buf[0] = val::BOOL;
             buf[1] = if *b { 1 } else { 0 };
             2
         }
         Value::Int(i) => {
-            if buf.len() < 9 { return 0; }
+            if buf.len() < 9 {
+                return 0;
+            }
             buf[0] = val::I64;
             buf[1..9].copy_from_slice(&i.to_be_bytes());
             9
         }
         Value::Float(f) => {
-            if buf.len() < 9 { return 0; }
+            if buf.len() < 9 {
+                return 0;
+            }
             buf[0] = val::F64;
             buf[1..9].copy_from_slice(&f.to_be_bytes());
             9
@@ -183,27 +191,41 @@ pub fn decode_value(buf: &[u8]) -> Option<(Value, usize)> {
     match buf[0] {
         val::NULL => Some((Value::Null, 1)),
         val::BOOL => {
-            if buf.len() < 2 { return None; }
+            if buf.len() < 2 {
+                return None;
+            }
             Some((Value::Bool(buf[1] != 0), 2))
         }
         val::I32 => {
-            if buf.len() < 5 { return None; }
+            if buf.len() < 5 {
+                return None;
+            }
             let i = i32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
             Some((Value::Int(i as i64), 5))
         }
         val::I64 => {
-            if buf.len() < 9 { return None; }
-            let i = i64::from_be_bytes([buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]]);
+            if buf.len() < 9 {
+                return None;
+            }
+            let i = i64::from_be_bytes([
+                buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8],
+            ]);
             Some((Value::Int(i), 9))
         }
         val::F32 => {
-            if buf.len() < 5 { return None; }
+            if buf.len() < 5 {
+                return None;
+            }
             let f = f32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
             Some((Value::Float(f as f64), 5))
         }
         val::F64 => {
-            if buf.len() < 9 { return None; }
-            let f = f64::from_be_bytes([buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8]]);
+            if buf.len() < 9 {
+                return None;
+            }
+            let f = f64::from_be_bytes([
+                buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8],
+            ]);
             Some((Value::Float(f), 9))
         }
         _ => None,
@@ -259,17 +281,23 @@ fn encode_value_data(buf: &mut [u8], value: &Value) -> usize {
     match value {
         Value::Null => 0,
         Value::Bool(b) => {
-            if buf.is_empty() { return 0; }
+            if buf.is_empty() {
+                return 0;
+            }
             buf[0] = if *b { 1 } else { 0 };
             1
         }
         Value::Int(i) => {
-            if buf.len() < 8 { return 0; }
+            if buf.len() < 8 {
+                return 0;
+            }
             buf[..8].copy_from_slice(&i.to_be_bytes());
             8
         }
         Value::Float(f) => {
-            if buf.len() < 8 { return 0; }
+            if buf.len() < 8 {
+                return 0;
+            }
             buf[..8].copy_from_slice(&f.to_be_bytes());
             8
         }
@@ -283,22 +311,22 @@ pub fn encode_set(buf: &mut [u8], address: &str, value: &Value) -> usize {
     if buf.len() < 2 {
         return 0;
     }
-    
+
     // Message type
     buf[0] = msg::SET;
-    
+
     // Flags: value type in lower 4 bits, no revision/lock/unlock
     let vtype = value_type_code(value);
     buf[1] = vtype & 0x0F;
-    
+
     let mut offset = 2;
-    
+
     // Address (length-prefixed)
     offset += encode_string(&mut buf[offset..], address);
-    
+
     // Value data only (type is in flags)
     offset += encode_value_data(&mut buf[offset..], value);
-    
+
     offset
 }
 
@@ -306,7 +334,7 @@ pub fn encode_set(buf: &mut [u8], address: &str, value: &Value) -> usize {
 pub fn encode_set_frame(buf: &mut [u8], address: &str, value: &Value) -> usize {
     let header_size = HEADER_SIZE;
     let payload_start = header_size;
-    
+
     let payload_len = encode_set(&mut buf[payload_start..], address, value);
     if payload_len == 0 {
         return 0;
@@ -323,23 +351,23 @@ pub fn encode_subscribe(buf: &mut [u8], pattern: &str) -> usize {
     }
     buf[0] = msg::SUBSCRIBE;
     let mut offset = 1;
-    
+
     // subscription id (u32)
     if buf.len() < offset + 4 {
         return 0;
     }
     buf[offset..offset + 4].copy_from_slice(&0u32.to_be_bytes());
     offset += 4;
-    
+
     // pattern
     offset += encode_string(&mut buf[offset..], pattern);
-    
+
     // signal types count (0 = all)
     if buf.len() > offset {
         buf[offset] = 0;
         offset += 1;
     }
-    
+
     offset
 }
 
@@ -363,25 +391,25 @@ pub fn encode_hello(buf: &mut [u8], name: &str) -> usize {
 
     // Message type
     buf[0] = msg::HELLO;
-    
+
     // Protocol version
     buf[1] = VERSION;
-    
+
     // Feature flags (all features supported)
     buf[2] = 0xF8; // param|event|stream|gesture|timeline
-    
+
     let mut offset = 3;
-    
+
     // Name
     offset += encode_string(&mut buf[offset..], name);
-    
+
     // Token (none)
     if buf.len() >= offset + 2 {
         buf[offset] = 0;
         buf[offset + 1] = 0;
         offset += 2;
     }
-    
+
     offset
 }
 
@@ -442,7 +470,7 @@ pub fn decode_message(payload: &[u8]) -> Option<Message<'_>> {
 
     let msg_type = payload[0];
     let data = &payload[1..];
-    
+
     match msg_type {
         msg::HELLO => {
             // HELLO format: version(1) + features(1) + name + token
@@ -462,8 +490,7 @@ pub fn decode_message(payload: &[u8]) -> Option<Message<'_>> {
             let _version = data[0];
             let _features = data[1];
             let _time = u64::from_be_bytes([
-                data[2], data[3], data[4], data[5],
-                data[6], data[7], data[8], data[9],
+                data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9],
             ]);
             let (session, _) = decode_string(&data[10..])?;
             Some(Message::Welcome { session })
@@ -477,35 +504,53 @@ pub fn decode_message(payload: &[u8]) -> Option<Message<'_>> {
             let flags = data[0];
             let vtype = flags & 0x0F;
             let _has_rev = (flags & 0x80) != 0;
-            
+
             let (address, offset) = decode_string(&data[1..])?;
             let value_data = &data[1 + offset..];
-            
+
             let value = match vtype {
                 val::NULL => Value::Null,
                 val::BOOL => {
-                    if value_data.is_empty() { return None; }
+                    if value_data.is_empty() {
+                        return None;
+                    }
                     Value::Bool(value_data[0] != 0)
                 }
                 val::I64 => {
-                    if value_data.len() < 8 { return None; }
+                    if value_data.len() < 8 {
+                        return None;
+                    }
                     let i = i64::from_be_bytes([
-                        value_data[0], value_data[1], value_data[2], value_data[3],
-                        value_data[4], value_data[5], value_data[6], value_data[7],
+                        value_data[0],
+                        value_data[1],
+                        value_data[2],
+                        value_data[3],
+                        value_data[4],
+                        value_data[5],
+                        value_data[6],
+                        value_data[7],
                     ]);
                     Value::Int(i)
                 }
                 val::F64 => {
-                    if value_data.len() < 8 { return None; }
+                    if value_data.len() < 8 {
+                        return None;
+                    }
                     let f = f64::from_be_bytes([
-                        value_data[0], value_data[1], value_data[2], value_data[3],
-                        value_data[4], value_data[5], value_data[6], value_data[7],
+                        value_data[0],
+                        value_data[1],
+                        value_data[2],
+                        value_data[3],
+                        value_data[4],
+                        value_data[5],
+                        value_data[6],
+                        value_data[7],
                     ]);
                     Value::Float(f)
                 }
                 _ => return None, // Unsupported type
             };
-            
+
             Some(Message::Set { address, value })
         }
         msg::SUBSCRIBE => {
@@ -573,7 +618,7 @@ impl CacheEntry {
     fn address(&self) -> &str {
         core::str::from_utf8(&self.address[..self.address_len as usize]).unwrap_or("")
     }
-    
+
     fn set_address(&mut self, addr: &str) {
         let bytes = addr.as_bytes();
         let len = bytes.len().min(MAX_ADDRESS_LEN);
@@ -591,16 +636,18 @@ pub struct StateCache {
 impl StateCache {
     pub const fn new() -> Self {
         Self {
-            entries: [const { CacheEntry {
-                address: [0; MAX_ADDRESS_LEN],
-                address_len: 0,
-                value: Value::Null,
-                valid: false,
-            } }; MAX_CACHE_ENTRIES],
+            entries: [const {
+                CacheEntry {
+                    address: [0; MAX_ADDRESS_LEN],
+                    address_len: 0,
+                    value: Value::Null,
+                    valid: false,
+                }
+            }; MAX_CACHE_ENTRIES],
             count: 0,
         }
     }
-    
+
     /// Get a cached value
     pub fn get(&self, address: &str) -> Option<Value> {
         for entry in &self.entries[..self.count] {
@@ -610,7 +657,7 @@ impl StateCache {
         }
         None
     }
-    
+
     /// Set a cached value
     pub fn set(&mut self, address: &str, value: Value) -> bool {
         // Update existing
@@ -620,7 +667,7 @@ impl StateCache {
                 return true;
             }
         }
-        
+
         // Add new
         if self.count < MAX_CACHE_ENTRIES {
             self.entries[self.count].set_address(address);
@@ -629,18 +676,18 @@ impl StateCache {
             self.count += 1;
             return true;
         }
-        
+
         false
     }
-    
+
     pub fn len(&self) -> usize {
         self.count
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.count == 0
     }
-    
+
     pub fn clear(&mut self) {
         for entry in &mut self.entries {
             entry.valid = false;
@@ -691,37 +738,37 @@ impl Client {
             rx_buf: [0; RX_BUF_SIZE],
         }
     }
-    
+
     /// Prepare HELLO frame
     pub fn prepare_hello(&mut self, name: &str) -> &[u8] {
         let n = encode_hello_frame(&mut self.tx_buf, name);
         &self.tx_buf[..n]
     }
-    
+
     /// Prepare SET frame
     pub fn prepare_set(&mut self, address: &str, value: Value) -> &[u8] {
         let n = encode_set_frame(&mut self.tx_buf, address, &value);
         &self.tx_buf[..n]
     }
-    
+
     /// Prepare SUBSCRIBE frame
     pub fn prepare_subscribe(&mut self, pattern: &str) -> &[u8] {
         let n = encode_subscribe_frame(&mut self.tx_buf, pattern);
         &self.tx_buf[..n]
     }
-    
+
     /// Prepare PING frame
     pub fn prepare_ping(&mut self) -> &[u8] {
         let n = encode_ping_frame(&mut self.tx_buf);
         &self.tx_buf[..n]
     }
-    
+
     /// Process received frame data
     pub fn process<'a>(&mut self, data: &'a [u8]) -> Option<Message<'a>> {
         let (_, payload_len) = decode_header(data)?;
         let payload = &data[HEADER_SIZE..HEADER_SIZE + payload_len];
         let msg = decode_message(payload)?;
-        
+
         match &msg {
             Message::Welcome { .. } => {
                 self.state = ClientState::Connected;
@@ -731,14 +778,14 @@ impl Client {
             }
             _ => {}
         }
-        
+
         Some(msg)
     }
-    
+
     pub fn is_connected(&self) -> bool {
         self.state == ClientState::Connected
     }
-    
+
     pub fn get_cached(&self, address: &str) -> Option<Value> {
         self.cache.get(address)
     }
@@ -965,9 +1012,7 @@ pub mod server {
                     self.state.set(address, value);
                     None // Broadcast handled separately via get_broadcast_targets
                 }
-                Message::Ping => {
-                    Some(self.prepare_pong())
-                }
+                Message::Ping => Some(self.prepare_pong()),
                 _ => None,
             }
         }
@@ -1099,34 +1144,34 @@ pub mod server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_encode_decode_value() {
         let mut buf = [0u8; 16];
-        
+
         // Float
         let n = encode_value(&mut buf, &Value::Float(3.14));
         assert_eq!(n, 9);
         let (v, consumed) = decode_value(&buf).unwrap();
         assert_eq!(consumed, 9);
         assert!((v.as_float().unwrap() - 3.14).abs() < 0.001);
-        
+
         // Int
         let n = encode_value(&mut buf, &Value::Int(-42));
         let (v, _) = decode_value(&buf).unwrap();
         assert_eq!(v.as_int(), Some(-42));
     }
-    
+
     #[test]
     fn test_encode_decode_set() {
         let mut buf = [0u8; 64];
         let n = encode_set_frame(&mut buf, "/test/value", &Value::Float(1.5));
         assert!(n > HEADER_SIZE);
-        
+
         let (_, payload_len) = decode_header(&buf).unwrap();
         let payload = &buf[HEADER_SIZE..HEADER_SIZE + payload_len];
         let msg = decode_message(payload).unwrap();
-        
+
         match msg {
             Message::Set { address, value } => {
                 assert_eq!(address, "/test/value");
@@ -1135,74 +1180,81 @@ mod tests {
             _ => panic!("Expected Set message"),
         }
     }
-    
+
     #[test]
     fn test_client_flow() {
         let mut client = Client::new();
         assert_eq!(client.state, ClientState::Disconnected);
-        
+
         // Prepare hello
         let hello = client.prepare_hello("ESP32");
         assert!(hello.len() > HEADER_SIZE);
-        
+
         // Simulate welcome response (binary format: type + version + features + time + session + name)
         let mut welcome_buf = [0u8; 64];
         let payload_start = HEADER_SIZE;
         let mut offset = payload_start;
-        
+
         // Message type
         welcome_buf[offset] = msg::WELCOME;
         offset += 1;
-        
+
         // Version
         welcome_buf[offset] = VERSION;
         offset += 1;
-        
+
         // Features flags
         welcome_buf[offset] = 0xF8;
         offset += 1;
-        
+
         // Server time (u64)
         welcome_buf[offset..offset + 8].copy_from_slice(&0u64.to_be_bytes());
         offset += 8;
-        
+
         // Session ID
         offset += encode_string(&mut welcome_buf[offset..], "session123");
-        
+
         // Server name
         offset += encode_string(&mut welcome_buf[offset..], "TestRouter");
-        
+
         encode_header(&mut welcome_buf, 0, offset - payload_start);
-        
+
         client.process(&welcome_buf[..offset]);
         assert_eq!(client.state, ClientState::Connected);
     }
-    
+
     #[test]
     fn test_state_cache() {
         let mut cache = StateCache::new();
-        
+
         cache.set("/sensor/temp", Value::Float(25.5));
         cache.set("/sensor/humidity", Value::Float(60.0));
-        
+
         assert_eq!(cache.get("/sensor/temp").unwrap().as_float(), Some(25.5));
-        assert_eq!(cache.get("/sensor/humidity").unwrap().as_float(), Some(60.0));
+        assert_eq!(
+            cache.get("/sensor/humidity").unwrap().as_float(),
+            Some(60.0)
+        );
         assert!(cache.get("/unknown").is_none());
     }
-    
+
     #[test]
     fn test_memory_size() {
         let client_size = core::mem::size_of::<Client>();
         let cache_size = core::mem::size_of::<StateCache>();
-        
+
         // Client should be under 4KB
-        assert!(client_size < 4096, "Client too large: {} bytes", client_size);
-        
+        assert!(
+            client_size < 4096,
+            "Client too large: {} bytes",
+            client_size
+        );
+
         // Total memory budget check
         let total = client_size + 1024; // + some working memory
         assert!(total < 8192, "Total too large: {} bytes", total);
     }
-    
+
     #[cfg(feature = "server")]
     #[test]
     fn test_mini_router() {
@@ -1211,7 +1263,10 @@ mod tests {
         let mut router = MiniRouter::new();
         router.set("/light/brightness", Value::Float(0.8));
 
-        assert_eq!(router.get("/light/brightness").unwrap().as_float(), Some(0.8));
+        assert_eq!(
+            router.get("/light/brightness").unwrap().as_float(),
+            Some(0.8)
+        );
     }
 
     #[cfg(feature = "server")]

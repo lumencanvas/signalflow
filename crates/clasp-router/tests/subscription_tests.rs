@@ -8,10 +8,12 @@
 //! - Multiple subscriptions per client
 //! - Subscription filtering by signal type
 
-use clasp_core::{codec, HelloMessage, Message, SetMessage, SubscribeMessage, UnsubscribeMessage, Value};
+use clasp_core::{
+    codec, HelloMessage, Message, SetMessage, SubscribeMessage, UnsubscribeMessage, Value,
+};
 use clasp_test_utils::TestRouter;
 use clasp_transport::{
-    websocket::{WebSocketSender, WebSocketReceiver},
+    websocket::{WebSocketReceiver, WebSocketSender},
     Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport,
 };
 use std::time::Duration;
@@ -21,10 +23,7 @@ use tokio::time::timeout;
 // Utilities
 // ============================================================================
 
-async fn connect_and_handshake(
-    url: &str,
-    name: &str,
-) -> (WebSocketSender, WebSocketReceiver) {
+async fn connect_and_handshake(url: &str, name: &str) -> (WebSocketSender, WebSocketReceiver) {
     let (sender, mut receiver) = WebSocketTransport::connect(url).await.unwrap();
 
     let hello = Message::Hello(HelloMessage {
@@ -90,7 +89,10 @@ async fn test_exact_match_subscription() {
         lock: false,
         unlock: false,
     });
-    pub_sender.send(codec::encode(&set1).unwrap()).await.unwrap();
+    pub_sender
+        .send(codec::encode(&set1).unwrap())
+        .await
+        .unwrap();
 
     // Publish to different path - should NOT match
     let set2 = Message::Set(SetMessage {
@@ -100,7 +102,10 @@ async fn test_exact_match_subscription() {
         lock: false,
         unlock: false,
     });
-    pub_sender.send(codec::encode(&set2).unwrap()).await.unwrap();
+    pub_sender
+        .send(codec::encode(&set2).unwrap())
+        .await
+        .unwrap();
 
     // Subscriber should only receive first message
     let msg1 = timeout(Duration::from_secs(1), async {
@@ -320,9 +325,7 @@ async fn test_unsubscribe() {
 
     // Unsubscribe
     sub_sender
-        .send(
-            codec::encode(&Message::Unsubscribe(UnsubscribeMessage { id: 1 })).unwrap(),
-        )
+        .send(codec::encode(&Message::Unsubscribe(UnsubscribeMessage { id: 1 })).unwrap())
         .await
         .unwrap();
 
@@ -357,7 +360,10 @@ async fn test_unsubscribe() {
     })
     .await;
 
-    assert!(msg2.is_err(), "Should NOT receive message after unsubscribe");
+    assert!(
+        msg2.is_err(),
+        "Should NOT receive message after unsubscribe"
+    );
 }
 
 #[tokio::test]
@@ -487,7 +493,10 @@ async fn test_subscription_initial_snapshot() {
     })
     .await;
 
-    assert!(found.is_ok(), "Did not receive snapshot with existing value");
+    assert!(
+        found.is_ok(),
+        "Did not receive snapshot with existing value"
+    );
 }
 
 #[tokio::test]

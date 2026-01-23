@@ -58,7 +58,10 @@ async fn find_port() -> u16 {
 }
 
 /// Measure memory per connection
-async fn measure_memory_per_connection(port: u16, connection_count: usize) -> Option<(u64, u64, f64)> {
+async fn measure_memory_per_connection(
+    port: u16,
+    connection_count: usize,
+) -> Option<(u64, u64, f64)> {
     let url = format!("ws://127.0.0.1:{}", port);
 
     // Measure baseline memory
@@ -100,7 +103,11 @@ async fn measure_memory_per_connection(port: u16, connection_count: usize) -> Op
 }
 
 /// Measure memory leak after disconnect/reconnect cycles
-async fn measure_memory_leak(port: u16, cycles: usize, connections_per_cycle: usize) -> Option<i64> {
+async fn measure_memory_leak(
+    port: u16,
+    cycles: usize,
+    connections_per_cycle: usize,
+) -> Option<i64> {
     let url = format!("ws://127.0.0.1:{}", port);
 
     // Baseline

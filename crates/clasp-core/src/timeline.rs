@@ -277,18 +277,14 @@ fn bezier_derivative(t: f64, p1: f64, p2: f64) -> f64 {
 fn interpolate_value(a: &Value, b: &Value, t: f64) -> Value {
     match (a, b) {
         (Value::Float(a), Value::Float(b)) => Value::Float(a + (b - a) * t),
-        (Value::Int(a), Value::Int(b)) => {
-            Value::Int(*a + ((*b - *a) as f64 * t) as i64)
-        }
-        (Value::Array(arr_a), Value::Array(arr_b)) if arr_a.len() == arr_b.len() => {
-            Value::Array(
-                arr_a
-                    .iter()
-                    .zip(arr_b.iter())
-                    .map(|(a, b)| interpolate_value(a, b, t))
-                    .collect(),
-            )
-        }
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a + ((*b - *a) as f64 * t) as i64),
+        (Value::Array(arr_a), Value::Array(arr_b)) if arr_a.len() == arr_b.len() => Value::Array(
+            arr_a
+                .iter()
+                .zip(arr_b.iter())
+                .map(|(a, b)| interpolate_value(a, b, t))
+                .collect(),
+        ),
         // For non-interpolatable values, use step at 0.5
         _ => {
             if t < 0.5 {

@@ -10,8 +10,8 @@
 use clasp_client::Clasp;
 use clasp_core::{codec, Message, SecurityMode, SetMessage, Value as CoreValue};
 use clasp_embedded::{
-    self, decode_message, encode_hello_frame, encode_ping_frame, encode_set_frame,
-    Client, Message as EmbeddedMessage, Value, HEADER_SIZE,
+    self, decode_message, encode_hello_frame, encode_ping_frame, encode_set_frame, Client,
+    Message as EmbeddedMessage, Value, HEADER_SIZE,
 };
 use clasp_router::{Router, RouterConfig};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,7 +113,10 @@ fn test_decoding_compatibility() {
     let (flags, payload_len) = clasp_embedded::decode_header(&encoded).unwrap();
     // Flags may vary (QoS, version bits) - just check we got something
     assert!(payload_len > 0);
-    println!("  ✓ Header decoded: flags=0x{:02x}, len={}", flags, payload_len);
+    println!(
+        "  ✓ Header decoded: flags=0x{:02x}, len={}",
+        flags, payload_len
+    );
 
     // Decode message with embedded
     let payload = &encoded[HEADER_SIZE..HEADER_SIZE + payload_len];
@@ -165,7 +168,9 @@ fn test_state_cache() {
 
     // Fill cache to limit
     for i in 0..clasp_embedded::MAX_CACHE_ENTRIES {
-        client.cache.set(&format!("/fill/{}", i), Value::Int(i as i64));
+        client
+            .cache
+            .set(&format!("/fill/{}", i), Value::Int(i as i64));
     }
     assert_eq!(client.cache.len(), clasp_embedded::MAX_CACHE_ENTRIES);
     println!(
@@ -221,7 +226,7 @@ async fn test_embedded_to_router() {
 
     // Create embedded client and encode messages
     let mut embedded = Client::new();
-    
+
     // Test HELLO
     let hello = embedded.prepare_hello("ESP32-Sensor");
     let hello_len = hello.len();
@@ -330,7 +335,10 @@ fn test_memory_footprint() {
     let total = client_size + 1024; // Plus some working memory
     println!("  Total estimate:   {:>6} bytes", total);
     println!("  ESP32 SRAM:       320,000 bytes");
-    println!("  Usage:            {:.2}%", (total as f64 / 320000.0) * 100.0);
+    println!(
+        "  Usage:            {:.2}%",
+        (total as f64 / 320000.0) * 100.0
+    );
 
     println!("  ✓ Memory footprint is embedded-friendly!");
 }
@@ -388,7 +396,10 @@ async fn test_round_trip() {
     let (msg, _) = codec::decode(set_frame).unwrap();
     if let Message::Set(set) = msg {
         // The full client sends on behalf of embedded
-        full_client.set(&set.address, set.value.as_f64().unwrap()).await.unwrap();
+        full_client
+            .set(&set.address, set.value.as_f64().unwrap())
+            .await
+            .unwrap();
     }
 
     // Wait for delivery
@@ -409,9 +420,15 @@ async fn test_round_trip() {
 
 #[tokio::main]
 async fn main() {
-    println!("╔══════════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                    CLASP EMBEDDED INTEGRATION TESTS                              ║");
-    println!("╚══════════════════════════════════════════════════════════════════════════════════╝");
+    println!(
+        "╔══════════════════════════════════════════════════════════════════════════════════╗"
+    );
+    println!(
+        "║                    CLASP EMBEDDED INTEGRATION TESTS                              ║"
+    );
+    println!(
+        "╚══════════════════════════════════════════════════════════════════════════════════╝"
+    );
 
     // Sync tests
     test_encoding_compatibility();
@@ -427,7 +444,9 @@ async fn main() {
     #[cfg(feature = "embedded-server")]
     test_mini_router();
 
-    println!("\n═══════════════════════════════════════════════════════════════════════════════════");
+    println!(
+        "\n═══════════════════════════════════════════════════════════════════════════════════"
+    );
     println!("  ✅ ALL EMBEDDED TESTS PASSED!");
     println!("═══════════════════════════════════════════════════════════════════════════════════");
 }

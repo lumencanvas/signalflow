@@ -97,7 +97,10 @@ async fn test_device_staleness() {
 async fn test_device_info_default() {
     let info = DeviceInfo::default();
 
-    assert!(!info.features.is_empty(), "Default DeviceInfo should have features");
+    assert!(
+        !info.features.is_empty(),
+        "Default DeviceInfo should have features"
+    );
     assert!(!info.bridge, "Default DeviceInfo should not be a bridge");
     assert_eq!(
         info.version,
@@ -166,7 +169,10 @@ async fn test_discovery_config_default() {
     let config = DiscoveryConfig::default();
 
     assert!(config.mdns, "Default config should have mDNS enabled");
-    assert!(config.broadcast, "Default config should have broadcast enabled");
+    assert!(
+        config.broadcast,
+        "Default config should have broadcast enabled"
+    );
     assert_eq!(
         config.broadcast_port,
         clasp_core::DEFAULT_DISCOVERY_PORT,
@@ -200,7 +206,11 @@ async fn test_discovery_manual_remove() {
     let removed = discovery.remove("removable");
 
     assert!(removed.is_some(), "Remove should return the device");
-    assert_eq!(discovery.devices().count(), 0, "Should have no devices after removal");
+    assert_eq!(
+        discovery.devices().count(),
+        0,
+        "Should have no devices after removal"
+    );
     assert!(
         discovery.get("removable").is_none(),
         "Should not find removed device"
@@ -226,11 +236,7 @@ async fn test_discovery_multiple_devices() {
         discovery.add(device);
     }
 
-    assert_eq!(
-        discovery.devices().count(),
-        5,
-        "Should have 5 devices"
-    );
+    assert_eq!(discovery.devices().count(), 5, "Should have 5 devices");
 }
 
 #[tokio::test]
@@ -250,7 +256,10 @@ async fn test_discovery_overwrite_device() {
     );
 
     let device = discovery.get("same-id").expect("Device should exist");
-    assert_eq!(device.name, "Second", "Device should be the second one added");
+    assert_eq!(
+        device.name, "Second",
+        "Device should be the second one added"
+    );
 }
 
 // ============================================================================
@@ -288,7 +297,10 @@ async fn test_discovery_event_error() {
 
     match event {
         DiscoveryEvent::Error(msg) => {
-            assert_eq!(msg, "Network error", "Error event should contain correct message");
+            assert_eq!(
+                msg, "Network error",
+                "Error event should contain correct message"
+            );
         }
         _ => panic!("Expected Error event variant"),
     }

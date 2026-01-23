@@ -199,10 +199,10 @@ pub struct RendezvousConfig {
 impl Default for RendezvousConfig {
     fn default() -> Self {
         Self {
-            ttl: 300,                      // 5 minutes
-            max_devices_per_source: 10,    // 10 devices per IP
-            max_total_devices: 10000,      // 10k total devices
-            cleanup_interval: 60,          // Clean up every minute
+            ttl: 300,                   // 5 minutes
+            max_devices_per_source: 10, // 10 devices per IP
+            max_total_devices: 10000,   // 10k total devices
+            cleanup_interval: 60,       // Clean up every minute
         }
     }
 }
@@ -287,7 +287,8 @@ impl ServerState {
         let ttl = Duration::from_secs(self.config.ttl);
         let now = Instant::now();
 
-        self.devices.retain(|_, state| now.duration_since(state.last_seen) < ttl);
+        self.devices
+            .retain(|_, state| now.duration_since(state.last_seen) < ttl);
     }
 
     fn refresh(&self, id: &str) -> bool {
@@ -347,9 +348,9 @@ impl RendezvousServer {
 
     /// Start the server
     pub async fn serve(&self, addr: &str) -> Result<()> {
-        let addr: SocketAddr = addr.parse().map_err(|e| {
-            crate::error::DiscoveryError::Other(format!("Invalid address: {}", e))
-        })?;
+        let addr: SocketAddr = addr
+            .parse()
+            .map_err(|e| crate::error::DiscoveryError::Other(format!("Invalid address: {}", e)))?;
 
         info!("Rendezvous server listening on {}", addr);
 
@@ -388,7 +389,10 @@ async fn handle_discover(
     State(state): State<Arc<ServerState>>,
     Query(query): Query<DiscoverQuery>,
 ) -> Json<Vec<RegisteredDevice>> {
-    debug!("Discovery query: tag={:?}, feature={:?}", query.tag, query.feature);
+    debug!(
+        "Discovery query: tag={:?}, feature={:?}",
+        query.tag, query.feature
+    );
     Json(state.discover(&query))
 }
 
@@ -548,9 +552,7 @@ mod tests {
     #[test]
     fn test_server_state_unregister() {
         let state = ServerState::new(RendezvousConfig::default());
-        let response = state
-            .register(DeviceRegistration::default())
-            .unwrap();
+        let response = state.register(DeviceRegistration::default()).unwrap();
 
         assert!(state.unregister(&response.id));
         assert!(!state.unregister(&response.id)); // Already removed
@@ -559,9 +561,7 @@ mod tests {
     #[test]
     fn test_server_state_refresh() {
         let state = ServerState::new(RendezvousConfig::default());
-        let response = state
-            .register(DeviceRegistration::default())
-            .unwrap();
+        let response = state.register(DeviceRegistration::default()).unwrap();
 
         assert!(state.refresh(&response.id));
         assert!(!state.refresh("nonexistent"));
