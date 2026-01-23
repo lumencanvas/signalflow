@@ -1,0 +1,59 @@
+# CLASP Load Test Docker Compose
+#
+# Runs a full load testing setup with router, load generator, and optional metrics.
+#
+# Usage:
+#   docker-compose -f docker-compose.load-test.yml build
+#   docker-compose -f docker-compose.load-test.yml up
+#
+# Configuration via environment variables or .env file
+
+version: '3.8'
+
+services:
+  # CLASP Router under test
+  clasp-router:
+    build:
+      context: ../..
+      dockerfile: clasp-e2e/docker/router.dockerfile
+    ports:
+      - "7330:7330"
+    environment:
+      - RUST_LOG=info
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "timeout", "2", "bash", "-c", "</dev/tcp/localhost/7330"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - clasp-test
+
+  # Load Generator
+  load-generator:
+    build:
+      context: ../..
+      dockerfile: clasp-e2e/docker/load-generator.dockerfile
+    depends_on:
+      clasp-router:
+        condition: service_healthy
+    environment:
+      - ROUTER_URL=ws://clasp-router:7330
+      - NUM_CLIENTS=${NUM_CLIENTS:-100}
+      - MESSAGES_PER_CLIENT=${MESSAGES_PER_CLIENT:-1000}
+      - DURATION_SECS=${DURATION_SECS:-60}
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    networks:
+      - clasp-test
+
+networks:
+  clasp-test:
+    driver: bridge

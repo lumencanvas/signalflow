@@ -1,6 +1,6 @@
 <template>
   <footer>
-    <div>CLASP · Creative Low-Latency Application Streaming Protocol · CLASP v2 · Open Specification</div>
+    <div>CLASP · Creative Low-Latency Application Streaming Protocol · Open Specification</div>
     <div class="attribution">Maintained by <a href="https://lumencanvas.studio">LumenCanvas</a> · 2026</div>
   </footer>
 </template>

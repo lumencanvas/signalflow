@@ -56,6 +56,9 @@ reqwest = { version = "0.12", features = ["json"] }
 # JWT for security tests
 jsonwebtoken = "9.2"
 
+# Error handling
+anyhow = "1.0"
+
 # Certificate generation for QUIC tests
 rcgen = "0.13"
 
@@ -171,6 +174,37 @@ path = "src/bin/clock_sync_benchmark.rs"
 [[bin]]
 name = "resilience-benchmark"
 path = "src/bin/resilience_benchmark.rs"
+
+# New comprehensive benchmarks (Test Overhaul)
+[[bin]]
+name = "cold-start-benchmarks"
+path = "src/bin/cold_start_benchmarks.rs"
+
+[[bin]]
+name = "memory-benchmarks"
+path = "src/bin/memory_benchmarks.rs"
+
+[[bin]]
+name = "sustained-load-benchmarks"
+path = "src/bin/sustained_load_benchmarks.rs"
+
+[[bin]]
+name = "protocol-comparison"
+path = "src/bin/protocol_comparison.rs"
+
+# Protocol Conformance Suite
+[[bin]]
+name = "conformance-report"
+path = "src/bin/conformance_report.rs"
+
+# Chaos and Network Simulation Tests
+[[bin]]
+name = "chaos-tests"
+path = "src/bin/chaos_tests.rs"
+
+[[bin]]
+name = "network-simulation-tests"
+path = "src/bin/network_simulation_tests.rs"
 
 # Benchmark harness
 [[bench]]

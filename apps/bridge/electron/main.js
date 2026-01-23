@@ -11,6 +11,250 @@ let mainWindow;
 let bridgeService = null;
 let bridgeReady = false;
 
+// ============================================
+// Circuit Breaker Implementation
+// ============================================
+
+/**
+ * Circuit breaker states:
+ * - CLOSED: Normal operation, requests flow through
+ * - OPEN: Failures exceeded threshold, requests blocked
+ * - HALF_OPEN: Testing if service recovered
+ */
+const CircuitState = {
+  CLOSED: 'CLOSED',
+  OPEN: 'OPEN',
+  HALF_OPEN: 'HALF_OPEN',
+};
+
+/**
+ * Circuit breaker for managing connection failures
+ */
+class CircuitBreaker {
+  constructor(options = {}) {
+    this.failureThreshold = options.failureThreshold || 3;
+    this.resetTimeout = options.resetTimeout || 30000; // 30 seconds
+    this.maxRetries = options.maxRetries || 10;
+    this.halfOpenMaxAttempts = options.halfOpenMaxAttempts || 1;
+
+    this.state = CircuitState.CLOSED;
+    this.failures = 0;
+    this.retries = 0;
+    this.lastFailure = null;
+    this.halfOpenAttempts = 0;
+  }
+
+  /**
+   * Check if requests should be allowed
+   */
+  shouldRetry() {
+    if (this.retries >= this.maxRetries) {
+      return false;
+    }
+
+    switch (this.state) {
+      case CircuitState.CLOSED:
+        return true;
+
+      case CircuitState.OPEN:
+        // Check if reset timeout has passed
+        if (this.lastFailure && Date.now() - this.lastFailure >= this.resetTimeout) {
+          this.state = CircuitState.HALF_OPEN;
+          this.halfOpenAttempts = 0;
+          return true;
+        }
+        return false;
+
+      case CircuitState.HALF_OPEN:
+        return this.halfOpenAttempts < this.halfOpenMaxAttempts;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Record a successful operation
+   */
+  recordSuccess() {
+    this.failures = 0;
+    this.retries = 0;
+    this.state = CircuitState.CLOSED;
+    this.halfOpenAttempts = 0;
+  }
+
+  /**
+   * Record a failed operation
+   */
+  recordFailure() {
+    this.failures++;
+    this.retries++;
+    this.lastFailure = Date.now();
+
+    if (this.state === CircuitState.HALF_OPEN) {
+      this.halfOpenAttempts++;
+      if (this.halfOpenAttempts >= this.halfOpenMaxAttempts) {
+        this.state = CircuitState.OPEN;
+      }
+    } else if (this.failures >= this.failureThreshold) {
+      this.state = CircuitState.OPEN;
+    }
+  }
+
+  /**
+   * Get current state
+   */
+  getState() {
+    return this.state;
+  }
+
+  /**
+   * Get retry count
+   */
+  getRetryCount() {
+    return this.retries;
+  }
+
+  /**
+   * Reset the circuit breaker
+   */
+  reset() {
+    this.state = CircuitState.CLOSED;
+    this.failures = 0;
+    this.retries = 0;
+    this.lastFailure = null;
+    this.halfOpenAttempts = 0;
+  }
+}
+
+// ============================================
+// Exponential Backoff Implementation
+// ============================================
+
+/**
+ * Calculate exponential backoff delay with jitter
+ * @param {number} attempt - Current attempt number (0-indexed)
+ * @param {number} baseDelay - Base delay in ms (default: 1000)
+ * @param {number} maxDelay - Maximum delay in ms (default: 30000)
+ * @param {number} jitterFactor - Jitter factor 0-1 (default: 0.2)
+ */
+function calculateBackoffDelay(attempt, baseDelay = 1000, maxDelay = 30000, jitterFactor = 0.2) {
+  // Exponential component: baseDelay * 2^attempt
+  const exponentialDelay = baseDelay * Math.pow(2, attempt);
+
+  // Cap at maxDelay
+  const cappedDelay = Math.min(exponentialDelay, maxDelay);
+
+  // Add jitter (randomize +/- jitterFactor)
+  const jitter = cappedDelay * jitterFactor * (Math.random() * 2 - 1);
+
+  return Math.round(cappedDelay + jitter);
+}
+
+// ============================================
+// Error Classification
+// ============================================
+
+/**
+ * Error types for connection failures
+ */
+const ErrorType = {
+  TIMEOUT: 'TIMEOUT',
+  NETWORK: 'NETWORK',
+  AUTH: 'AUTH',
+  PROTOCOL: 'PROTOCOL',
+  UNKNOWN: 'UNKNOWN',
+};
+
+/**
+ * Classify an error into a category
+ * @param {Error} error - The error to classify
+ * @returns {string} Error type
+ */
+function classifyError(error) {
+  if (!error) return ErrorType.UNKNOWN;
+
+  const code = error.code || '';
+  const message = (error.message || '').toLowerCase();
+
+  // Timeout errors
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || message.includes('timeout')) {
+    return ErrorType.TIMEOUT;
+  }
+
+  // Network errors
+  if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ENETUNREACH' ||
+      code === 'ECONNRESET' || code === 'EPIPE' || message.includes('network')) {
+    return ErrorType.NETWORK;
+  }
+
+  // Auth errors
+  if (message.includes('401') || message.includes('403') ||
+      message.includes('unauthorized') || message.includes('forbidden') ||
+      message.includes('authentication')) {
+    return ErrorType.AUTH;
+  }
+
+  // Protocol errors
+  if (message.includes('protocol') || message.includes('handshake') ||
+      message.includes('version')) {
+    return ErrorType.PROTOCOL;
+  }
+
+  return ErrorType.UNKNOWN;
+}
+
+// ============================================
+// Persistent Logging
+// ============================================
+
+let logFilePath = null;
+
+/**
+ * Initialize persistent logging
+ */
+function initPersistentLogging() {
+  try {
+    const logsDir = app.getPath('logs');
+    logFilePath = path.join(logsDir, 'clasp-bridge.log');
+
+    // Ensure logs directory exists
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    // Log startup
+    persistLog('info', 'CLASP Bridge starting', { version: app.getVersion() });
+  } catch (e) {
+    console.error('Failed to initialize persistent logging:', e);
+  }
+}
+
+/**
+ * Write a log entry to the persistent log file
+ * @param {string} level - Log level (info, warn, error)
+ * @param {string} message - Log message
+ * @param {object} data - Additional data
+ */
+function persistLog(level, message, data = null) {
+  if (!logFilePath) return;
+
+  try {
+    const entry = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data,
+    });
+    fs.appendFileSync(logFilePath, entry + '\n');
+  } catch (e) {
+    // Silently fail - don't break the app for logging errors
+  }
+}
+
+// Circuit breakers for different connection types
+const circuitBreakers = new Map();
+
 // Track running server processes
 const runningServers = new Map(); // id -> { process, config, status, logs, stats }
 const MAX_LOG_LINES = 500;
@@ -315,15 +559,76 @@ async function connectBridgeToRouter(bridgeId, routerId = null) {
             error: 'Connection closed',
           });
         }
-        
-        // Attempt to reconnect after a delay if router is still running
-        setTimeout(() => {
-          const server = runningServers.get(router.id);
-          const bridge = runningServers.get(bridgeId);
-          if (server && server.status === 'running' && bridge) {
-            connectBridgeToRouter(bridgeId, bridge.config?.routerId);
+
+        // Get or create circuit breaker for this bridge
+        let circuitBreaker = circuitBreakers.get(bridgeId);
+        if (!circuitBreaker) {
+          circuitBreaker = new CircuitBreaker({
+            failureThreshold: 3,
+            resetTimeout: 30000,
+            maxRetries: 10,
+          });
+          circuitBreakers.set(bridgeId, circuitBreaker);
+        }
+
+        // Record the disconnection as a failure
+        circuitBreaker.recordFailure();
+        const errorType = ErrorType.NETWORK;
+
+        // Log the disconnection
+        persistLog('warn', 'Bridge disconnected from router', {
+          bridgeId,
+          routerId: router.id,
+          errorType,
+          circuitState: circuitBreaker.getState(),
+          retryCount: circuitBreaker.getRetryCount(),
+        });
+
+        // Check if we should retry
+        if (circuitBreaker.shouldRetry()) {
+          // Calculate exponential backoff delay
+          const delay = calculateBackoffDelay(
+            circuitBreaker.getRetryCount(),
+            1000,  // 1 second base
+            30000, // 30 seconds max
+            0.2    // 20% jitter
+          );
+
+          persistLog('info', 'Scheduling reconnection attempt', {
+            bridgeId,
+            delay,
+            attempt: circuitBreaker.getRetryCount(),
+          });
+
+          // Attempt to reconnect with exponential backoff
+          setTimeout(() => {
+            const server = runningServers.get(router.id);
+            const bridge = runningServers.get(bridgeId);
+            if (server && server.status === 'running' && bridge) {
+              connectBridgeToRouter(bridgeId, bridge.config?.routerId).then(success => {
+                if (success) {
+                  circuitBreaker.recordSuccess();
+                  persistLog('info', 'Reconnection successful', { bridgeId });
+                }
+              });
+            }
+          }, delay);
+        } else {
+          persistLog('error', 'Circuit breaker open - stopping reconnection attempts', {
+            bridgeId,
+            circuitState: circuitBreaker.getState(),
+            totalRetries: circuitBreaker.getRetryCount(),
+          });
+
+          if (mainWindow) {
+            mainWindow.webContents.send('bridge-router-status', {
+              bridgeId,
+              connected: false,
+              error: `Reconnection failed after ${circuitBreaker.getRetryCount()} attempts. Circuit breaker open.`,
+              circuitState: circuitBreaker.getState(),
+            });
           }
-        }, 2000);
+        }
       }
     });
 
@@ -1210,7 +1515,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  console.log('App ready, starting bridge service...');
+  console.log('App ready, initializing...');
+  initPersistentLogging();
+  console.log('Starting bridge service...');
   startBridgeService();
   console.log('Creating window...');
   createWindow();

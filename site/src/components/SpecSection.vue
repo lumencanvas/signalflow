@@ -144,12 +144,12 @@ const frameCode = `┌───────────────────�
 │            └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘    │
 │ Bytes 2-3: Payload length (uint16 big-endian, max 65535)         │
 │ [Optional] Bytes 4-11: Timestamp (uint64 microseconds)           │
-│ Payload:   v3 compact binary (version=1) or MessagePack (v=0)    │
+│ Payload:   compact binary (version=1) or MessagePack (v=0)    │
 └──────────────────────────────────────────────────────────────────┘
 
 Version bits (0-2):
   000 = v2 legacy (MessagePack with named keys)
-  001 = v3 compact (positional binary, 54% smaller)
+  001 = compact (positional binary, 54% smaller)
 
 QoS Values (bits 6-7):
   00 = Fire    - Best effort, no ACK (streams)
@@ -199,7 +199,7 @@ const bundleMsg = `// BUNDLE - atomic group of messages, optionally scheduled
 }`
 
 // Data types
-const dataTypesCode = `// v3 compact binary value types:
+const dataTypesCode = `// compact binary value types:
 Type     Code   Encoding            Example Use
 ───────────────────────────────────────────────────────────
 null     0x00   1 byte              No value
@@ -328,18 +328,18 @@ const signalTypes = [
 const benchmarks = {
   encoding: [
     { proto: 'MQTT', rate: '11.4M', winner: true },
-    { proto: 'CLASP v3', rate: '8M', winner: false },
+    { proto: 'CLASP', rate: '8M', winner: false },
     { proto: 'OSC', rate: '4.5M', winner: false }
   ],
   decoding: [
     { proto: 'MQTT', rate: '11.4M', winner: true },
-    { proto: 'CLASP v3', rate: '11M', winner: false },
+    { proto: 'CLASP', rate: '11M', winner: false },
     { proto: 'OSC', rate: '5.7M', winner: false }
   ],
   size: [
     { proto: 'MQTT', bytes: 19, winner: true },
     { proto: 'OSC', bytes: 24, winner: false },
-    { proto: 'CLASP v3', bytes: 31, winner: false }
+    { proto: 'CLASP', bytes: 31, winner: false }
   ],
   features: [
     { feature: 'State synchronization', clasp: true, osc: false, mqtt: false },
@@ -356,7 +356,7 @@ const benchmarks = {
 
 <template>
   <section class="section" id="spec">
-    <h2>FULL SPEC (CLASP v3)</h2>
+    <h2>FULL SPEC</h2>
 
     <div class="spec-wrap">
       <aside class="spec-toc">
@@ -515,7 +515,7 @@ const benchmarks = {
         >
           <h3 @click="toggleSection(specSections[5])">5. Message Reference</h3>
           <div class="spec-content">
-            <p>All messages start with a <code>type</code> byte (v3 compact binary) or <code>type</code> field (v2 MessagePack):</p>
+            <p>All messages start with a <code>type</code> byte (compact binary) or <code>type</code> field (legacy MessagePack):</p>
 
             <div class="table">
               <div class="row head">
@@ -573,7 +573,7 @@ const benchmarks = {
         >
           <h3 @click="toggleSection(specSections[7])">7. Data Types</h3>
           <div class="spec-content">
-            <p>Values use v3 compact binary encoding (54% smaller than MessagePack). Most of the time you'll just use numbers, strings, and objects:</p>
+            <p>Values use compact binary encoding (54% smaller than MessagePack). Most of the time you'll just use numbers, strings, and objects:</p>
             <CodeBlock :code="dataTypesCode" language="plaintext" />
           </div>
         </section>
@@ -719,7 +719,7 @@ const benchmarks = {
             </p>
 
             <p class="bench-run">
-              Run benchmarks yourself: <code>cargo run -p clasp-test-suite --bin proof-tests --release</code>
+              Run benchmarks yourself: <code>cargo run --release -p clasp-e2e --bin latency-benchmarks</code>
             </p>
           </div>
         </section>

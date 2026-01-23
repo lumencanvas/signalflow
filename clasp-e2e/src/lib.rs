@@ -5,6 +5,7 @@
 
 use std::time::Duration;
 
+pub mod compliance;
 pub mod tests;
 
 // Re-export test utilities from clasp-test-utils

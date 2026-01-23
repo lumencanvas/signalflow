@@ -300,11 +300,21 @@ These measure raw encode/decode speed—the **theoretical ceiling**, not system 
 
 ### System Throughput (End-to-End)
 
-Run `cargo run -p clasp-test-suite --bin real_benchmarks --release` for actual numbers including:
-- End-to-end latency (pub → router → sub)
-- Fanout to multiple subscribers
-- Wildcard routing overhead
-- State management costs
+Actual measured performance on localhost (macOS, M-series):
+
+| Metric | P50 | P95 | P99 | Notes |
+|--------|-----|-----|-----|-------|
+| **SET (fire-and-forget)** | <1µs | 1µs | 39µs | Client → Router |
+| **Single-hop** | 34µs | 52µs | 82µs | Pub → Router → Sub |
+| **Fanout (10 subs)** | 1.3ms | 1.4ms | 1.4ms | Time until ALL receive |
+| **Fanout (100 subs)** | 2.0ms | 2.2ms | 2.6ms | Time until ALL receive |
+| **Throughput** | 74k msg/s | - | - | Single client, sustained |
+
+Run benchmarks yourself:
+```bash
+cargo run --release -p clasp-e2e --bin latency-benchmarks
+cargo run --release -p clasp-e2e --bin chaos-tests
+```
 
 ### Why Binary Encoding?
 

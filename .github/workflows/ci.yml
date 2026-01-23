@@ -66,6 +66,144 @@ jobs:
           cargo run -p clasp-test-suite --bin embedded-tests
           cargo run -p clasp-test-suite --bin protocol-tests
 
+  # Protocol Conformance Suite
+  conformance:
+    name: Conformance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ubuntu-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run conformance suite
+        run: cargo run -p clasp-e2e --bin conformance-report
+
+      - name: Run chaos tests
+        run: cargo run -p clasp-e2e --bin chaos-tests
+
+  # Code Coverage
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ubuntu-coverage-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Generate coverage report
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+
+  # Benchmark Regression Detection
+  benchmark:
+    name: Benchmark Regression
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for comparison
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ubuntu-bench-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run benchmarks
+        run: |
+          cargo build --release -p clasp-e2e
+          cargo run --release -p clasp-e2e --bin latency-benchmarks 2>&1 | tee benchmark-results.txt
+
+      - name: Check for regression
+        run: |
+          # Extract P99 latency from results
+          P99=$(grep -oP 'P99:\s*\K\d+' benchmark-results.txt | head -1 || echo "0")
+          echo "P99 Latency: ${P99}µs"
+
+          # Warn if P99 > 1000µs (1ms)
+          if [ "$P99" -gt 1000 ]; then
+            echo "⚠️ Warning: P99 latency (${P99}µs) exceeds 1ms threshold"
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.txt
+
+  # Desktop App Tests
+  desktop-tests:
+    name: Desktop App Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: apps/bridge
+        run: npm install
+
+      - name: Run unit tests
+        working-directory: apps/bridge
+        run: npm test
+        continue-on-error: true  # Don't fail CI if desktop tests need setup
+
   build-electron:
     name: Build Electron (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

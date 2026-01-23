@@ -1,0 +1,67 @@
+# CLASP Chaos Test Docker Compose
+#
+# Runs chaos tests including network simulation.
+# Requires --cap-add=NET_ADMIN for network impairment.
+#
+# Usage:
+#   docker-compose -f docker-compose.chaos-test.yml build
+#   docker-compose -f docker-compose.chaos-test.yml up
+
+version: '3.8'
+
+services:
+  # CLASP Router under test
+  clasp-router:
+    build:
+      context: ../..
+      dockerfile: clasp-e2e/docker/router.dockerfile
+    ports:
+      - "7330:7330"
+    environment:
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "timeout", "2", "bash", "-c", "</dev/tcp/localhost/7330"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - clasp-chaos
+
+  # Chaos test runner
+  chaos-runner:
+    build:
+      context: ../..
+      dockerfile: clasp-e2e/docker/network-sim.dockerfile
+    depends_on:
+      clasp-router:
+        condition: service_healthy
+    environment:
+      - ROUTER_URL=ws://clasp-router:7330
+    command: ["/usr/local/bin/chaos-tests"]
+    networks:
+      - clasp-chaos
+
+  # Network simulation test runner (requires NET_ADMIN)
+  network-sim-runner:
+    build:
+      context: ../..
+      dockerfile: clasp-e2e/docker/network-sim.dockerfile
+    depends_on:
+      clasp-router:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - ROUTER_URL=ws://clasp-router:7330
+    command:
+      - /bin/bash
+      - -c
+      - |
+        /usr/local/bin/simulate-network.sh 50 10 1 && \
+        /usr/local/bin/network-simulation-tests
+    networks:
+      - clasp-chaos
+
+networks:
+  clasp-chaos:
+    driver: bridge

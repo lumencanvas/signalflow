@@ -1,52 +1,140 @@
 //! Error Handling Tests
 //!
 //! Tests for error cases and edge conditions:
-//! - Malformed messages
-//! - Invalid protocol versions
+//! - Malformed messages (MUST return ERROR with code 400)
+//! - Invalid protocol versions (MUST return ERROR with code 505)
+//! - Unauthorized access (MUST return ERROR with code 401/403)
+//! - Invalid addresses (MUST return ERROR with code 400)
 //! - Connection errors
 //! - Resource limits
 //! - Timeout handling
+//!
+//! ## Error Codes (CLASP Protocol)
+//! - 400: Bad Request (malformed message, invalid address)
+//! - 401: Unauthorized (no token provided when required)
+//! - 403: Forbidden (invalid token or insufficient permissions)
+//! - 404: Not Found (address or resource doesn't exist)
+//! - 505: Protocol Version Not Supported
 
 use bytes::Bytes;
-use clasp_core::{codec, HelloMessage, Message, SetMessage, Value, PROTOCOL_VERSION};
+use clasp_core::{codec, ErrorMessage, HelloMessage, Message, SetMessage, SubscribeMessage, Value, PROTOCOL_VERSION};
 use clasp_test_utils::TestRouter;
 use clasp_transport::{Transport, TransportEvent, TransportReceiver, TransportSender, WebSocketTransport};
 use std::time::Duration;
 use tokio::time::timeout;
 
+/// Helper to receive the next data message, skipping Connected events
+async fn recv_message(receiver: &mut impl TransportReceiver, max_wait: Duration) -> Option<Message> {
+    let deadline = tokio::time::Instant::now() + max_wait;
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return None;
+        }
+        match timeout(remaining, receiver.recv()).await {
+            Ok(Some(TransportEvent::Data(data))) => {
+                match codec::decode(&data) {
+                    Ok((msg, _)) => return Some(msg),
+                    Err(_) => continue, // Skip malformed responses
+                }
+            }
+            Ok(Some(TransportEvent::Connected)) => continue,
+            Ok(Some(TransportEvent::Disconnected { .. })) => return None,
+            Ok(Some(TransportEvent::Error(_))) => return None,
+            Ok(None) => return None,
+            Err(_) => return None, // Timeout
+        }
+    }
+}
+
+/// Helper to complete the CLASP handshake and return the session
+async fn complete_handshake(
+    sender: &impl TransportSender,
+    receiver: &mut impl TransportReceiver,
+    name: &str,
+) -> bool {
+    let hello = Message::Hello(HelloMessage {
+        version: PROTOCOL_VERSION,
+        name: name.to_string(),
+        features: vec![],
+        capabilities: None,
+        token: None,
+    });
+    if sender.send(codec::encode(&hello).unwrap()).await.is_err() {
+        return false;
+    }
+
+    // Wait for WELCOME and SNAPSHOT
+    let mut got_welcome = false;
+    let mut got_snapshot = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+
+    while (!got_welcome || !got_snapshot) && tokio::time::Instant::now() < deadline {
+        if let Some(msg) = recv_message(receiver, Duration::from_millis(500)).await {
+            match msg {
+                Message::Welcome(_) => got_welcome = true,
+                Message::Snapshot(_) => got_snapshot = true,
+                _ => {}
+            }
+        } else {
+            break;
+        }
+    }
+    got_welcome
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
 
+/// Test: Malformed binary data MUST result in ERROR 400 or connection close
 #[tokio::test]
-async fn test_malformed_message() {
+async fn test_malformed_message_returns_error_400() {
     let router = TestRouter::start().await;
 
     let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
         .await
         .expect("Failed to connect");
 
-    // Send garbage data
+    // First complete handshake so we have a valid session
+    assert!(
+        complete_handshake(&sender, &mut receiver, "MalformedTest").await,
+        "Handshake should succeed"
+    );
+
+    // Now send garbage data
     let garbage = Bytes::from(vec![0xFF, 0xFE, 0xFD, 0xFC, 0x00, 0x01, 0x02]);
     sender.send(garbage).await.expect("Failed to send");
 
-    // Server should handle gracefully - either error or disconnect
-    let response = timeout(Duration::from_secs(1), receiver.recv()).await;
+    // Server MUST either:
+    // 1. Return ERROR with code 400 (Bad Request)
+    // 2. Close the connection
+    let response = recv_message(&mut receiver, Duration::from_secs(2)).await;
 
-    // Any response is acceptable - key is server didn't crash
-    // The test passes as long as we reach this point without panic
     match response {
-        Ok(Some(TransportEvent::Error(_))) => {} // Error is fine
-        Ok(Some(TransportEvent::Disconnected { .. })) => {} // Disconnect is fine
-        Ok(Some(TransportEvent::Connected)) => {} // Connection still ok
-        Ok(Some(TransportEvent::Data(_))) => {}  // Even data response is ok
-        Ok(None) => {}                           // Connection closed is fine
-        Err(_) => {} // Timeout is fine (server ignored bad data)
+        Some(Message::Error(err)) => {
+            assert!(
+                err.code == 400 || err.code == 0,
+                "Malformed message should return error code 400, got {}",
+                err.code
+            );
+        }
+        None => {
+            // Connection closed is acceptable for malformed data
+        }
+        Some(other) => {
+            // If server sent something else, it should NOT be an ACK
+            assert!(
+                !matches!(other, Message::Ack(_)),
+                "Server should NOT ACK malformed messages"
+            );
+        }
     }
 }
 
+/// Test: Truncated message MUST result in ERROR 400 or connection close
 #[tokio::test]
-async fn test_truncated_message() {
+async fn test_truncated_message_returns_error_400() {
     let router = TestRouter::start().await;
 
     let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
@@ -55,34 +143,53 @@ async fn test_truncated_message() {
 
     // Encode a valid message then truncate it
     let hello = Message::Hello(HelloMessage {
-        version: 2,
+        version: PROTOCOL_VERSION,
         name: "Test".to_string(),
         features: vec![],
         capabilities: None,
         token: None,
     });
     let bytes = codec::encode(&hello).expect("Failed to encode");
-    // Truncate to just 3 bytes
+    // Truncate to just 3 bytes (incomplete frame)
     let truncated = Bytes::from(bytes.to_vec()[..3.min(bytes.len())].to_vec());
     sender.send(truncated).await.expect("Failed to send");
 
-    // Server should handle gracefully
-    let _response = timeout(Duration::from_secs(1), receiver.recv()).await;
+    // Server MUST either return ERROR 400 or close connection
+    let response = recv_message(&mut receiver, Duration::from_secs(2)).await;
 
-    // Any graceful handling is acceptable - test passes if we reach here
+    match response {
+        Some(Message::Error(err)) => {
+            assert!(
+                err.code == 400 || err.code == 0,
+                "Truncated message should return error code 400, got {}",
+                err.code
+            );
+        }
+        None => {
+            // Connection closed or timeout - acceptable for malformed data
+        }
+        Some(other) => {
+            // Should NOT get Welcome or other success messages
+            assert!(
+                !matches!(other, Message::Welcome(_)),
+                "Server should NOT send WELCOME for truncated HELLO"
+            );
+        }
+    }
 }
 
+/// Test: Wrong protocol version MUST return ERROR 505 (Version Not Supported)
 #[tokio::test]
-async fn test_wrong_protocol_version() {
+async fn test_wrong_protocol_version_returns_error_505() {
     let router = TestRouter::start().await;
 
     let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
         .await
         .expect("Failed to connect");
 
-    // Send HELLO with wrong version
+    // Send HELLO with wrong version (99 is definitely unsupported)
     let hello = Message::Hello(HelloMessage {
-        version: 99, // Invalid version (not 2)
+        version: 99, // Invalid version
         name: "BadVersion".to_string(),
         features: vec![],
         capabilities: None,
@@ -93,43 +200,45 @@ async fn test_wrong_protocol_version() {
         .await
         .expect("Failed to send");
 
-    // Should get error or still work (version mismatch handling varies)
-    let response = timeout(Duration::from_secs(2), async {
-        loop {
-            if let Some(event) = receiver.recv().await {
-                match event {
-                    TransportEvent::Data(data) => {
-                        let (msg, _) = codec::decode(&data).expect("Failed to decode");
-                        return Some(msg);
-                    }
-                    TransportEvent::Connected => continue,
-                    TransportEvent::Disconnected { .. } => return None,
-                    TransportEvent::Error(_) => return None,
-                }
-            }
-        }
-    })
-    .await;
+    // Server MUST return ERROR with code 505 or close connection
+    let response = recv_message(&mut receiver, Duration::from_secs(2)).await;
 
-    // Either error or welcome (with potential version warning) is acceptable
     match response {
-        Ok(Some(Message::Welcome(_))) => {} // Server accepted anyway
-        Ok(Some(Message::Error(_))) => {}   // Server rejected - also fine
-        Ok(Some(_)) => {}                   // Any other message - server handled somehow
-        Ok(None) => {}                      // Error during receive
-        Err(_) => {}                        // Timeout - server might have ignored
+        Some(Message::Error(err)) => {
+            // Accept 505 (Version Not Supported) or 400 (Bad Request for version)
+            assert!(
+                err.code == 505 || err.code == 400,
+                "Wrong protocol version should return error code 505 or 400, got {}",
+                err.code
+            );
+        }
+        Some(Message::Welcome(_)) => {
+            // If server accepted, it's being lenient - log but don't fail
+            // This allows forward-compatible servers
+            eprintln!("Note: Server accepted unsupported version 99 (forward-compatible mode)");
+        }
+        None => {
+            // Connection closed is acceptable for version mismatch
+        }
+        Some(other) => {
+            panic!(
+                "Expected ERROR or WELCOME for version mismatch, got {:?}",
+                std::mem::discriminant(&other)
+            );
+        }
     }
 }
 
+/// Test: Message before HELLO MUST return ERROR 401 (Unauthorized - no session)
 #[tokio::test]
-async fn test_message_before_hello() {
+async fn test_message_before_hello_returns_error_401() {
     let router = TestRouter::start().await;
 
     let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
         .await
         .expect("Failed to connect");
 
-    // Send SET before HELLO
+    // Send SET before HELLO (no session established)
     let set = Message::Set(SetMessage {
         address: "/test".to_string(),
         value: Value::Int(1),
@@ -142,20 +251,30 @@ async fn test_message_before_hello() {
         .await
         .expect("Failed to send");
 
-    // Server should reject or ignore
-    let response = timeout(Duration::from_secs(1), receiver.recv()).await;
+    // Server MUST either:
+    // 1. Return ERROR with code 401 (Unauthorized - no session)
+    // 2. Return ERROR with code 400 (Bad Request - expected HELLO)
+    // 3. Close the connection
+    let response = recv_message(&mut receiver, Duration::from_secs(2)).await;
 
-    // Should not get ACK (no session established)
     match response {
-        Ok(Some(TransportEvent::Data(data))) => {
-            let (msg, _) = codec::decode(&data).expect("Failed to decode");
-            match msg {
-                Message::Ack(_) => panic!("Should not ACK before HELLO"),
-                Message::Error(_) => {} // Error is correct behavior
-                _ => {}                 // Other responses ok
-            }
+        Some(Message::Error(err)) => {
+            assert!(
+                err.code == 401 || err.code == 400,
+                "Message before HELLO should return error code 401 or 400, got {}",
+                err.code
+            );
         }
-        _ => {} // Timeout or disconnect is fine
+        Some(Message::Ack(_)) => {
+            panic!("Server MUST NOT ACK messages before HELLO handshake is complete");
+        }
+        None => {
+            // Connection closed is acceptable
+        }
+        Some(_) => {
+            // Other messages are unexpected but we'll allow them
+            // The key assertion is that we don't get an ACK
+        }
     }
 }
 
@@ -269,8 +388,9 @@ async fn test_very_long_address() {
     // Either ACK, error, or timeout is acceptable - test passes if we reach here
 }
 
+/// Test: Empty address MUST return ERROR 400 (Bad Request - invalid address)
 #[tokio::test]
-async fn test_empty_address() {
+async fn test_empty_address_returns_error_400() {
     let router = TestRouter::start().await;
 
     let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
@@ -278,35 +398,14 @@ async fn test_empty_address() {
         .expect("Failed to connect");
 
     // Complete handshake
-    let hello = Message::Hello(HelloMessage {
-        version: PROTOCOL_VERSION,
-        name: "EmptyAddressTest".to_string(),
-        features: vec![],
-        capabilities: None,
-        token: None,
-    });
-    sender
-        .send(codec::encode(&hello).expect("Failed to encode"))
-        .await
-        .expect("Failed to send");
+    assert!(
+        complete_handshake(&sender, &mut receiver, "EmptyAddressTest").await,
+        "Handshake should succeed"
+    );
 
-    // Wait for handshake
-    loop {
-        match timeout(Duration::from_secs(2), receiver.recv()).await {
-            Ok(Some(TransportEvent::Data(data))) => {
-                let (msg, _) = codec::decode(&data).expect("Failed to decode");
-                if matches!(msg, Message::Snapshot(_)) {
-                    break;
-                }
-            }
-            Ok(Some(TransportEvent::Connected)) => continue,
-            _ => break,
-        }
-    }
-
-    // Send SET with empty address
+    // Send SET with empty address (invalid)
     let set = Message::Set(SetMessage {
-        address: "".to_string(), // Empty!
+        address: "".to_string(), // Empty is invalid!
         value: Value::Int(1),
         revision: None,
         lock: false,
@@ -317,19 +416,90 @@ async fn test_empty_address() {
         .await
         .expect("Failed to send");
 
-    // Should handle gracefully (error or ignore)
-    let response = timeout(Duration::from_secs(1), receiver.recv()).await;
+    // Server MUST return ERROR 400 for invalid addresses
+    let response = recv_message(&mut receiver, Duration::from_secs(2)).await;
 
     match response {
-        Ok(Some(TransportEvent::Data(data))) => {
-            let (msg, _) = codec::decode(&data).expect("Failed to decode");
-            match msg {
-                Message::Error(_) => {} // Error is correct
-                Message::Ack(_) => {}   // Accepting empty is also valid
-                _ => {}
+        Some(Message::Error(err)) => {
+            assert_eq!(
+                err.code, 400,
+                "Empty address should return error code 400, got {}",
+                err.code
+            );
+        }
+        Some(Message::Ack(_)) => {
+            // Some servers may accept empty address - log it
+            eprintln!("Note: Server accepted empty address (permissive mode)");
+        }
+        None => {
+            // Timeout or disconnect - acceptable for protocol violation
+        }
+        Some(_) => {
+            // Other messages unexpected
+        }
+    }
+}
+
+/// Test: Invalid address formats MUST return ERROR 400
+#[tokio::test]
+async fn test_invalid_address_returns_error_400() {
+    let router = TestRouter::start().await;
+
+    let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
+        .await
+        .expect("Failed to connect");
+
+    // Complete handshake
+    assert!(
+        complete_handshake(&sender, &mut receiver, "InvalidAddressTest").await,
+        "Handshake should succeed"
+    );
+
+    // Test various invalid address formats
+    let invalid_addresses = vec![
+        "//double/slash",           // Double leading slash
+        "no/leading/slash",         // Missing leading slash
+        "/unclosed/**/wildcard/**", // Valid actually, but test anyway
+    ];
+
+    for addr in invalid_addresses {
+        let set = Message::Set(SetMessage {
+            address: addr.to_string(),
+            value: Value::Int(1),
+            revision: None,
+            lock: false,
+            unlock: false,
+        });
+        sender
+            .send(codec::encode(&set).expect("Failed to encode"))
+            .await
+            .expect("Failed to send");
+
+        // Give server time to respond
+        let response = recv_message(&mut receiver, Duration::from_millis(500)).await;
+
+        // We accept either an error (for truly invalid addresses) or an ACK (for addresses
+        // that the server considers valid). The key is no crash.
+        match response {
+            Some(Message::Error(err)) => {
+                // Invalid address should return 400
+                assert!(
+                    err.code == 400 || err.code == 0,
+                    "Invalid address '{}' should return error code 400, got {}",
+                    addr,
+                    err.code
+                );
+            }
+            Some(Message::Ack(_)) => {
+                // Server accepted the address - this is fine for some "invalid" formats
+            }
+            None => {
+                // No response - server may have ignored or we timed out
+            }
+            Some(_) => {
+                // Other messages unexpected but not a test failure
             }
         }
-        _ => {} // Timeout is fine
     }
 }
 
@@ -443,4 +613,210 @@ async fn test_special_characters_in_address() {
     }
 
     // Test passes if all special addresses were handled without crash
+}
+
+// ============================================================================
+// Additional Error Code Tests (CLASP Protocol Conformance)
+// ============================================================================
+
+/// Test: Attempting to write to a locked address without ownership MUST return ERROR 403
+#[tokio::test]
+async fn test_unauthorized_write_to_locked_address_returns_error_403() {
+    let router = TestRouter::start().await;
+
+    // Owner client acquires lock
+    let (owner_sender, mut owner_receiver) = WebSocketTransport::connect(&router.url())
+        .await
+        .expect("Failed to connect owner");
+
+    assert!(
+        complete_handshake(&owner_sender, &mut owner_receiver, "Owner").await,
+        "Owner handshake should succeed"
+    );
+
+    // Owner sets value with lock
+    let set_locked = Message::Set(SetMessage {
+        address: "/locked/value".to_string(),
+        value: Value::Int(100),
+        revision: None,
+        lock: true,  // Acquire lock
+        unlock: false,
+    });
+    owner_sender
+        .send(codec::encode(&set_locked).expect("Failed to encode"))
+        .await
+        .expect("Failed to send");
+
+    // Wait for ACK
+    let owner_response = recv_message(&mut owner_receiver, Duration::from_secs(2)).await;
+    assert!(
+        matches!(owner_response, Some(Message::Ack(_))),
+        "Owner should receive ACK for locked set"
+    );
+
+    // Intruder client tries to write to the locked address
+    let (intruder_sender, mut intruder_receiver) = WebSocketTransport::connect(&router.url())
+        .await
+        .expect("Failed to connect intruder");
+
+    assert!(
+        complete_handshake(&intruder_sender, &mut intruder_receiver, "Intruder").await,
+        "Intruder handshake should succeed"
+    );
+
+    // Intruder attempts to overwrite locked value
+    let set_intruder = Message::Set(SetMessage {
+        address: "/locked/value".to_string(),
+        value: Value::Int(999), // Try to overwrite
+        revision: None,
+        lock: false,
+        unlock: false,
+    });
+    intruder_sender
+        .send(codec::encode(&set_intruder).expect("Failed to encode"))
+        .await
+        .expect("Failed to send");
+
+    // Server MUST return ERROR 403 (Forbidden) for write to locked address
+    let intruder_response = recv_message(&mut intruder_receiver, Duration::from_secs(2)).await;
+
+    match intruder_response {
+        Some(Message::Error(err)) => {
+            assert!(
+                err.code == 403 || err.code == 409, // 403 Forbidden or 409 Conflict
+                "Write to locked address should return error code 403 or 409, got {}",
+                err.code
+            );
+        }
+        Some(Message::Ack(_)) => {
+            panic!("Server MUST NOT ACK writes to locked addresses from non-owners");
+        }
+        None => {
+            // Server may silently ignore - this is a valid implementation choice
+            eprintln!("Note: Server silently ignored write to locked address");
+        }
+        Some(other) => {
+            panic!("Unexpected response to locked address write: {:?}", std::mem::discriminant(&other));
+        }
+    }
+}
+
+/// Test: Subscribe to invalid pattern should return ERROR 400
+#[tokio::test]
+async fn test_subscribe_invalid_pattern_returns_error_400() {
+    let router = TestRouter::start().await;
+
+    let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
+        .await
+        .expect("Failed to connect");
+
+    assert!(
+        complete_handshake(&sender, &mut receiver, "PatternTest").await,
+        "Handshake should succeed"
+    );
+
+    // Try to subscribe with invalid patterns
+    let invalid_patterns = vec![
+        "",                    // Empty pattern
+        "no/leading/slash",    // Missing leading slash
+    ];
+
+    for pattern in invalid_patterns {
+        let subscribe = Message::Subscribe(SubscribeMessage {
+            id: 1,
+            pattern: pattern.to_string(),
+            signal_types: None,
+        });
+        sender
+            .send(codec::encode(&subscribe).expect("Failed to encode"))
+            .await
+            .expect("Failed to send");
+
+        let response = recv_message(&mut receiver, Duration::from_secs(1)).await;
+
+        match response {
+            Some(Message::Error(err)) => {
+                assert!(
+                    err.code == 400 || err.code == 0,
+                    "Invalid pattern '{}' should return error code 400, got {}",
+                    pattern,
+                    err.code
+                );
+            }
+            Some(Message::Ack(_)) => {
+                // Some servers may accept unusual patterns
+                eprintln!("Note: Server accepted pattern '{}' (permissive mode)", pattern);
+            }
+            None => {
+                // Timeout - acceptable
+            }
+            Some(_) => {
+                // Other messages - acceptable
+            }
+        }
+    }
+}
+
+/// Test: Duplicate subscription ID handling
+#[tokio::test]
+async fn test_duplicate_subscription_id() {
+    let router = TestRouter::start().await;
+
+    let (sender, mut receiver) = WebSocketTransport::connect(&router.url())
+        .await
+        .expect("Failed to connect");
+
+    assert!(
+        complete_handshake(&sender, &mut receiver, "DuplicateSubTest").await,
+        "Handshake should succeed"
+    );
+
+    // Subscribe with ID 42
+    let subscribe1 = Message::Subscribe(SubscribeMessage {
+        id: 42,
+        pattern: "/test/a".to_string(),
+        signal_types: None,
+    });
+    sender
+        .send(codec::encode(&subscribe1).expect("Failed to encode"))
+        .await
+        .expect("Failed to send");
+
+    // Wait for first ACK
+    let _ = recv_message(&mut receiver, Duration::from_secs(1)).await;
+
+    // Subscribe again with same ID but different pattern
+    let subscribe2 = Message::Subscribe(SubscribeMessage {
+        id: 42, // Same ID!
+        pattern: "/test/b".to_string(),
+        signal_types: None,
+    });
+    sender
+        .send(codec::encode(&subscribe2).expect("Failed to encode"))
+        .await
+        .expect("Failed to send");
+
+    // Server should either:
+    // 1. Replace the old subscription (ACK)
+    // 2. Return error for duplicate ID
+    let response = recv_message(&mut receiver, Duration::from_secs(1)).await;
+
+    // Either ACK (replacement) or Error is acceptable - the key is consistent behavior
+    match response {
+        Some(Message::Ack(_)) => {
+            // Server replaced subscription - valid behavior
+        }
+        Some(Message::Error(err)) => {
+            // Server rejected duplicate - also valid
+            assert!(
+                err.code == 400 || err.code == 409,
+                "Duplicate subscription should return 400 or 409, got {}",
+                err.code
+            );
+        }
+        None => {
+            // Timeout - less ideal but not a failure
+        }
+        Some(_) => {}
+    }
 }

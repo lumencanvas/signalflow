@@ -645,6 +645,19 @@ impl Clasp {
         self.send_message(&msg).await
     }
 
+    /// Set and unlock (release a previously held lock)
+    pub async fn set_unlocked(&self, address: &str, value: impl Into<Value>) -> Result<()> {
+        let msg = Message::Set(SetMessage {
+            address: address.to_string(),
+            value: value.into(),
+            revision: None,
+            lock: false,
+            unlock: true,
+        });
+
+        self.send_message(&msg).await
+    }
+
     /// Get current value (cached or request)
     pub async fn get(&self, address: &str) -> Result<Value> {
         // Check cache first
