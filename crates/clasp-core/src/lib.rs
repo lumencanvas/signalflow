@@ -31,6 +31,8 @@ pub mod p2p;
 pub mod security;
 pub mod state;
 pub mod time;
+#[cfg(feature = "std")]
+pub mod timeline;
 pub mod types;
 
 pub use address::Address;
@@ -50,10 +52,12 @@ pub use security::{
 };
 pub use state::ParamState;
 pub use time::Timestamp;
+#[cfg(feature = "std")]
+pub use timeline::{PlaybackState, TimelinePlayer};
 pub use types::*;
 
-/// Protocol version (v3 = efficient binary encoding)
-pub const PROTOCOL_VERSION: u8 = 3;
+/// Protocol version (used in HELLO messages)
+pub const PROTOCOL_VERSION: u8 = 1;
 
 /// Magic byte for frame identification
 pub const MAGIC_BYTE: u8 = 0x53; // 'S' for Streaming

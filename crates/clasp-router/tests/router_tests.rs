@@ -29,6 +29,8 @@ async fn test_router_custom_config() {
         features: vec!["param".to_string(), "event".to_string()],
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 1000,
+        gesture_coalescing: true,
+        gesture_coalesce_interval_ms: 16,
     };
     let router = Router::new(config);
     assert_eq!(router.session_count(), 0);
@@ -511,6 +513,7 @@ mod p2p_tests {
             id: None,
             phase: None,
             timestamp: None,
+            timeline: None,
         });
 
         sender_a
@@ -579,6 +582,7 @@ mod p2p_tests {
             id: None,
             phase: None,
             timestamp: None,
+            timeline: None,
         });
 
         sender.send(codec::encode(&publish).unwrap()).await.unwrap();

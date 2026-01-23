@@ -7,6 +7,7 @@ description = "Comprehensive integration and load tests for CLASP protocol"
 [features]
 default = ["embedded-server"]
 embedded-server = ["clasp-embedded/server"]
+p2p = ["clasp-client/p2p", "clasp-transport/webrtc"]
 
 [dependencies]
 # CLASP crates (workspace)
@@ -15,7 +16,7 @@ clasp-transport.workspace = true
 clasp-bridge.workspace = true
 clasp-router.workspace = true
 clasp-client.workspace = true
-clasp-discovery.workspace = true
+clasp-discovery = { workspace = true, features = ["rendezvous"] }
 clasp-embedded.workspace = true
 
 # Real protocol libraries for integration testing
@@ -47,6 +48,7 @@ tracing-subscriber.workspace = true
 # Timing and stats
 hdrhistogram = "7.5"
 rand = "0.8"
+reqwest = { version = "0.12", features = ["json"] }
 
 # JWT for security tests
 jsonwebtoken = "9.2"
@@ -164,3 +166,15 @@ path = "src/bin/security_pentest.rs"
 [[bench]]
 name = "throughput"
 harness = false
+
+[[bin]]
+name = "gesture-coalescing-benchmarks"
+path = "src/bin/gesture_coalescing_benchmarks.rs"
+
+[[bin]]
+name = "rendezvous-benchmarks"
+path = "src/bin/rendezvous_benchmarks.rs"
+
+[[bin]]
+name = "p2p-connection-tests"
+path = "src/bin/p2p_connection_tests.rs"

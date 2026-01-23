@@ -408,6 +408,7 @@ async fn publish_event(
         id: None,
         phase: None,
         timestamp: None,
+        timeline: None,
     });
 
     if let Err(e) = state.event_tx.send(BridgeEvent::ToClasp(msg)).await {

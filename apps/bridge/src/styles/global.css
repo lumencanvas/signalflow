@@ -109,7 +109,7 @@ html, body {
 
 /* Sidebar */
 .sidebar {
-  width: 220px;
+  width: 320px;
   flex-shrink: 0;
   background: var(--stone-200);
   border-right: var(--border-width) solid var(--color-border-dark);
@@ -308,6 +308,36 @@ html, body {
 .device-protocol-badge.websocket { background: #fef9c3; color: #854d0e; }
 .device-protocol-badge.socketio { background: #fee2e2; color: #991b1b; }
 .device-protocol-badge.http { background: #f3e8ff; color: #6b21a8; }
+.device-protocol-badge.remote { background: #dbeafe; color: #1e40af; }
+
+/* Remote router styling */
+.device-item-remote {
+  border-left: 3px solid var(--blue-500);
+}
+
+/* Clickable discovered device items */
+.device-item-clickable {
+  cursor: pointer;
+  border: 1px dashed var(--teal-400);
+  background: var(--teal-50);
+}
+
+.device-item-clickable:hover {
+  background: var(--teal-100);
+  border-color: var(--teal-500);
+  border-style: solid;
+}
+
+.device-connect-icon {
+  flex-shrink: 0;
+  color: var(--teal-500);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.device-item-clickable:hover .device-connect-icon {
+  opacity: 1;
+}
 
 /* Server Fields */
 .server-fields {
@@ -420,16 +450,17 @@ html, body {
 .bridge-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-md);
+  gap: var(--space-lg);
 }
 
 .bridge-card {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-md);
+  padding: var(--space-lg);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border-dark);
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .bridge-card:hover {
@@ -1367,6 +1398,36 @@ html, body {
   min-width: 0;
 }
 
+.device-connection-info {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+  padding-left: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.router-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-block;
+  margin-left: var(--space-xs);
+}
+
+.router-status-badge.connected {
+  color: var(--color-success);
+}
+
+.router-status-badge.error {
+  color: var(--color-error);
+}
+
+.router-status-badge.disconnected {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
 .device-error-msg {
   width: 100%;
   font-size: 9px;
@@ -2299,9 +2360,9 @@ html, body {
 
 /* Base responsive improvements */
 .sidebar {
-  min-width: 180px;
-  max-width: 280px;
-  width: clamp(180px, 20vw, 280px);
+  min-width: 280px;
+  max-width: 360px;
+  width: clamp(280px, 24vw, 360px);
   transition: width 0.2s ease, min-width 0.2s ease;
 }
 
@@ -2334,7 +2395,7 @@ html, body {
    ============================================ */
 @media (min-width: 1400px) {
   .sidebar {
-    width: 260px;
+    width: 360px;
   }
 
   .bridge-grid {
@@ -2351,8 +2412,8 @@ html, body {
    ============================================ */
 @media (max-width: 1200px) {
   .sidebar {
-    width: 200px;
-    min-width: 160px;
+    width: 300px;
+    min-width: 240px;
   }
 
   .bridge-grid {
@@ -2386,8 +2447,8 @@ html, body {
 @media (max-width: 900px) {
   /* Narrower sidebar */
   .sidebar {
-    width: 180px;
-    min-width: 140px;
+    width: 260px;
+    min-width: 220px;
   }
 
   .section-title {

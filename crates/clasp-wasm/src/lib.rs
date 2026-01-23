@@ -348,6 +348,7 @@ impl ClaspWasm {
             id: None,
             phase: None,
             timestamp: None,
+            timeline: None,
         });
         self.send_message(&msg);
     }

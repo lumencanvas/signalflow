@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional, Union, Callable
 from enum import Enum, IntEnum
 from dataclasses import dataclass
 
-# Protocol constants (v3 = efficient binary encoding)
-PROTOCOL_VERSION = 3
+# Protocol constants
+PROTOCOL_VERSION = 1
 DEFAULT_WS_PORT = 7330
 DEFAULT_DISCOVERY_PORT = 7331
 WS_SUBPROTOCOL = "clasp"

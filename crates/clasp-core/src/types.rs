@@ -130,6 +130,88 @@ pub enum GesturePhase {
     Cancel,
 }
 
+/// Easing functions for timeline interpolation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum EasingType {
+    /// Linear interpolation (constant speed)
+    #[default]
+    Linear,
+    /// Slow start, fast end
+    EaseIn,
+    /// Fast start, slow end
+    EaseOut,
+    /// Slow start and end, fast middle
+    EaseInOut,
+    /// Step function (instant change at keyframe)
+    Step,
+    /// Custom cubic bezier (control points in keyframe)
+    CubicBezier,
+}
+
+/// A keyframe in a timeline
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimelineKeyframe {
+    /// Time offset in microseconds from timeline start
+    pub time: u64,
+    /// Value at this keyframe
+    pub value: Value,
+    /// Easing function to next keyframe
+    #[serde(default)]
+    pub easing: EasingType,
+    /// Optional cubic bezier control points [x1, y1, x2, y2] for CubicBezier easing
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bezier: Option<[f64; 4]>,
+}
+
+/// Timeline automation message
+/// Immutable once published - to modify, publish a new timeline
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimelineData {
+    /// Keyframes in chronological order
+    pub keyframes: Vec<TimelineKeyframe>,
+    /// Whether the timeline loops
+    #[serde(default)]
+    pub loop_: bool,
+    /// When to start playback (absolute server time in µs)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<u64>,
+    /// Duration override in µs (if None, derived from last keyframe)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u64>,
+}
+
+impl TimelineData {
+    /// Create a new timeline with keyframes
+    pub fn new(keyframes: Vec<TimelineKeyframe>) -> Self {
+        Self {
+            keyframes,
+            loop_: false,
+            start_time: None,
+            duration: None,
+        }
+    }
+
+    /// Set looping
+    pub fn with_loop(mut self, loop_: bool) -> Self {
+        self.loop_ = loop_;
+        self
+    }
+
+    /// Set start time
+    pub fn with_start_time(mut self, time: u64) -> Self {
+        self.start_time = Some(time);
+        self
+    }
+
+    /// Get the timeline duration
+    pub fn duration(&self) -> u64 {
+        self.duration.unwrap_or_else(|| {
+            self.keyframes.last().map(|kf| kf.time).unwrap_or(0)
+        })
+    }
+}
+
 /// Value type that can be sent in messages
 /// NOTE: Variant order matters for serde(untagged) - Array must come before Bytes
 /// because MessagePack arrays of small integers can be misinterpreted as binary data
@@ -378,7 +460,7 @@ pub struct UnsubscribeMessage {
     pub id: u32,
 }
 
-/// PUBLISH message - for events, streams, gestures
+/// PUBLISH message - for events, streams, gestures, timelines
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublishMessage {
     pub address: String,
@@ -400,6 +482,9 @@ pub struct PublishMessage {
     pub phase: Option<GesturePhase>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
+    // For timelines
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<TimelineData>,
 }
 
 /// SET message - set param value

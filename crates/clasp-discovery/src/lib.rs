@@ -3,6 +3,7 @@
 //! Provides device discovery mechanisms:
 //! - mDNS/Bonjour for LAN auto-discovery
 //! - UDP broadcast fallback
+//! - Rendezvous server for WAN discovery
 //! - Manual registration
 
 pub mod device;
@@ -13,6 +14,9 @@ pub mod mdns;
 
 #[cfg(feature = "broadcast")]
 pub mod broadcast;
+
+#[cfg(feature = "rendezvous")]
+pub mod rendezvous;
 
 pub use device::{Device, DeviceInfo};
 pub use error::{DiscoveryError, Result};

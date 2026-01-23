@@ -46,11 +46,13 @@ use clasp_transport::{QuicConfig, QuicTransport};
 
 use crate::{
     error::{Result, RouterError},
+    gesture::{GestureRegistry, GestureResult},
     p2p::{analyze_address, P2PAddressType, P2PCapabilities},
     session::{Session, SessionId},
     state::RouterState,
     subscription::{Subscription, SubscriptionManager},
 };
+use std::time::Duration;
 
 /// Transport configuration for multi-transport serving.
 ///
@@ -94,6 +96,10 @@ pub struct RouterConfig {
     pub security_mode: SecurityMode,
     /// Maximum subscriptions per session (0 = unlimited)
     pub max_subscriptions_per_session: usize,
+    /// Enable gesture move coalescing (reduces bandwidth for high-frequency touch input)
+    pub gesture_coalescing: bool,
+    /// Gesture move coalesce interval in milliseconds (default: 16ms = 60fps)
+    pub gesture_coalesce_interval_ms: u64,
 }
 
 impl Default for RouterConfig {
@@ -105,12 +111,61 @@ impl Default for RouterConfig {
                 "event".to_string(),
                 "stream".to_string(),
                 "timeline".to_string(),
+                "gesture".to_string(),
             ],
             max_sessions: 100,
             session_timeout: 300,
             security_mode: SecurityMode::Open,
             max_subscriptions_per_session: 1000, // 0 = unlimited
+            gesture_coalescing: true,
+            gesture_coalesce_interval_ms: 16,
         }
+    }
+}
+
+/// Builder for RouterConfig
+#[derive(Debug, Clone, Default)]
+pub struct RouterConfigBuilder {
+    config: RouterConfig,
+}
+
+impl RouterConfigBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.config.name = name.into();
+        self
+    }
+
+    pub fn max_sessions(mut self, max: usize) -> Self {
+        self.config.max_sessions = max;
+        self
+    }
+
+    pub fn session_timeout(mut self, secs: u64) -> Self {
+        self.config.session_timeout = secs;
+        self
+    }
+
+    pub fn security_mode(mut self, mode: SecurityMode) -> Self {
+        self.config.security_mode = mode;
+        self
+    }
+
+    pub fn gesture_coalescing(mut self, enabled: bool) -> Self {
+        self.config.gesture_coalescing = enabled;
+        self
+    }
+
+    pub fn gesture_coalesce_interval_ms(mut self, ms: u64) -> Self {
+        self.config.gesture_coalesce_interval_ms = ms;
+        self
+    }
+
+    pub fn build(self) -> RouterConfig {
+        self.config
     }
 }
 
@@ -129,11 +184,21 @@ pub struct Router {
     token_validator: Option<Arc<dyn TokenValidator>>,
     /// P2P capabilities tracker
     p2p_capabilities: Arc<P2PCapabilities>,
+    /// Gesture registry for move coalescing
+    gesture_registry: Option<Arc<GestureRegistry>>,
 }
 
 impl Router {
     /// Create a new router with the given configuration
     pub fn new(config: RouterConfig) -> Self {
+        let gesture_registry = if config.gesture_coalescing {
+            Some(Arc::new(GestureRegistry::new(Duration::from_millis(
+                config.gesture_coalesce_interval_ms,
+            ))))
+        } else {
+            None
+        };
+
         Self {
             config,
             sessions: Arc::new(DashMap::new()),
@@ -142,6 +207,7 @@ impl Router {
             running: Arc::new(RwLock::new(false)),
             token_validator: None,
             p2p_capabilities: Arc::new(P2PCapabilities::new()),
+            gesture_registry,
         }
     }
 
@@ -205,6 +271,11 @@ impl Router {
             self.start_session_cleanup_task();
         }
 
+        // Start gesture flush task if coalescing is enabled
+        if let Some(ref registry) = self.gesture_registry {
+            self.start_gesture_flush_task(Arc::clone(registry));
+        }
+
         while *self.running.read() {
             match server.accept().await {
                 Ok((sender, receiver, addr)) => {
@@ -218,6 +289,47 @@ impl Router {
         }
 
         Ok(())
+    }
+
+    /// Start background task to flush stale gesture moves
+    fn start_gesture_flush_task(&self, registry: Arc<GestureRegistry>) {
+        let sessions = Arc::clone(&self.sessions);
+        let subscriptions = Arc::clone(&self.subscriptions);
+        let running = Arc::clone(&self.running);
+        let flush_interval = Duration::from_millis(self.config.gesture_coalesce_interval_ms);
+
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(flush_interval);
+
+            loop {
+                ticker.tick().await;
+
+                if !*running.read() {
+                    break;
+                }
+
+                // Flush any stale buffered moves
+                let to_flush = registry.flush_stale();
+                for pub_msg in to_flush {
+                    let msg = Message::Publish(pub_msg.clone());
+                    let subscribers = subscriptions
+                        .find_subscribers(&pub_msg.address, Some(SignalType::Gesture));
+
+                    if let Ok(bytes) = codec::encode(&msg) {
+                        for sub_session_id in subscribers {
+                            if let Some(sub_session) = sessions.get(&sub_session_id) {
+                                let _ = sub_session.send(bytes.clone()).await;
+                            }
+                        }
+                    }
+                }
+
+                // Cleanup very old gestures (> 5 minutes with no end)
+                registry.cleanup_stale(Duration::from_secs(300));
+            }
+
+            debug!("Gesture flush task stopped");
+        });
     }
 
     /// Start background task to clean up timed-out sessions
@@ -429,7 +541,16 @@ impl Router {
             running: Arc::clone(&self.running),
             token_validator: self.token_validator.clone(),
             p2p_capabilities: Arc::clone(&self.p2p_capabilities),
+            gesture_registry: self.gesture_registry.clone(),
         }
+    }
+
+    /// Get active gesture count (for diagnostics)
+    pub fn active_gesture_count(&self) -> usize {
+        self.gesture_registry
+            .as_ref()
+            .map(|r| r.active_count())
+            .unwrap_or(0)
     }
 
     /// Handle a new connection
@@ -447,6 +568,7 @@ impl Router {
         let token_validator = self.token_validator.clone();
         let security_mode = self.config.security_mode;
         let p2p_capabilities = Arc::clone(&self.p2p_capabilities);
+        let gesture_registry = self.gesture_registry.clone();
 
         tokio::spawn(async move {
             let mut session: Option<Arc<Session>> = None;
@@ -470,6 +592,7 @@ impl Router {
                                     security_mode,
                                     &token_validator,
                                     &p2p_capabilities,
+                                    &gesture_registry,
                                 )
                                 .await
                                 {
@@ -622,6 +745,7 @@ async fn handle_message(
     security_mode: SecurityMode,
     token_validator: &Option<Arc<dyn TokenValidator>>,
     p2p_capabilities: &Arc<P2PCapabilities>,
+    gesture_registry: &Option<Arc<GestureRegistry>>,
 ) -> Option<MessageResult> {
     match msg {
         Message::Hello(hello) => {
@@ -1011,6 +1135,41 @@ async fn handle_message(
 
             // Standard PUBLISH handling for non-P2P addresses
             let signal_type = pub_msg.signal;
+
+            // Check for gesture coalescing
+            if let Some(registry) = gesture_registry {
+                if signal_type == Some(SignalType::Gesture) {
+                    match registry.process(pub_msg) {
+                        GestureResult::Forward(messages) => {
+                            // Forward all messages (may include flushed move + end)
+                            for forward_msg in messages {
+                                let msg_to_send = Message::Publish(forward_msg.clone());
+                                let subscribers = subscriptions
+                                    .find_subscribers(&forward_msg.address, signal_type);
+                                if let Ok(bytes) = codec::encode(&msg_to_send) {
+                                    for sub_session_id in subscribers {
+                                        if sub_session_id != session.id {
+                                            if let Some(sub_session) =
+                                                sessions.get(&sub_session_id)
+                                            {
+                                                let _ = sub_session.send(bytes.clone()).await;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            return Some(MessageResult::None);
+                        }
+                        GestureResult::Buffered => {
+                            // Move was buffered, nothing to forward yet
+                            return Some(MessageResult::None);
+                        }
+                        GestureResult::PassThrough => {
+                            // Not a gesture, fall through to standard handling
+                        }
+                    }
+                }
+            }
 
             // Find subscribers
             let subscribers = subscriptions.find_subscribers(&pub_msg.address, signal_type);

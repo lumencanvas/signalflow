@@ -22,7 +22,7 @@ class TestConstants:
     """Test protocol constants."""
 
     def test_protocol_version(self):
-        assert PROTOCOL_VERSION == 2
+        assert PROTOCOL_VERSION == 1
 
     def test_default_ws_port(self):
         assert DEFAULT_WS_PORT == 7330

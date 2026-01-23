@@ -12,6 +12,12 @@ pub enum TransportError {
     #[error("connection closed")]
     ConnectionClosed,
 
+    #[error("bind failed: {0}")]
+    BindFailed(String),
+
+    #[error("accept failed: {0}")]
+    AcceptFailed(String),
+
     #[error("send failed: {0}")]
     SendFailed(String),
 

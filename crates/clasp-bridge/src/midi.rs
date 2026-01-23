@@ -353,6 +353,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             }))
         }
         // Control Change
@@ -380,6 +381,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             }))
         }
         // Pitch Bend
@@ -407,6 +409,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             })),
             0xFA => Some(Message::Publish(PublishMessage {
                 address: format!("{}/transport", base_addr),
@@ -418,6 +421,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             })),
             0xFB => Some(Message::Publish(PublishMessage {
                 address: format!("{}/transport", base_addr),
@@ -429,6 +433,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             })),
             0xFC => Some(Message::Publish(PublishMessage {
                 address: format!("{}/transport", base_addr),
@@ -440,6 +445,7 @@ fn midi_message_to_clasp(message: &[u8], base_addr: &str) -> Option<Message> {
                 id: None,
                 phase: None,
                 timestamp: None,
+                timeline: None,
             })),
             _ => None,
         },

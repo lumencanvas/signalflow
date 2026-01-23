@@ -1,8 +1,8 @@
 """
 CLASP Python client
 
-Supports v3 binary encoding for efficient wire format.
-Backward compatible: can decode v2 MessagePack frames.
+Supports binary encoding for efficient wire format.
+Backward compatible: can decode MessagePack frames (legacy).
 """
 
 import asyncio
@@ -34,7 +34,7 @@ from .types import (
 )
 
 
-# Message type codes (v3 binary format)
+# Message type codes (binary format)
 MSG_HELLO = 0x01
 MSG_WELCOME = 0x02
 MSG_ANNOUNCE = 0x03
@@ -53,7 +53,7 @@ MSG_ERROR = 0x51
 MSG_QUERY = 0x60
 MSG_RESULT = 0x61
 
-# Value type codes (v3 binary format)
+# Value type codes (binary format)
 VAL_NULL = 0x00
 VAL_BOOL = 0x01
 VAL_I8 = 0x02
@@ -411,11 +411,11 @@ class Clasp:
         await self._ws.send(data)
 
     def _encode(self, msg: Dict[str, Any]) -> bytes:
-        """Encode message to v3 binary frame"""
+        """Encode message to binary frame"""
         payload = self._encode_message_v3(msg)
 
-        # Build frame header with v3 version bit
-        flags = 0x01  # Version = 1 (v3 binary)
+        # Build frame header with encoding version bit
+        flags = 0x01  # Encoding = 1 (binary), 0 = MessagePack (legacy)
         header = bytes([
             0x53,  # Magic
             flags,
@@ -426,7 +426,7 @@ class Clasp:
         return header + payload
 
     def _decode(self, data: bytes) -> Dict[str, Any]:
-        """Decode frame to message - auto-detects v2 vs v3"""
+        """Decode frame to message - auto-detects MessagePack vs binary encoding"""
         if len(data) < 4 or data[0] != 0x53:
             raise ClaspError("Invalid frame")
 
@@ -445,11 +445,11 @@ class Clasp:
                 # v2 MessagePack
                 return msgpack.unpackb(payload, raw=False)
 
-        # v3 binary format
+        # Binary encoding format
         return self._decode_message_v3(payload)
 
     def _encode_message_v3(self, msg: Dict[str, Any]) -> bytes:
-        """Encode message to v3 binary format"""
+        """Encode message to binary format"""
         msg_type = msg.get("type")
         parts = []
 
@@ -562,7 +562,7 @@ class Clasp:
         return b''.join(parts)
 
     def _decode_message_v3(self, data: bytes) -> Dict[str, Any]:
-        """Decode v3 binary message"""
+        """Decode binary encoded message"""
         if not data:
             raise ClaspError("Empty message")
 

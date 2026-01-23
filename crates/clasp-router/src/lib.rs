@@ -86,9 +86,11 @@
 //! - [`state`] - Parameter state storage
 //! - [`subscription`] - Pattern-based subscription matching
 //! - [`p2p`] - Peer-to-peer mesh networking support
+//! - [`gesture`] - Gesture move coalescing for bandwidth optimization
 //! - [`error`] - Error types
 
 pub mod error;
+pub mod gesture;
 pub mod p2p;
 pub mod router;
 pub mod session;
@@ -96,8 +98,9 @@ pub mod state;
 pub mod subscription;
 
 pub use error::{Result, RouterError};
+pub use gesture::{GestureRegistry, GestureResult};
 pub use p2p::{analyze_address, P2PAddressType, P2PCapabilities};
-pub use router::{Router, RouterConfig, TransportConfig};
+pub use router::{Router, RouterConfig, RouterConfigBuilder, TransportConfig};
 pub use session::{Session, SessionId};
 pub use state::RouterState;
 pub use subscription::SubscriptionManager;

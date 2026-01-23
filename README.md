@@ -83,19 +83,29 @@ Download the latest release for your platform:
 
 ### CLI Usage
 
+**Important:** CLASP uses a router-based architecture. Start a router first, then add protocol connections.
+
 ```bash
-# Start an OSC server on port 9000
+# 1. Start CLASP router (required - central message hub)
+clasp server --port 7330
+
+# 2. Start protocol connections (these connect TO the router)
+# OSC: listens for OSC messages, translates and routes to CLASP
 clasp osc --port 9000
 
-# Connect to an MQTT broker
+# MQTT: connects to MQTT broker, translates and routes to CLASP
 clasp mqtt --host broker.local --port 1883
 
-# Start HTTP REST API
+# HTTP: provides REST API that translates to CLASP
 clasp http --bind 0.0.0.0:3000
 
 # Show all options
 clasp --help
 ```
+
+**How it works:** Protocol commands (`clasp osc`, `clasp mqtt`, etc.) create bidirectional protocol connections that connect to the CLASP router. They translate between external protocols and CLASP, routing all messages through the central router. This enables any protocol to communicate with any other protocol through CLASP.
+
+See [Bridge Setup Guide](docs/guides/bridge-setup.md) for detailed setup instructions.
 
 ## CLASP-to-CLASP Examples
 
@@ -263,12 +273,12 @@ CLASP clients in different languages can seamlessly communicate:
 
 ## Features
 
-- **Protocol Bridges**: OSC, MIDI, Art-Net, DMX, MQTT, WebSocket, Socket.IO, HTTP/REST
+- **Protocol Connections**: OSC, MIDI, Art-Net, DMX, MQTT, WebSocket, Socket.IO, HTTP/REST
 - **Signal Routing**: Wildcard patterns (`*`, `**`), transforms, aggregation
 - **Low Latency**: WebSocket transport with sub-millisecond overhead
 - **State Sync**: Automatic state synchronization between clients
-- **Desktop App**: Visual bridge configuration and signal monitoring
-- **CLI Tool**: Start servers and bridges from the command line
+- **Desktop App**: Visual protocol configuration and signal monitoring
+- **CLI Tool**: Start routers and protocol connections from the command line
 - **Embeddable**: Rust crates, WASM module, Python, JavaScript
 
 ## Performance

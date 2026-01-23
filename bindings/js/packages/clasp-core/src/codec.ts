@@ -1,10 +1,10 @@
 /**
- * CLASP v3 Binary Codec
+ * CLASP Binary Codec
  *
  * Efficient binary encoding for all CLASP messages.
- * Backward compatible: can decode v2 MessagePack frames.
+ * Backward compatible: can decode MessagePack frames (legacy).
  *
- * Performance compared to v2 (MessagePack with named keys):
+ * Performance compared to MessagePack (with named keys):
  * - SET message: 69 bytes → 32 bytes (54% smaller)
  * - Encoding speed: ~10M msg/s (vs 1.8M)
  * - Decoding speed: ~12M msg/s (vs 1.5M)
@@ -112,7 +112,7 @@ export const PHASE = {
 
 /** Extended frame flags with version */
 export interface FrameFlagsV3 extends FrameFlags {
-  /** Encoding version: 0 = v2 (MessagePack), 1 = v3 (binary) */
+  /** Encoding version: 0 = MessagePack (legacy), 1 = binary (default) */
   version: number;
 }
 
@@ -173,7 +173,7 @@ export function encodeFrame(payload: Uint8Array, options: FrameOptions = {}): Ui
     hasTimestamp,
     encrypted: false,
     compressed: false,
-    version: 1, // v3 binary encoding
+    version: 1, // binary encoding (1 = binary, 0 = MessagePack legacy)
   });
   view.setUint16(2, payload.length, false);
 
@@ -219,7 +219,7 @@ export function decodeFrame(data: Uint8Array): DecodedFrame {
 }
 
 /**
- * Encode a message to v3 binary payload
+ * Encode a message to binary payload
  */
 export function encodeMessageBinary(message: Message): Uint8Array {
   const buf = new ArrayBuffer(4096);
@@ -286,7 +286,7 @@ export function encodeMessageBinary(message: Message): Uint8Array {
 }
 
 /**
- * Decode a message - auto-detects v2 (MessagePack) vs v3 (binary)
+ * Decode a message - auto-detects MessagePack (legacy) vs binary encoding
  */
 export function decodeMessageBinary(data: Uint8Array): Message {
   if (data.length === 0) {
@@ -295,7 +295,7 @@ export function decodeMessageBinary(data: Uint8Array): Message {
 
   const first = data[0];
 
-  // v3 messages start with known message type codes (0x01-0x61)
+  // Binary encoded messages start with known message type codes (0x01-0x61)
   // v2 MessagePack maps start with 0x80-0x8F (fixmap) or 0xDE-0xDF (map16/map32)
   if (isMsgpackMap(first)) {
     return msgpackDecode(data) as Message;
@@ -305,7 +305,7 @@ export function decodeMessageBinary(data: Uint8Array): Message {
 }
 
 /**
- * Encode a message to a frame (v3 binary)
+ * Encode a message to a frame (binary encoding)
  */
 export function encodeMessage(message: Message, options: FrameOptions = {}): Uint8Array {
   const payload = encodeMessageBinary(message);
@@ -369,7 +369,7 @@ export function checkComplete(data: Uint8Array): number | null {
 }
 
 // ============================================================================
-// V3 BINARY ENCODING
+// BINARY ENCODING
 // ============================================================================
 
 function encodeSet(view: DataView, offset: number, msg: SetMessage): number {
@@ -783,7 +783,7 @@ function encodeResult(view: DataView, offset: number, msg: ResultMessage): numbe
 }
 
 // ============================================================================
-// V3 BINARY DECODING
+// BINARY DECODING
 // ============================================================================
 
 function decodeV3Binary(data: Uint8Array): Message {

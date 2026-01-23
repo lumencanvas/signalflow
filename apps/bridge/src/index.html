@@ -47,8 +47,25 @@
       <aside class="sidebar">
         <section class="sidebar-section">
           <div class="section-header">
-            <h2 class="section-title">MY SERVERS</h2>
-            <button class="help-btn" title="Servers listen for incoming connections. Start a CLASP server to let other apps connect, or start protocol servers (OSC, MIDI, etc.) to receive data from those protocols.">
+            <h2 class="section-title">CLASP ROUTERS</h2>
+            <button class="help-btn" title="CLASP routers are central message hubs that route signals between clients. Start a router first, then connect protocols to it.">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg>
+            </button>
+            <span class="section-badge" id="router-badge">0</span>
+          </div>
+          <div id="router-list" class="device-list"></div>
+          <div class="sidebar-buttons">
+            <button class="btn btn-sm btn-primary" id="add-router-btn">
+              <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              ADD ROUTER
+            </button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="section-header">
+            <h2 class="section-title">PROTOCOL CONNECTIONS</h2>
+            <button class="help-btn" title="Connect external protocols (OSC, MIDI, MQTT, etc.) to CLASP routers. These connections translate between protocols and CLASP, routing messages through the router.">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg>
             </button>
             <span class="section-badge" id="server-badge">0</span>
@@ -57,7 +74,7 @@
           <div class="sidebar-buttons">
             <button class="btn btn-sm btn-primary" id="add-server-btn">
               <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              ADD SERVER
+              ADD PROTOCOL
             </button>
           </div>
         </section>
@@ -79,22 +96,6 @@
           </div>
         </section>
 
-        <section class="sidebar-section">
-          <div class="section-header">
-            <h2 class="section-title">OUTPUT TARGETS</h2>
-            <button class="help-btn" title="Output targets are destinations where CLASP Bridge sends translated signals. Add targets like 'OSC to Resolume' or 'MIDI to DAW' to route your bridged signals to other applications.">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg>
-            </button>
-            <span class="section-badge" id="output-badge">0</span>
-          </div>
-          <div id="output-list" class="device-list"></div>
-          <div class="sidebar-buttons">
-            <button class="btn btn-sm btn-secondary" id="add-output-btn">
-              <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              ADD OUTPUT
-            </button>
-          </div>
-        </section>
 
         <section class="sidebar-section sidebar-stats">
           <div class="stat-row">
@@ -125,13 +126,13 @@
           <!-- Bridges Panel -->
           <div class="tab-panel active" id="panel-bridges">
             <div class="panel-toolbar">
-              <h2 class="panel-title">Protocol Bridges</h2>
-              <button class="help-btn" title="Bridges translate between different protocols. For example, OSC→CLASP converts incoming OSC messages to CLASP format, allowing any OSC app to communicate with CLASP clients.">
+              <h2 class="panel-title">Direct Bridges</h2>
+              <button class="help-btn" title="Direct protocol-to-protocol connections that bypass CLASP routers. Use these when you want OSC→OSC or MIDI→MIDI without routing through a router. For router-based routing, use Protocol Connections instead.">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg>
               </button>
               <button class="btn btn-primary" id="add-bridge-btn">
                 <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                NEW BRIDGE
+                CREATE DIRECT BRIDGE
               </button>
             </div>
             <div class="panel-content">
@@ -231,12 +232,12 @@
             </div>
             <div class="panel-content">
               <div class="test-panel-grid">
-                <!-- Server Health -->
+                <!-- Router & Connection Health -->
                 <div class="test-section">
-                  <h3 class="test-section-title">Server Health</h3>
+                  <h3 class="test-section-title">Router & Connection Health</h3>
                   <div id="server-health" class="server-health-grid">
                     <div class="empty-state-small">
-                      <span class="empty-state-text">No servers running</span>
+                      <span class="empty-state-text">No routers or connections running</span>
                     </div>
                   </div>
                 </div>
@@ -246,10 +247,11 @@
                   <h3 class="test-section-title">Test Signal Generator</h3>
                   <div class="test-generator">
                     <div class="form-group">
-                      <label class="form-label">Target Server</label>
+                      <label class="form-label">Target Connection</label>
                       <select id="test-target-server" class="select">
-                        <option value="">Select a server...</option>
+                        <option value="">Select a protocol connection...</option>
                       </select>
+                      <span class="form-hint">Select a protocol connection to send test signals through</span>
                     </div>
                     <div class="form-group">
                       <label class="form-label">Signal Address</label>
@@ -313,7 +315,7 @@
                   <option value="debug">Debug+</option>
                 </select>
                 <select class="select select-sm" id="log-filter-server">
-                  <option value="all">All Sources</option>
+                  <option value="all">All Routers & Connections</option>
                 </select>
                 <button class="btn btn-sm btn-secondary" id="export-logs-btn">
                   <svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -364,7 +366,10 @@
     <dialog id="bridge-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">CREATE BRIDGE</h2>
+          <h2 class="modal-title">CREATE DIRECT BRIDGE</h2>
+          <div class="modal-help-text" style="font-size: 11px; color: var(--color-text-muted); margin-top: 4px;">
+            Direct bridges connect protocols without a router. For router-based routing, use Protocol Connections instead.
+          </div>
           <button type="button" class="modal-close" data-close-modal>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -770,14 +775,14 @@ function transform(input) {
     <dialog id="server-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">ADD SERVER</h2>
+          <h2 class="modal-title">ADD PROTOCOL CONNECTION</h2>
           <button type="button" class="modal-close" data-close-modal>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
         <form id="server-form">
           <div class="form-group">
-            <label class="form-label">Server Type</label>
+            <label class="form-label">Protocol Type</label>
             <select name="serverType" class="select" id="server-type">
               <option value="clasp">CLASP (Native Protocol)</option>
               <option value="osc">OSC (Open Sound Control)</option>
@@ -790,13 +795,13 @@ function transform(input) {
               <option value="sacn">sACN/E1.31 (Streaming ACN)</option>
               <option value="dmx">DMX (USB Serial Interface)</option>
             </select>
-            <span class="form-hint" id="server-type-hint">Full CLASP protocol server - other apps can connect and exchange signals</span>
+            <span class="form-hint" id="server-type-hint">CLASP router - central message hub that routes signals between clients</span>
           </div>
 
-          <!-- CLASP Server Fields -->
+          <!-- CLASP Router Fields -->
           <div id="server-clasp-fields" class="server-fields">
             <div class="form-group">
-              <label class="form-label">Server Name</label>
+              <label class="form-label">Router Name</label>
               <input type="text" name="claspName" class="input" placeholder="My CLASP Server" value="CLASP Bridge Server">
               <span class="form-hint">Friendly name shown to other clients during discovery</span>
             </div>
@@ -869,7 +874,7 @@ function transform(input) {
             </div>
           </div>
 
-          <!-- MIDI Server Fields -->
+          <!-- MIDI Connection Fields -->
           <div id="server-midi-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">
@@ -891,9 +896,16 @@ function transform(input) {
               </select>
               <span class="form-hint">Select a MIDI output to send messages to</span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="midi-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- OSC Server Fields -->
+          <!-- OSC Connection Fields -->
           <div id="server-osc-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">
@@ -907,6 +919,11 @@ function transform(input) {
               </select>
             </div>
             <div class="form-group">
+              <label class="form-label">IP Address (optional)</label>
+              <input type="text" name="oscIp" class="input" placeholder="127.0.0.1" pattern="^([0-9]{1,3}\.){3}[0-9]{1,3}$">
+              <span class="form-hint">Specific IP to bind to (leave empty to use bind address above)</span>
+            </div>
+            <div class="form-group">
               <label class="form-label">Port</label>
               <input type="number" name="oscPort" class="input" placeholder="9000" value="9000" min="1" max="65535">
             </div>
@@ -914,9 +931,16 @@ function transform(input) {
               <button type="button" class="btn btn-secondary btn-sm" id="test-osc-btn">Test Port</button>
               <span class="form-hint test-result" id="osc-test-result"></span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="osc-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- MQTT Broker Fields -->
+          <!-- MQTT Connection Fields -->
           <div id="server-mqtt-fields" class="server-fields hidden">
             <div class="form-row">
               <div class="form-group">
@@ -974,9 +998,16 @@ function transform(input) {
               <input type="text" name="mqttNamespace" class="input" placeholder="/mqtt" value="/mqtt">
               <span class="form-hint">MQTT topic "sensors/temp" → CLASP address "/mqtt/sensors/temp"</span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="mqtt-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- WebSocket Server Fields -->
+          <!-- WebSocket Connection Fields -->
           <div id="server-websocket-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Mode</label>
@@ -1008,9 +1039,16 @@ function transform(input) {
               <label class="form-label">CLASP Namespace</label>
               <input type="text" name="wsNamespace" class="input" placeholder="/websocket" value="/websocket">
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="websocket-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- HTTP Server Fields -->
+          <!-- HTTP Connection Fields -->
           <div id="server-http-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Bind Address</label>
@@ -1025,9 +1063,16 @@ function transform(input) {
                 <input type="checkbox" name="httpCors" checked> Enable CORS
               </label>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="http-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- Art-Net Server Fields -->
+          <!-- Art-Net Connection Fields -->
           <div id="server-artnet-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Bind Address</label>
@@ -1041,9 +1086,16 @@ function transform(input) {
               <label class="form-label">Universe</label>
               <input type="number" name="artnetUniverse" class="input" placeholder="0" value="0" min="0" max="15">
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="artnet-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- sACN/E1.31 Server Fields -->
+          <!-- sACN/E1.31 Connection Fields -->
           <div id="server-sacn-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Mode</label>
@@ -1089,9 +1141,16 @@ function transform(input) {
               <input type="text" name="sacnBindAddress" class="input" placeholder="0.0.0.0">
               <span class="form-hint">Leave empty to use all network interfaces</span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="sacn-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- DMX Serial Fields -->
+          <!-- DMX Connection Fields -->
           <div id="server-dmx-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">
@@ -1113,9 +1172,16 @@ function transform(input) {
               <button type="button" class="btn btn-secondary btn-sm" id="test-dmx-btn">Test Connection</button>
               <span class="form-hint test-result" id="dmx-test-result"></span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="dmx-router-select">
+                <option value="">Auto-select first available router</option>
+              </select>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
+            </div>
           </div>
 
-          <!-- Socket.IO Server Fields -->
+          <!-- Socket.IO Connection Fields -->
           <div id="server-socketio-fields" class="server-fields hidden">
             <div class="form-group">
               <label class="form-label">Mode</label>
@@ -1134,136 +1200,23 @@ function transform(input) {
               <input type="text" name="socketioNamespace" class="input" placeholder="/" value="/">
               <span class="form-hint">Socket.IO namespace to use, defaults to /</span>
             </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn btn-secondary" data-close-modal>CANCEL</button>
-            <button type="submit" class="btn btn-primary">START SERVER</button>
-          </div>
-        </form>
-      </div>
-    </dialog>
-
-    <!-- Output Target Modal -->
-    <dialog id="output-modal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title">ADD OUTPUT TARGET</h2>
-          <button type="button" class="modal-close" data-close-modal>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <form id="output-form">
-          <div class="form-group">
-            <label class="form-label">Output Type</label>
-            <select name="outputType" class="select" id="output-type">
-              <option value="osc">OSC (Open Sound Control)</option>
-              <option value="midi">MIDI (Musical Instruments)</option>
-              <option value="artnet">Art-Net (DMX over Ethernet)</option>
-              <option value="mqtt">MQTT (IoT Messaging)</option>
-              <option value="websocket">WebSocket (JSON)</option>
-              <option value="http">HTTP (Webhooks)</option>
-            </select>
-            <span class="form-hint" id="output-type-hint">Send OSC messages to other applications like Resolume, TouchDesigner, or Max</span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Name</label>
-            <input type="text" name="outputName" class="input" placeholder="e.g. Resolume, TouchDesigner, DAW">
-            <span class="form-hint">Friendly name to identify this output</span>
-          </div>
-
-          <!-- OSC Output Fields -->
-          <div id="output-osc-fields" class="output-fields">
             <div class="form-group">
-              <label class="form-label">Target Host</label>
-              <input type="text" name="oscHost" class="input" placeholder="192.168.1.100" value="127.0.0.1">
-              <span class="form-hint">IP address or hostname of the target application</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Port</label>
-              <input type="number" name="oscTargetPort" class="input" placeholder="7000" value="7000" min="1" max="65535">
-              <span class="form-hint">Port the target application is listening on</span>
-            </div>
-          </div>
-
-          <!-- MIDI Output Fields -->
-          <div id="output-midi-fields" class="output-fields hidden">
-            <div class="form-group">
-              <label class="form-label">
-                MIDI Output Port
-                <button type="button" class="btn-icon refresh-midi-outputs" title="Refresh MIDI ports">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
-                </button>
-              </label>
-              <select name="midiOutputPort" class="select" id="midi-output-port-select">
-                <option value="default">System Default</option>
+              <label class="form-label">Connect to CLASP Router</label>
+              <select name="routerId" class="select" id="socketio-router-select">
+                <option value="">Auto-select first available router</option>
               </select>
-              <span class="form-hint">Select the MIDI output device to send to</span>
-            </div>
-          </div>
-
-          <!-- Art-Net Output Fields -->
-          <div id="output-artnet-fields" class="output-fields hidden">
-            <div class="form-group">
-              <label class="form-label">Target Host</label>
-              <input type="text" name="artnetHost" class="input" placeholder="192.168.1.50" value="255.255.255.255">
-              <span class="form-hint">IP address of Art-Net node, or 255.255.255.255 for broadcast</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Universe</label>
-              <input type="number" name="artnetOutputUniverse" class="input" placeholder="0" value="0" min="0" max="32767">
-            </div>
-          </div>
-
-          <!-- MQTT Output Fields -->
-          <div id="output-mqtt-fields" class="output-fields hidden">
-            <div class="form-group">
-              <label class="form-label">Broker Host</label>
-              <input type="text" name="mqttOutputHost" class="input" placeholder="localhost" value="localhost">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Port</label>
-              <input type="number" name="mqttOutputPort" class="input" placeholder="1883" value="1883" min="1" max="65535">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Base Topic</label>
-              <input type="text" name="mqttBaseTopic" class="input" placeholder="clasp/output" value="clasp/output">
-              <span class="form-hint">Signals will be published under this topic prefix</span>
-            </div>
-          </div>
-
-          <!-- WebSocket Output Fields -->
-          <div id="output-websocket-fields" class="output-fields hidden">
-            <div class="form-group">
-              <label class="form-label">Server URL</label>
-              <input type="text" name="wsOutputUrl" class="input" placeholder="ws://localhost:8080" value="ws://localhost:8080">
-              <span class="form-hint">WebSocket server URL to connect to</span>
-            </div>
-          </div>
-
-          <!-- HTTP Output Fields -->
-          <div id="output-http-fields" class="output-fields hidden">
-            <div class="form-group">
-              <label class="form-label">Webhook URL</label>
-              <input type="text" name="httpOutputUrl" class="input" placeholder="https://example.com/webhook">
-              <span class="form-hint">HTTP endpoint to POST signals to</span>
-            </div>
-            <div class="form-group">
-              <label class="form-label">
-                <input type="checkbox" name="httpBatch" checked> Batch signals
-              </label>
-              <span class="form-hint">Group multiple signals into one request (reduces HTTP calls)</span>
+              <span class="form-hint">Select which CLASP router this connection should use</span>
             </div>
           </div>
 
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" data-close-modal>CANCEL</button>
-            <button type="submit" class="btn btn-primary">ADD OUTPUT</button>
+            <button type="submit" class="btn btn-primary" id="server-form-submit">START CONNECTION</button>
           </div>
         </form>
       </div>
     </dialog>
+
 
     <!-- Preset Picker Modal -->
     <dialog id="preset-modal" class="modal modal-lg">

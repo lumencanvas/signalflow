@@ -196,6 +196,8 @@ async fn test_embedded_to_router() {
         features: vec!["param".into()],
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 10,
+        gesture_coalescing: true,
+        gesture_coalesce_interval_ms: 16,
     });
 
     let addr = format!("127.0.0.1:{}", port);
@@ -348,6 +350,8 @@ async fn test_round_trip() {
         features: vec!["param".into()],
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 10,
+        gesture_coalescing: true,
+        gesture_coalesce_interval_ms: 16,
     });
 
     let addr = format!("127.0.0.1:{}", port);

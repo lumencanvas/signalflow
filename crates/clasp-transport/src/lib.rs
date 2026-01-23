@@ -25,6 +25,9 @@ pub mod websocket;
 pub mod wasm_websocket;
 
 // Native-only transports
+#[cfg(all(feature = "tcp", not(target_arch = "wasm32")))]
+pub mod tcp;
+
 #[cfg(all(feature = "udp", not(target_arch = "wasm32")))]
 pub mod udp;
 
@@ -50,6 +53,9 @@ pub use websocket::{WebSocketConfig, WebSocketServer, WebSocketTransport};
 // WASM WebSocket exports
 #[cfg(all(feature = "wasm-websocket", target_arch = "wasm32"))]
 pub use wasm_websocket::{WasmWebSocketConfig, WasmWebSocketTransport};
+
+#[cfg(all(feature = "tcp", not(target_arch = "wasm32")))]
+pub use tcp::{TcpConfig, TcpServer, TcpTransport};
 
 #[cfg(all(feature = "udp", not(target_arch = "wasm32")))]
 pub use udp::{UdpConfig, UdpTransport};

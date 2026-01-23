@@ -40,8 +40,8 @@ use alloc::{string::String, vec::Vec};
 /// Protocol magic byte
 pub const MAGIC: u8 = 0x53; // 'S' for Stream
 
-/// Protocol version
-pub const VERSION: u8 = 3;
+/// Protocol version (used in HELLO messages)
+pub const VERSION: u8 = 1;
 
 /// Message type codes (same as v3)
 pub mod msg {

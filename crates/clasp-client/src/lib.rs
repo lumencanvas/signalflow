@@ -75,6 +75,7 @@
 //! | `set()` | Parameters with state | Persisted | Confirm |
 //! | `emit()` | One-shot events | Not persisted | Confirm |
 //! | `stream()` | High-rate sensor data | Not persisted | Fire |
+//! | `gesture()` | Touch/pen/motion input | Phase only | Fire |
 //!
 //! ## Error Handling
 //!
@@ -107,5 +108,10 @@ pub mod prelude {
     pub use crate::error::{ClientError, Result};
     #[cfg(feature = "p2p")]
     pub use crate::p2p::{P2PEvent, P2PManager};
-    pub use clasp_core::{Message, SignalType, Value};
+    pub use clasp_core::{
+        EasingType, GesturePhase, Message, SignalType, TimelineData, TimelineKeyframe, Value,
+    };
 }
+
+// Re-export types for convenience
+pub use clasp_core::{EasingType, GesturePhase, TimelineData, TimelineKeyframe};

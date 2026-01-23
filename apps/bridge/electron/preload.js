@@ -30,6 +30,7 @@ const api = {
   getAllServerStats: () => ipcRenderer.invoke('get-all-server-stats'),
   healthCheck: (id) => ipcRenderer.invoke('health-check', id),
   runDiagnostics: () => ipcRenderer.invoke('run-diagnostics'),
+  getBridgeStatus: () => ipcRenderer.invoke('get-bridge-status'),
 
   // Test signal generator
   sendTestSignal: (config) => ipcRenderer.invoke('send-test-signal', config),
@@ -98,6 +99,14 @@ const api = {
   onServerStatsUpdate: (callback) => {
     ipcRenderer.on('server-stats-update', (event, stats) => callback(stats));
     return () => ipcRenderer.removeAllListeners('server-stats-update');
+  },
+  onBridgeReady: (callback) => {
+    ipcRenderer.on('bridge-ready', (event, ready) => callback(ready));
+    return () => ipcRenderer.removeAllListeners('bridge-ready');
+  },
+  onBridgeRouterStatus: (callback) => {
+    ipcRenderer.on('bridge-router-status', (event, status) => callback(status));
+    return () => ipcRenderer.removeAllListeners('bridge-router-status');
   },
 };
 

@@ -1,14 +1,60 @@
 # CLASP Project Master Plan
 
-**Last Updated:** 2026-01-22
+**Last Updated:** 2026-01-23
 **Version:** 0.1.8
 **Status:** Active Development
+
+---
+
+## 🔍 Latest Session Summary (2026-01-22/23)
+
+**Changes Made:**
+1. **Desktop App UI Improvements:**
+   - Sidebar width increased to 320px (was 220px)
+   - Window size reduced by 10% (1152×810)
+   - Remote router support: click discovered servers to add as connection targets
+   - Remote routers display with "REMOTE" badge and blue styling
+   - Remote routers appear in protocol connection dropdowns
+
+2. **Bridge Service:**
+   - Built `clasp-service` binary (was missing, causing "Bridge service not ready" errors)
+   - Improved error logging in `startBridgeService()` function
+   - Binary path verification added
+
+3. **Documentation:**
+   - All public docs updated with protocol-centric terminology
+   - Handoff document updated with completion status
+
+**Codebase Health Check (2026-01-23):**
+- ✅ All Rust tests passing (15+ tests)
+- ✅ No compilation errors
+- ✅ Minor warnings only (unused imports, dead code - normal dev warnings)
+- ✅ Desktop app terminology consistent (ADD ROUTER, ADD PROTOCOL, ADD OUTPUT)
+- ✅ Documentation consistent with codebase
+- ✅ State management properly organized
+- ✅ Binary build scripts correct
+
+---
+
+## 🎯 For New LLM: START HERE
+
+**Read `.internal/HANDOFF-GUIDE.md` first** - It explains where to start, what's been done, and what needs to be done.
+
+**Quick Start:**
+1. Read `.internal/COMPLETE-ARCHITECTURE-SUMMARY.md` (5 min) - The definitive model
+2. Read `.internal/MASTER-CONSOLIDATION-PLAN.md` (15 min) - File-by-file updates
+3. Read `.internal/IMPLEMENTATION-ROADMAP.md` (10 min) - Phase-by-phase plan
+4. Start Phase 1: Fix "internal" router connection
 
 ---
 
 ## Quick Context
 
 CLASP (Creative Low-Latency Application Streaming Protocol) is a universal protocol bridge for creative applications. This document consolidates all internal planning.
+
+**Version Context:** Protocol specification is version 1.0 (references to v3 removed). Package versions (0.1.x) will continue to increment independently. The protocol itself is stable at v1.
+
+**Architecture Model:** Protocol-Centric Organization (see `.internal/COMPLETE-ARCHITECTURE-SUMMARY.md` for definitive model)
 
 ---
 
@@ -72,12 +118,25 @@ clasp/
 - [x] WebSocket subprotocol updated to `clasp`
 - [x] Protocol spec cleaned up (single version)
 - [x] Architecture documentation
+- [x] Documentation updated for protocol-centric terminology (2026-01-22)
+- [x] "Internal" router connection implemented in Electron app
+- [x] clasp-service binary built and integrated (2026-01-22)
+- [x] Desktop app sidebar widened, window resized (2026-01-22)
+- [x] Remote router support: click discovered servers to add as connection target (2026-01-22)
 
 ### 🔄 In Progress
 
 - [ ] Server-in-application examples (Rust, Node.js, Python)
 - [ ] Version coordination across packages
-- [ ] Desktop app protocol updates
+- [x] Desktop app protocol updates (clasp-service built and integrated)
+- [x] Desktop app server scanning improvements
+  - [x] Click discovered server to add as remote router
+  - [x] Remote routers display with REMOTE badge
+  - [x] Remote routers appear in protocol connection dropdowns
+  - [x] Sidebar made wider (320px)
+  - [x] Window size reduced 10%
+- [ ] Bridge and server setup documentation with examples
+- [ ] Protocol mapping examples (X→CLASP and CLASP→X)
 
 ### 📋 Planned
 
@@ -115,17 +174,122 @@ cargo set-version 0.1.9 --workspace
 
 ### 2. Desktop App (apps/bridge)
 
-**Status:** Needs protocol update verification
+**Status:** Needs protocol update verification + UI/UX improvements for clarity
 
-**Tasks:**
+**⚠️ CRITICAL ARCHITECTURE ISSUES FOUND:**
+
+See `.internal/ARCHITECTURE-FINDINGS-AND-RECOMMENDATIONS.md` for complete analysis.
+
+**Key Findings:**
+1. **"Internal" router connection is NOT implemented** - Protocol servers create bridges with `target_addr: 'internal'`, but signals are NOT automatically forwarded to CLASP routers. They just appear in the signal monitor.
+2. **Bridges are hidden** - Protocol servers create bridges internally, but they're not added to `state.bridges` array, so users can't see/edit them.
+3. **Terminology is misleading** - "ADD SERVER" suggests standalone servers, but they also create hidden bridges.
+4. **Protocol adapters are bidirectional** - Most protocols (OSC, MIDI, MQTT, WebSocket, HTTP, Art-Net, sACN) support bidirectional communication. Only DMX is output-only.
+5. **Transports are router settings** - WebSocket, QUIC, TCP are settings on the CLASP router, not separate components.
+
+**See `.internal/COMPONENT-CAPABILITIES-MAP.md` for complete analysis of what each component does and can do.**
+
+**Critical Tasks:**
+- [ ] **FIX "INTERNAL" ROUTER CONNECTION (CRITICAL):**
+  - [ ] Implement actual forwarding of bridge signals to CLASP router
+  - [ ] When `target_addr: 'internal'`, find first running CLASP router and connect
+  - [ ] Forward all bridge signals to router via WebSocket
+  - [ ] Show connection status in UI (which router it connects to)
+  - [ ] Error if no CLASP router exists when trying to connect
+- [ ] **SHOW AUTO-CREATED BRIDGES (HIGH PRIORITY):**
+  - [ ] Add auto-created bridges to `state.bridges` array
+  - [ ] Mark as `autoCreated: true` and link to server
+  - [ ] Show in Bridges tab with "Auto" label
+  - [ ] Allow user to edit/delete auto-created bridges
+- [ ] **REORGANIZE UI INTO CLEAR SECTIONS (HIGH PRIORITY):**
+  - [ ] **CLASP ROUTERS** section - for creating routers
+  - [ ] **PROTOCOL CONNECTIONS** section - organize by protocol (not by role)
+    - [ ] Button: "ADD PROTOCOL" (not "ADD SERVER")
+    - [ ] Modal: Select protocol first, then configure role (server/client/device) as a setting
+    - [ ] Show connection status: "→ Connected to: CLASP Router"
+    - [ ] Allow multiple connections per protocol (e.g., OSC on port 9000 and 8000)
+  - [ ] **DIRECT CONNECTIONS** section - protocol-to-protocol bridges (bypass CLASP)
+    - [ ] Button: "CREATE DIRECT BRIDGE" or "CREATE PROTOCOL-TO-PROTOCOL BRIDGE"
+    - [ ] Make it clear these bypass CLASP router
+  - [ ] Update terminology: "CLASP Server" → "CLASP Router", "OSC Server" → "OSC Connection"
+  - [ ] See `.internal/DEEP-UI-ARCHITECTURE-ANALYSIS.md` for detailed rationale
+- [ ] **MAKE ADAPTER CONNECTION EXPLICIT (HIGH PRIORITY):**
+  - [ ] Add dropdown in adapter modal to select CLASP router
+  - [ ] Show which router each adapter connects to in adapter list
+  - [ ] Error if no router exists when trying to connect
+- [ ] **ADD TRANSPORT SETTINGS TO ROUTER (MEDIUM PRIORITY):**
+  - [ ] Add transport selection to router creation/editing modal
+  - [ ] Checkboxes: WebSocket, QUIC, TCP
+  - [ ] Show active transports in router list
 - [ ] Verify WebSocket connects with `clasp` subprotocol
 - [ ] Test message encoding/decoding with binary format
 - [ ] Update any UI that references v2/v3
 - [ ] Test with latest clasp-router
+- [ ] **IMPROVE SERVER SCANNING UI:**
+  - [ ] Click discovered server to add it (with rename option)
+  - [ ] Option to create bridge to discovered server
+  - [ ] Better visual feedback during scan
+  - [ ] Show server capabilities/metadata in list
+  - [ ] Persist discovered servers with custom names
+- [ ] **CLARIFY BRIDGE VS SERVER IN UI (HIGH PRIORITY):**
+  - [ ] See detailed plans:
+    - [ ] `.internal/ARCHITECTURE-FINDINGS-AND-RECOMMENDATIONS.md` - Complete analysis with recommendations
+    - [ ] `.internal/ACTUAL-ARCHITECTURE-MAP.md` - What each component actually does
+    - [ ] `.internal/CLEAR-ARCHITECTURE-PROPOSAL.md` - Recommended path forward
+    - [ ] `.internal/COMPONENT-CAPABILITIES-MAP.md` - What each component does and can do
+    - [ ] `.internal/PROTOCOL-ADAPTER-ROLES.md` - Server vs Client roles for adapters
+    - [ ] `.internal/UI-UX-IMPROVEMENTS.md` - Proposed UI changes
+  - [ ] **Key Finding:** Servers (`state.servers`) and Bridges (`state.bridges`) are separate
+    - [ ] Servers auto-create bridges to CLASP internally, but don't show in Bridges tab
+    - [ ] This is why users are confused - they add a "server" but don't see it as a bridge
+  - [ ] **Recommended Changes:**
+    - [ ] Rename "MY SERVERS" → "CONNECTED PROTOCOLS" or "PROTOCOL CONNECTIONS"
+    - [ ] Rename "ADD SERVER" → "CONNECT PROTOCOL"
+    - [ ] Update modal title to "CONNECT PROTOCOL"
+    - [ ] Add description: "Creates a bridge that connects [protocol] to CLASP router"
+    - [ ] Show "OSC Bridge → CLASP Router" in list instead of "OSC Server"
+    - [ ] Add note: "This bridge won't appear in 'Protocol Bridges' tab (it's auto-managed)"
+    - [ ] Add visual indicators showing connection to CLASP router
+    - [ ] Use language accessible to non-technical digital artists
+    - [ ] Maintain design consistency with current style
+- [ ] **CLARIFY BRIDGE VS SERVER TERMINOLOGY IN UI:**
+  - [ ] **Modal Title & Description:**
+    - [ ] Change "ADD SERVER" modal title to "ADD PROTOCOL BRIDGE" or "CONNECT PROTOCOL"
+    - [ ] Add clear description: "Connect [protocol] devices to CLASP. Messages are automatically translated and routed through CLASP."
+    - [ ] Show visual indicator that bridge connects to CLASP router (e.g., "→ CLASP Router" badge)
+  - [ ] **Button Labels:**
+    - [ ] Change "START SERVER" to "START BRIDGE" or "CONNECT"
+    - [ ] Update sidebar button from "+ ADD SERVER" to "+ ADD BRIDGE" or "+ CONNECT PROTOCOL"
+  - [ ] **Server List Display:**
+    - [ ] Show connection status: "Connected to CLASP Router" or "Bridge to CLASP"
+    - [ ] Add icon/badge indicating it's a bridge (not standalone server)
+    - [ ] Show which CLASP router it's connected to (if multiple routers exist)
+  - [ ] **Help Text & Tooltips:**
+    - [ ] Add tooltip to "ADD SERVER" button: "Create a bridge that connects [protocol] devices to CLASP"
+    - [ ] Add inline help in modal: "This creates a bridge that translates [protocol] messages to CLASP format and routes them through the CLASP router."
+    - [ ] Clarify: "Your [protocol] devices can connect here, and their messages will be available to all CLASP clients."
+  - [ ] **Visual Design:**
+    - [ ] Add visual flow indicator in modal: "[Protocol] Device → Bridge → CLASP Router → Other Clients"
+    - [ ] Use consistent terminology: "Bridge" not "Server" for protocol connections
+    - [ ] Keep "Server" only for CLASP native protocol server
+  - [ ] **For Digital Artists (Non-Technical Users):**
+    - [ ] Use simple language: "Connect your [protocol] gear" instead of "Start [protocol] server"
+    - [ ] Explain benefit: "Makes your [protocol] devices work with CLASP"
+    - [ ] Show example: "TouchOSC → OSC Bridge → Works with all CLASP apps"
+    - [ ] Avoid technical jargon in UI labels
+  - [ ] **Consistency:**
+    - [ ] Ensure all protocol options use same terminology
+    - [ ] Update all help text to be consistent
+    - [ ] Make sure "Protocol Bridges" tab matches sidebar terminology
+  - [ ] **Future: Standalone Servers:**
+    - [ ] Plan separate section/option for standalone protocol servers
+    - [ ] Label clearly: "Standalone [Protocol] Server (No CLASP)"
+    - [ ] Explain when to use: "For apps that only speak [protocol], no CLASP translation"
 
 **Files to check:**
 - `apps/bridge/electron/main.js` ✅ (updated to `clasp`)
-- `apps/bridge/src/app.js`
+- `apps/bridge/src/app.js` (needs server scanning improvements)
+- `apps/bridge/src/index.html` (UI for discovered servers)
 - `apps/bridge/package.json` (dependencies)
 
 ### 3. Server-in-Application Examples
@@ -291,6 +455,14 @@ Requirements:
 
 ## Protocol Notes
 
+### Version Context
+
+**Protocol Specification:** Version 1.0 (references to v3 removed from spec)
+**Package Versions:** Continue to increment independently (0.1.8, 0.1.9, etc.)
+**Code References:** May still reference "v3" internally (binary encoding version), but protocol spec is v1
+
+**Important:** The protocol specification document (CLASP-Protocol.md) is version 1.0. Internal code comments may reference "v3" to indicate the binary encoding format, but the official protocol version is 1.
+
 ### WebSocket Subprotocol
 
 **Value:** `clasp` (NOT `clasp.v2` or `clasp.v3`)
@@ -375,6 +547,61 @@ cargo run -p clasp-test-suite --bin real_benchmarks --release
 
 ## Documentation Updates Needed
 
+**See `.internal/MASTER-CONSOLIDATION-PLAN.md` for comprehensive file-by-file update plan.**
+
+### Critical Documentation Updates ✅ COMPLETED (2026-01-22)
+
+- [x] **README.md**
+  - [x] Update Quick Start: "protocol connections" terminology
+  - [x] Clarify: Bridge commands create protocol connections to router
+  - [x] Update terminology: "CLASP Server" → "CLASP Router"
+  
+- [x] **docs/index.md**
+  - [x] Update to protocol-centric model
+  - [x] Update terminology throughout
+
+- [x] **docs/guides/bridge-setup.md**
+  - [x] Update Desktop App section: "ADD SERVER" → "ADD PROTOCOL"
+  - [x] Clarify protocol connections vs direct bridges
+  - [x] Update all terminology
+
+- [x] **docs/guides/desktop-app-servers.md**
+  - [x] Rewritten for protocol-centric model
+  - [x] Title: "Desktop App: Understanding Protocol Connections"
+  - [x] Updated all terminology
+
+- [x] **crates/clasp-cli/README.md**
+  - [x] Update "Start Protocol Bridges" → "Start Protocol Connections"
+  - [x] Clarify connection to router
+  - [x] Update examples
+
+- [x] **docs/protocols/README.md**
+  - [x] Update terminology throughout
+
+### Remaining Documentation (Lower Priority)
+
+- [ ] **docs/guides/protocol-mapping.md**
+  - [ ] Verify terminology
+  - [ ] Add note about bidirectional connections
+  - [ ] Clarify protocol-to-protocol vs protocol-to-CLASP
+
+- [ ] **docs/architecture.md**
+  - [ ] Update diagrams for protocol-centric model
+  - [ ] Clarify protocol connections vs direct bridges
+
+- [ ] **docs/protocols/*.md** (individual protocol docs)
+  - [ ] Review each protocol doc
+  - [ ] Ensure consistent terminology
+  - [ ] Add connection examples
+
+- [ ] **Website (site/)**
+  - [ ] Review all pages
+  - [ ] Update terminology throughout
+  - [ ] Update examples
+  - [ ] Update screenshots (after UI changes)
+
+### Additional Documentation
+
 - [ ] Update clasp.to website for new protocol
 - [ ] Update playground for `clasp` subprotocol
 - [ ] Remove any v2/v3 comparison language
@@ -409,6 +636,33 @@ cargo run -p clasp-test-suite --bin real_benchmarks --release
 - **npm:** @clasp-to/core
 - **PyPI:** clasp-to
 - **crates.io:** clasp-*
+
+---
+
+## Related Internal Documents
+
+### 🎯 Start Here
+- **`.internal/COMPLETE-ARCHITECTURE-SUMMARY.md`** - **DEFINITIVE MODEL** - Complete summary of protocol-centric architecture
+- **`.internal/MASTER-CONSOLIDATION-PLAN.md`** - **COMPREHENSIVE UPDATE PLAN** - File-by-file updates for all docs, README, website, app
+- **`.internal/IMPLEMENTATION-ROADMAP.md`** - Phase-by-phase implementation plan with timelines
+- **`.internal/QUICK-REFERENCE.md`** - Quick reference for developers
+
+### Architecture & Analysis
+- `.internal/DEEP-UI-ARCHITECTURE-ANALYSIS.md` - Deep UI/UX analysis with protocol-centric recommendations
+- `.internal/COMPONENT-CAPABILITIES-MAP.md` - What each component does and can do
+- `.internal/PROTOCOL-ADAPTER-ROLES.md` - Server vs Client roles for adapters
+- `.internal/ARCHITECTURE-FINDINGS-AND-RECOMMENDATIONS.md` - Complete architecture analysis
+- `.internal/ACTUAL-ARCHITECTURE-MAP.md` - What each component actually does
+- `.internal/CLEAR-ARCHITECTURE-PROPOSAL.md` - Recommended path forward
+- `.internal/UI-UX-IMPROVEMENTS.md` - Proposed UI changes
+
+### Implementation Status
+- ✅ All architecture analysis complete
+- ✅ Protocol-centric model determined and documented
+- ✅ Master consolidation plan created (file-by-file updates)
+- ✅ Implementation roadmap created (phase-by-phase)
+- ✅ Complete architecture summary created
+- 🚀 Ready for implementation
 
 ---
 

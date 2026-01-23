@@ -167,6 +167,7 @@ async fn test_all_message_types() -> TestResult {
                     id: None,
                     phase: None,
                     timestamp: None,
+                    timeline: None,
                 }),
                 Message::Bundle(BundleMessage {
                     timestamp: Some(1704067200000000),
@@ -446,6 +447,7 @@ async fn test_bundle_messages() -> TestResult {
                         id: None,
                         phase: None,
                         timestamp: None,
+                        timeline: None,
                     }),
                 ],
             });

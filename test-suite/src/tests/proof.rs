@@ -897,6 +897,7 @@ pub fn visualize_midi_to_clasp_bridge() -> TestResult {
         id: None,
         phase: None,
         timestamp: None,
+        timeline: None,
     });
     let clasp_note_bytes = codec::encode(&clasp_note).unwrap();
 

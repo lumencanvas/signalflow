@@ -9,8 +9,8 @@ import { exportConfig, importConfig, downloadConfig, loadConfigFromFile, mergeCo
 
 // State
 const state = {
-  servers: [],      // User-created servers (inputs)
-  outputs: [],      // Output targets (destinations)
+  routers: [],      // CLASP routers (central message hubs)
+  servers: [],      // Protocol connections (OSC, MIDI, MQTT, etc. - connected to routers)
   devices: [],      // Discovered devices
   bridges: [],
   mappings: [],
@@ -20,12 +20,13 @@ const state = {
   signalRate: 0,
   paused: false,
   scanning: false,
+  bridgeServiceReady: false, // Whether the clasp-service binary is running and ready
   activeTab: 'bridges',
   learnMode: false,
   learnTarget: null, // 'source' or 'target'
   editingMapping: null,
   editingServer: null, // Server being edited
-  editingOutput: null, // Output being edited
+  editingRouter: null, // Router being edited
   monitorFilter: '',
   protocolFilter: 'all', // Protocol filter for monitor
   maxSignals: 200, // Max signals to keep in monitor (auto-clear)
@@ -94,10 +95,13 @@ let rateCounterInterval = null;
 async function init() {
   // Load saved data from localStorage
   loadMappingsFromStorage();
-  loadOutputsFromStorage();
   loadMaxSignalsSetting();
 
-  // Restore saved servers and bridges (reconnect them)
+  // Wait for bridge service to be ready before restoring protocol connections
+  await waitForBridgeService();
+
+  // Restore saved routers, servers, and bridges (reconnect them)
+  await restoreRoutersOnStartup();
   await restoreServersOnStartup();
   await restoreBridgesOnStartup();
 
@@ -123,9 +127,9 @@ async function init() {
   setupServerStatsUpdates();
 
   // Initial render
+  renderRouters();
   renderServers();
   renderDevices();
-  renderOutputs();
   renderBridges();
   renderMappings();
   renderSignalMonitor();
@@ -144,13 +148,73 @@ async function init() {
 }
 
 // ============================================
+// Bridge Service Readiness
+// ============================================
+
+async function waitForBridgeService(timeoutMs = 10000) {
+  if (!window.clasp) {
+    console.log('No clasp API available, skipping bridge service wait');
+    return false;
+  }
+
+  const startTime = Date.now();
+  
+  // Check initial status
+  try {
+    const status = await window.clasp.getBridgeStatus();
+    if (status.ready) {
+      state.bridgeServiceReady = true;
+      console.log('Bridge service already ready');
+      return true;
+    }
+  } catch (e) {
+    console.warn('Failed to check initial bridge status:', e);
+  }
+
+  // Poll for readiness
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(async () => {
+      try {
+        const status = await window.clasp.getBridgeStatus();
+        if (status.ready) {
+          clearInterval(checkInterval);
+          state.bridgeServiceReady = true;
+          console.log('Bridge service became ready');
+          resolve(true);
+          return;
+        }
+      } catch (e) {
+        // Ignore errors during polling
+      }
+
+      if (Date.now() - startTime > timeoutMs) {
+        clearInterval(checkInterval);
+        console.warn('Bridge service did not become ready within timeout');
+        state.bridgeServiceReady = false;
+        resolve(false);
+      }
+    }, 200);
+  });
+}
+
+// ============================================
 // Data Loading
 // ============================================
 
 async function loadDevices() {
   try {
     if (window.clasp) {
-      state.devices = await window.clasp.getDevices();
+      const backendDevices = await window.clasp.getDevices();
+      // Merge with existing devices, avoiding duplicates
+      for (const device of backendDevices) {
+        const existing = state.devices.find(d => d.id === device.id || (d.host === device.host && d.port === device.port));
+        if (!existing) {
+          state.devices.push(device);
+        } else {
+          // Update existing device with latest info
+          Object.assign(existing, device);
+        }
+      }
     }
   } catch (e) {
     console.error('Failed to load devices:', e);
@@ -186,6 +250,19 @@ function saveMappingsToStorage() {
   }
 }
 
+function loadRoutersFromStorage() {
+  try {
+    const saved = localStorage.getItem('clasp-routers');
+    if (saved) {
+      const routers = JSON.parse(saved);
+      return routers.map(r => ({ ...r, status: 'disconnected' }));
+    }
+  } catch (e) {
+    console.error('Failed to load routers from storage:', e);
+  }
+  return [];
+}
+
 function loadServersFromStorage() {
   try {
     const saved = localStorage.getItem('clasp-servers');
@@ -200,6 +277,28 @@ function loadServersFromStorage() {
   return [];
 }
 
+function saveRoutersToStorage() {
+  try {
+    const routersToSave = state.routers.map(r => ({
+      id: r.id,
+      type: r.type,
+      protocol: r.protocol,
+      name: r.name,
+      address: r.address,
+      announce: r.announce,
+      authEnabled: r.authEnabled,
+      token: r.token,
+      // Remote router fields
+      isRemote: r.isRemote || false,
+      remoteAddress: r.remoteAddress,
+      discoveredFrom: r.discoveredFrom,
+    }));
+    localStorage.setItem('clasp-routers', JSON.stringify(routersToSave));
+  } catch (e) {
+    console.error('Failed to save routers:', e);
+  }
+}
+
 function saveServersToStorage() {
   try {
     // Save server configs (not runtime status)
@@ -209,6 +308,7 @@ function saveServersToStorage() {
       protocol: s.protocol,
       name: s.name,
       address: s.address,
+      routerId: s.routerId, // Which router this connects to
       // Protocol-specific configs
       bind: s.bind,
       port: s.port,
@@ -251,6 +351,35 @@ function saveBridgesToStorage() {
   }
 }
 
+async function restoreRoutersOnStartup() {
+  const savedRouters = loadRoutersFromStorage();
+  for (const routerConfig of savedRouters) {
+    // Remote routers don't need to be started - just add them to state
+    if (routerConfig.isRemote) {
+      routerConfig.status = 'available';
+      state.routers.push(routerConfig);
+      continue;
+    }
+    
+    // Local routers need to be started
+    try {
+      if (window.clasp) {
+        const result = await window.clasp.startServer(routerConfig);
+        routerConfig.id = result?.id || routerConfig.id;
+        routerConfig.status = 'connected';
+      } else {
+        routerConfig.status = 'connected';
+      }
+      state.routers.push(routerConfig);
+    } catch (err) {
+      console.warn(`Failed to restore router ${routerConfig.name}:`, err);
+      routerConfig.status = 'error';
+      routerConfig.error = err.message;
+      state.routers.push(routerConfig);
+    }
+  }
+}
+
 async function restoreServersOnStartup() {
   const savedServers = loadServersFromStorage();
   for (const serverConfig of savedServers) {
@@ -275,6 +404,8 @@ async function restoreServersOnStartup() {
 
 async function restoreBridgesOnStartup() {
   const savedBridges = loadBridgesFromStorage();
+  // Clear existing bridges first to prevent duplicates
+  state.bridges = [];
   for (const bridgeConfig of savedBridges) {
     try {
       if (window.clasp) {
@@ -453,16 +584,16 @@ function updateServerTypeFields(serverType) {
 
   // Update hint text
   const hints = {
-    clasp: 'Full CLASP protocol server - other apps can connect and exchange signals',
-    osc: 'Open Sound Control server - receive OSC messages from controllers and apps',
-    midi: 'MIDI bridge - connect to MIDI devices and translate to/from CLASP signals',
-    mqtt: 'MQTT client - connect to an MQTT broker with full auth and QoS support',
-    websocket: 'WebSocket bridge - accept JSON or MsgPack messages from web apps',
-    socketio: 'Socket.IO bridge - real-time bidirectional event-based communication',
-    http: 'HTTP REST API - expose signals as HTTP endpoints for webhooks and integrations',
-    artnet: 'Art-Net receiver - receive DMX512 data over Ethernet from lighting consoles',
-    sacn: 'sACN/E1.31 bridge - industry-standard streaming ACN for professional lighting',
-    dmx: 'DMX interface - connect directly to DMX fixtures via USB adapter',
+    clasp: 'CLASP router - central message hub that routes signals between clients',
+    osc: 'OSC connection - receive OSC messages from controllers and translate to CLASP',
+    midi: 'MIDI connection - connect to MIDI devices and translate to/from CLASP signals',
+    mqtt: 'MQTT connection - connect to an MQTT broker with full auth and QoS support',
+    websocket: 'WebSocket connection - accept JSON or MsgPack messages from web apps',
+    socketio: 'Socket.IO connection - real-time bidirectional event-based communication',
+    http: 'HTTP connection - expose signals as HTTP endpoints for webhooks and integrations',
+    artnet: 'Art-Net connection - receive DMX512 data over Ethernet from lighting consoles',
+    sacn: 'sACN/E1.31 connection - industry-standard streaming ACN for professional lighting',
+    dmx: 'DMX connection - connect directly to DMX fixtures via USB adapter',
   };
   const hintEl = $('server-type-hint');
   if (hintEl) {
@@ -477,6 +608,69 @@ function updateServerTypeFields(serverType) {
   } else if (serverType === 'osc' || serverType === 'artnet' || serverType === 'http') {
     refreshNetworkInterfaces();
   }
+
+  // Populate router dropdowns for protocol connections (not CLASP routers)
+  if (serverType !== 'clasp') {
+    populateRouterDropdowns();
+  }
+
+  // Update submit button text
+  const submitBtn = $('server-form-submit');
+  if (submitBtn) {
+    if (serverType === 'clasp') {
+      submitBtn.textContent = 'START ROUTER';
+    } else {
+      submitBtn.textContent = 'START CONNECTION';
+    }
+  }
+}
+
+// Populate router selection dropdowns in protocol connection modals
+function populateRouterDropdowns() {
+  const routerSelectors = [
+    'osc-router-select',
+    'midi-router-select',
+    'mqtt-router-select',
+    'websocket-router-select',
+    'http-router-select',
+    'artnet-router-select',
+    'sacn-router-select',
+    'dmx-router-select',
+    'socketio-router-select',
+  ];
+
+  routerSelectors.forEach(selectorId => {
+    const select = $(selectorId);
+    if (!select) return;
+
+    // Clear existing options except the first one
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+
+    // Get available routers: local running/connected routers + remote routers
+    const availableRouters = state.routers.filter(r => 
+      r.isRemote || r.status === 'connected' || r.status === 'running' || r.status === 'available'
+    );
+    
+    if (availableRouters.length === 0) {
+      // If no routers, show warning
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No routers available - add a router first';
+      option.disabled = true;
+      select.appendChild(option);
+    } else {
+      availableRouters.forEach(router => {
+        const option = document.createElement('option');
+        option.value = router.id;
+        const prefix = router.isRemote ? '↗ ' : ''; // Arrow to indicate remote
+        const address = router.remoteAddress || router.address || '';
+        option.textContent = `${prefix}${router.name}${address ? ` @ ${address}` : ''}`;
+        select.appendChild(option);
+      });
+    }
+  });
 }
 
 // ============================================
@@ -1232,11 +1426,23 @@ function setupEventListeners() {
     const id = target.dataset.id;
 
     switch (action) {
+      case 'delete-router':
+        deleteRouter(id);
+        break;
+      case 'edit-router':
+        editRouter(id);
+        break;
+      case 'restart-router':
+        restartRouter(id);
+        break;
       case 'delete-server':
         deleteServer(id);
         break;
       case 'edit-server':
         editServer(id);
+        break;
+      case 'restart-server':
+        restartServer(id);
         break;
       case 'delete-bridge':
         deleteBridge(id);
@@ -1307,17 +1513,60 @@ function setupEventListeners() {
   // Scan button
   $('scan-btn')?.addEventListener('click', handleScan);
 
-  // Add server button
+  // Add router button
+  $('add-router-btn')?.addEventListener('click', () => {
+    state.editingRouter = null;
+    state.editingServer = null;
+    const form = $('server-form');
+    if (form) {
+      form.reset();
+      const serverTypeSelect = $('server-type');
+      if (serverTypeSelect) {
+        serverTypeSelect.value = 'clasp';
+        // Hide server type dropdown for router creation (it's always CLASP)
+        serverTypeSelect.closest('.form-group')?.classList.add('hidden');
+      }
+      updateServerTypeFields('clasp');
+    }
+    const modalTitle = document.querySelector('#server-modal .modal-title');
+    if (modalTitle) modalTitle.textContent = 'ADD CLASP ROUTER';
+    $('server-modal')?.showModal();
+  });
+
+  // Add protocol connection button
   $('add-server-btn')?.addEventListener('click', () => {
     state.editingServer = null;
+    state.editingRouter = null;
+    const form = $('server-form');
+    if (form) {
+      form.reset();
+      const serverTypeSelect = $('server-type');
+      if (serverTypeSelect) {
+        serverTypeSelect.value = 'osc'; // Default to OSC for protocol connections
+        // Show server type dropdown for protocol connections
+        serverTypeSelect.closest('.form-group')?.classList.remove('hidden');
+      }
+      updateServerTypeFields('osc');
+      populateRouterDropdowns(); // Populate router dropdowns
+    }
     const modalTitle = document.querySelector('#server-modal .modal-title');
-    if (modalTitle) modalTitle.textContent = 'ADD SERVER';
-    $('server-form')?.reset();
+    if (modalTitle) modalTitle.textContent = 'ADD PROTOCOL CONNECTION';
     $('server-modal')?.showModal();
   });
 
   // Server form
   $('server-form')?.addEventListener('submit', handleAddServer);
+
+  // Router list actions (edit/delete/restart)
+  $('router-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+    if (action === 'edit-router') editRouter(id);
+    if (action === 'delete-router') deleteRouter(id);
+    if (action === 'restart-router') restartRouter(id);
+  });
 
   // Server list actions (edit/delete/restart)
   $('server-list')?.addEventListener('click', (e) => {
@@ -1330,39 +1579,18 @@ function setupEventListeners() {
     if (action === 'restart-server') restartServer(id);
   });
 
-  // Add output button
-  $('add-output-btn')?.addEventListener('click', () => {
-    state.editingOutput = null;
-    const modalTitle = document.querySelector('#output-modal .modal-title');
-    if (modalTitle) modalTitle.textContent = 'ADD OUTPUT TARGET';
-    $('output-form')?.reset();
-    updateOutputTypeFields('osc'); // Default to OSC
-    $('output-modal')?.showModal();
+  // Discovered device list - click to add as connection
+  $('device-list')?.addEventListener('click', (e) => {
+    const item = e.target.closest('.device-item');
+    if (!item) return;
+    const deviceId = item.dataset.id;
+    const device = state.devices.find(d => d.id === deviceId);
+    if (!device) return;
+    
+    // Open the server modal pre-filled with this device's info
+    addDiscoveredDeviceAsConnection(device);
   });
 
-  // Output form
-  $('output-form')?.addEventListener('submit', handleAddOutput);
-
-  // Output type field switching
-  $('output-type')?.addEventListener('change', (e) => {
-    updateOutputTypeFields(e.target.value);
-  });
-
-  // Output list actions (edit/delete)
-  $('output-list')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const action = btn.dataset.action;
-    const id = btn.dataset.id;
-    if (action === 'edit-output') editOutput(id);
-    if (action === 'delete-output') deleteOutput(id);
-  });
-
-  // MIDI output refresh button
-  document.querySelector('.refresh-midi-outputs')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    refreshMidiOutputPorts();
-  });
 
   // Add bridge button
   $('add-bridge-btn')?.addEventListener('click', () => {
@@ -1446,17 +1674,35 @@ function setupEventListeners() {
       loadDevices().then(renderDevices);
     });
 
-    // Server status updates
+    // Server status updates (handles both routers and protocol connections)
     window.clasp.onServerStatus?.((status) => {
+      // Check if this is a router
+      const router = state.routers.find(r => r.id === status.id);
+      if (router) {
+        router.status = status.status;
+        if (status.error) {
+          router.error = status.error;
+          showNotification(`Router error: ${status.error}`, 'error');
+        }
+        if (status.status === 'running') {
+          showNotification(`Router started successfully`, 'success');
+        }
+        renderRouters();
+        populateRouterDropdowns(); // Refresh dropdowns in case router status changed
+        updateStatus();
+        return;
+      }
+
+      // Check if this is a protocol connection
       const server = state.servers.find(s => s.id === status.id);
       if (server) {
         server.status = status.status;
         if (status.error) {
           server.error = status.error;
-          showNotification(`Server error: ${status.error}`, 'error');
+          showNotification(`Connection error: ${status.error}`, 'error');
         }
         if (status.status === 'running') {
-          showNotification(`Server started successfully`, 'success');
+          showNotification(`Connection started successfully`, 'success');
         }
         renderServers();
         updateStatus();
@@ -1516,11 +1762,16 @@ async function handleScan() {
   updateScanButton();
 
   try {
-    if (window.clasp) {
-      await window.clasp.scanNetwork();
+    if (window.clasp && window.clasp.scanNetwork) {
+      const devices = await window.clasp.scanNetwork();
+      console.log('Scan completed, found devices:', devices?.length || 0);
     } else {
+      console.warn('CLASP API not available, using mock scan');
       await new Promise(r => setTimeout(r, 1500));
     }
+  } catch (err) {
+    console.error('Scan error:', err);
+    showNotification(`Scan failed: ${err.message}`, 'error');
   } finally {
     state.scanning = false;
     updateScanButton();
@@ -1542,6 +1793,88 @@ function updateScanButton() {
   }
 }
 
+async function handleAddRouter(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = new FormData(form);
+  const isEditing = state.editingRouter !== null;
+
+  let routerConfig = {
+    id: isEditing ? state.editingRouter.id : Date.now().toString(),
+    type: 'clasp',
+    protocol: 'clasp',
+    status: 'starting',
+    address: data.get('claspAddress') || 'localhost:7330',
+    name: data.get('claspName') || `CLASP Router @ ${data.get('claspAddress') || 'localhost:7330'}`,
+    announce: data.get('claspAnnounce') === 'on',
+    authEnabled: data.get('claspAuthEnabled') === 'on',
+  };
+
+  if (routerConfig.authEnabled && state.tokens.length > 0) {
+    routerConfig.tokenFileContent = getTokenFileContent();
+    routerConfig.token = state.tokens[0].token;
+  } else {
+    routerConfig.authEnabled = false;
+    routerConfig.token = '';
+  }
+
+  try {
+    if (window.clasp) {
+      const result = await window.clasp.startServer(routerConfig);
+      routerConfig.id = result?.id || routerConfig.id;
+      routerConfig.status = 'connected';
+    } else {
+      routerConfig.status = 'connected';
+    }
+
+    if (isEditing) {
+      const idx = state.routers.findIndex(r => r.id === routerConfig.id);
+      if (idx !== -1) {
+        state.routers[idx] = routerConfig;
+      } else {
+        state.routers.push(routerConfig);
+      }
+    } else {
+      state.routers.push(routerConfig);
+    }
+
+    state.editingRouter = null;
+    saveRoutersToStorage();
+    renderRouters();
+    populateRouterDropdowns(); // Refresh router dropdowns for protocol connections
+    renderServers(); // Re-render protocol connections to update connection status
+    renderFlowDiagram(); // Update flow diagram when routers change
+    updateStatus();
+    $('server-modal')?.close();
+    form.reset();
+    // Show server type dropdown again when modal closes (for next use)
+    const serverTypeSelect = $('server-type');
+    if (serverTypeSelect) {
+      serverTypeSelect.closest('.form-group')?.classList.remove('hidden');
+    }
+    updateServerTypeFields('clasp');
+  } catch (err) {
+    console.error('Failed to start router:', err);
+    routerConfig.status = 'error';
+    routerConfig.error = err.message;
+
+    if (isEditing) {
+      const idx = state.routers.findIndex(r => r.id === routerConfig.id);
+      if (idx !== -1) {
+        state.routers[idx] = routerConfig;
+      } else {
+        state.routers.push(routerConfig);
+      }
+    } else {
+      state.routers.push(routerConfig);
+    }
+
+    state.editingRouter = null;
+    saveRoutersToStorage();
+    renderRouters();
+  }
+}
+
 async function handleAddServer(e) {
   e.preventDefault();
   const form = e.target;
@@ -1549,35 +1882,49 @@ async function handleAddServer(e) {
   const serverType = data.get('serverType') || 'clasp';
   const isEditing = state.editingServer !== null;
 
+  // Separate routers from protocol connections
+  if (serverType === 'clasp') {
+    // This is a CLASP router
+    return handleAddRouter(e);
+  }
+
+  // This is a protocol connection
+  // Validate router availability before proceeding
+  const requestedRouterId = data.get('routerId') || null;
+  let targetRouter = null;
+  
+  if (requestedRouterId) {
+    targetRouter = state.routers.find(r => r.id === requestedRouterId);
+  } else {
+    // Auto-select: find first available router
+    targetRouter = state.routers.find(r => 
+      r.isRemote || r.status === 'running' || r.status === 'connected' || r.status === 'available'
+    );
+  }
+  
+  if (!targetRouter) {
+    showNotification('No CLASP router available. Please add a router first.', 'error');
+    // Optionally open router creation modal
+    const shouldCreateRouter = confirm('No router found. Would you like to create one now?');
+    if (shouldCreateRouter) {
+      $('add-router-btn')?.click();
+    }
+    return;
+  }
+  
   let serverConfig = {
     id: isEditing ? state.editingServer.id : Date.now().toString(),
     type: serverType,
     protocol: serverType,
     status: 'starting',
+    routerId: targetRouter.id, // Use found router ID
   };
 
   // Build config based on server type
   switch (serverType) {
-    case 'clasp':
-      serverConfig.address = data.get('claspAddress') || 'localhost:7330';
-      serverConfig.serverName = data.get('claspName') || 'CLASP Bridge Server';
-      serverConfig.announce = data.get('claspAnnounce') === 'on';
-      serverConfig.name = data.get('claspName') || `CLASP Server @ ${serverConfig.address}`;
-      // Authentication
-      serverConfig.authEnabled = data.get('claspAuthEnabled') === 'on';
-      if (serverConfig.authEnabled && state.tokens.length > 0) {
-        // Pass token file content to the backend
-        serverConfig.tokenFileContent = getTokenFileContent();
-        // Also pass first token for the monitor connection
-        serverConfig.token = state.tokens[0].token;
-      } else {
-        serverConfig.authEnabled = false;
-        serverConfig.token = '';
-      }
-      break;
-
     case 'osc':
-      serverConfig.bind = data.get('oscBind') || '0.0.0.0';
+      const oscIp = data.get('oscIp')?.trim();
+      serverConfig.bind = oscIp || data.get('oscBind') || '0.0.0.0';
       serverConfig.port = parseInt(data.get('oscPort')) || 9000;
       serverConfig.address = `${serverConfig.bind}:${serverConfig.port}`;
       serverConfig.name = `OSC Server @ ${serverConfig.address}`;
@@ -1692,10 +2039,13 @@ async function handleAddServer(e) {
     state.editingServer = null;
     saveServersToStorage();
     renderServers();
+    renderFlowDiagram(); // Update flow diagram when servers change
     updateStatus();
     $('server-modal')?.close();
     form.reset();
-    updateServerTypeFields('clasp'); // Reset to default fields
+    updateServerTypeFields('osc'); // Reset to default for protocol connections
+    const modalTitle = document.querySelector('#server-modal .modal-title');
+    if (modalTitle) modalTitle.textContent = 'ADD PROTOCOL CONNECTION';
   } catch (err) {
     console.error('Failed to start server:', err);
     serverConfig.status = 'error';
@@ -1718,6 +2068,32 @@ async function handleAddServer(e) {
   }
 }
 
+async function deleteRouter(id) {
+  try {
+    const router = state.routers.find(r => r.id === id);
+    
+    // For local routers, stop the server process
+    // For remote routers, just remove from list (nothing to stop)
+    if (router && !router.isRemote && window.clasp) {
+      await window.clasp.stopServer(id);
+    }
+    
+    state.routers = state.routers.filter(r => r.id !== id);
+    saveRoutersToStorage();
+    renderRouters();
+    populateRouterDropdowns(); // Refresh dropdowns since router was removed
+    renderServers(); // Re-render protocol connections to update connection status
+    renderFlowDiagram(); // Update flow diagram
+    updateStatus();
+    
+    if (router?.isRemote) {
+      showNotification(`Removed remote router: ${router.name}`, 'info');
+    }
+  } catch (err) {
+    console.error('Failed to delete router:', err);
+  }
+}
+
 async function deleteServer(id) {
   try {
     if (window.clasp) {
@@ -1726,9 +2102,84 @@ async function deleteServer(id) {
     state.servers = state.servers.filter(s => s.id !== id);
     saveServersToStorage();
     renderServers();
+    renderFlowDiagram(); // Update flow diagram
     updateStatus();
   } catch (err) {
     console.error('Failed to delete server:', err);
+  }
+}
+
+async function restartRouter(id) {
+  const router = state.routers.find(r => r.id === id);
+  if (!router) return;
+
+  router.status = 'reconnecting';
+  router.error = null;
+  renderRouters();
+  showNotification(`Restarting ${router.name}...`, 'info');
+  
+  try {
+    if (window.clasp) {
+      await window.clasp.stopServer(id);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const result = await window.clasp.startServer(router);
+      router.id = result?.id || router.id;
+      router.status = 'connected';
+    } else {
+      router.status = 'connected';
+    }
+    saveRoutersToStorage();
+    renderRouters();
+    populateRouterDropdowns(); // Refresh dropdowns in case router status changed
+    renderServers(); // Re-render protocol connections to update connection status
+    renderFlowDiagram(); // Update flow diagram
+    showNotification(`${router.name} restarted`, 'success');
+  } catch (err) {
+    console.error('Failed to restart router:', err);
+    router.status = 'error';
+    router.error = err.message;
+    saveRoutersToStorage();
+    renderRouters();
+    populateRouterDropdowns(); // Refresh dropdowns
+    renderServers(); // Re-render protocol connections
+    renderFlowDiagram(); // Update flow diagram
+    showNotification(`Failed to restart: ${err.message}`, 'error');
+  }
+}
+
+function editRouter(id) {
+  const router = state.routers.find(r => r.id === id);
+  if (!router) return;
+
+  state.editingRouter = router;
+  state.editingServer = null;
+
+  // Populate form
+  const form = $('server-form');
+  if (form) {
+    form.reset();
+    const serverTypeSelect = $('server-type');
+    if (serverTypeSelect) {
+      serverTypeSelect.value = 'clasp';
+      // Hide server type dropdown when editing router (it's always CLASP)
+      serverTypeSelect.closest('.form-group')?.classList.add('hidden');
+    }
+    updateServerTypeFields('clasp');
+
+    // Fill in router fields
+    const claspAddressInput = $('claspAddress');
+    if (claspAddressInput) claspAddressInput.value = router.address || 'localhost:7330';
+    
+    const claspNameInput = $('claspName');
+    if (claspNameInput) claspNameInput.value = router.name || 'CLASP Router';
+
+    const claspAnnounceInput = $('claspAnnounce');
+    if (claspAnnounceInput) claspAnnounceInput.checked = router.announce !== false;
+
+    const claspAuthEnabledInput = $('claspAuthEnabled');
+    if (claspAuthEnabledInput) claspAuthEnabledInput.checked = router.authEnabled === true;
+
+    $('server-modal')?.showModal();
   }
 }
 
@@ -1773,20 +2224,76 @@ async function restartServer(id) {
   updateStatus();
 }
 
+// Add a discovered CLASP server as a remote router endpoint
+function addDiscoveredDeviceAsConnection(device) {
+  // Build the address
+  const address = device.address || device.host;
+  const port = device.port || 7330;
+  const fullAddress = address ? (address.includes(':') ? address : `${address}:${port}`) : 'localhost:7330';
+  const wsAddress = fullAddress.startsWith('ws://') ? fullAddress : `ws://${fullAddress}`;
+  
+  // Check if we already have this router saved
+  const existingRouter = state.routers.find(r => 
+    r.address === fullAddress || r.address === wsAddress || r.remoteAddress === fullAddress
+  );
+  
+  if (existingRouter) {
+    showNotification(`Router "${existingRouter.name}" already added`, 'warning');
+    return;
+  }
+  
+  // Create a remote router entry (not a local one we start)
+  const remoteRouter = {
+    id: `remote-${Date.now()}`,
+    type: 'clasp',
+    protocol: 'clasp',
+    name: device.name || `Remote Router @ ${fullAddress}`,
+    address: wsAddress,
+    remoteAddress: fullAddress,
+    isRemote: true, // Flag to indicate this is a remote router we connect TO
+    status: 'available', // Remote routers are "available" not "running"
+    discoveredFrom: device.id,
+  };
+  
+  // Add to routers list
+  state.routers.push(remoteRouter);
+  saveRoutersToStorage();
+  renderRouters();
+  
+  // Refresh router dropdowns in protocol connection forms
+  populateRouterDropdowns();
+  
+  showNotification(`Added remote router: ${remoteRouter.name}. You can now route protocol connections to it.`, 'success');
+}
+
 function editServer(id) {
   const server = state.servers.find(s => s.id === id);
   if (!server) return;
 
   state.editingServer = server;
 
-  // Update modal title
+  // Update modal title based on type
   const modalTitle = document.querySelector('#server-modal .modal-title');
-  if (modalTitle) modalTitle.textContent = 'EDIT SERVER';
+  if (modalTitle) {
+    if (server.type === 'clasp' || server.protocol === 'clasp') {
+      modalTitle.textContent = 'EDIT CLASP ROUTER';
+    } else {
+      modalTitle.textContent = 'EDIT PROTOCOL CONNECTION';
+    }
+  }
 
   // Set server type
   const typeSelect = $('server-type');
   if (typeSelect) {
     typeSelect.value = server.protocol || server.type || 'clasp';
+    // Show/hide server type dropdown based on whether it's a router or protocol connection
+    if (server.type === 'clasp' || server.protocol === 'clasp') {
+      // Hide for routers
+      typeSelect.closest('.form-group')?.classList.add('hidden');
+    } else {
+      // Show for protocol connections
+      typeSelect.closest('.form-group')?.classList.remove('hidden');
+    }
     typeSelect.dispatchEvent(new Event('change')); // Trigger field switching
   }
 
@@ -1801,7 +2308,17 @@ function editServer(id) {
       break;
     case 'osc':
       form.elements.oscBind.value = server.bind || '0.0.0.0';
+      if (form.elements.oscIp) {
+        // If bind is a specific IP (not 0.0.0.0), put it in the IP field
+        form.elements.oscIp.value = (server.bind && server.bind !== '0.0.0.0') ? server.bind : '';
+      }
       form.elements.oscPort.value = server.port || 9000;
+      const oscRouterSelect = $('osc-router-select');
+      if (oscRouterSelect) {
+        populateRouterDropdowns(); // Populate first
+        // Use connected router ID if available, otherwise use assigned router ID
+        oscRouterSelect.value = server.connectedRouterId || server.routerId || '';
+      }
       break;
     case 'mqtt':
       form.elements.mqttHost.value = server.host || 'localhost';
@@ -1819,6 +2336,15 @@ function editServer(id) {
       }
       if (form.elements.mqttUsername) form.elements.mqttUsername.value = server.username || '';
       if (form.elements.mqttPassword) form.elements.mqttPassword.value = server.password || '';
+      if (form.elements.routerId) {
+        const routerSelect = $('mqtt-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'websocket':
       form.elements.wsMode.value = server.mode || 'server';
@@ -1826,16 +2352,43 @@ function editServer(id) {
       if (form.elements.wsFormat) form.elements.wsFormat.value = server.format || 'json';
       if (form.elements.wsPingInterval) form.elements.wsPingInterval.value = server.pingInterval || 30;
       if (form.elements.wsNamespace) form.elements.wsNamespace.value = server.namespace || '/websocket';
+      if (form.elements.routerId) {
+        const routerSelect = $('websocket-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'http':
       form.elements.httpBind.value = server.bind || '0.0.0.0:3000';
       form.elements.httpBasePath.value = server.basePath || '/api';
       form.elements.httpCors.checked = server.cors !== false;
+      if (form.elements.routerId) {
+        const routerSelect = $('http-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'artnet':
       form.elements.artnetBind.value = server.bind || '0.0.0.0:6454';
       form.elements.artnetSubnet.value = server.subnet || 0;
       form.elements.artnetUniverse.value = server.universe || 0;
+      if (form.elements.routerId) {
+        const routerSelect = $('artnet-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'sacn':
       if (form.elements.sacnMode) form.elements.sacnMode.value = server.mode || 'receiver';
@@ -1849,19 +2402,55 @@ function editServer(id) {
       }
       if (form.elements.sacnUnicastDests) form.elements.sacnUnicastDests.value = (server.unicastDestinations || []).join(', ');
       if (form.elements.sacnBindAddress) form.elements.sacnBindAddress.value = server.bindAddress || '';
+      if (form.elements.routerId) {
+        const routerSelect = $('sacn-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'dmx':
       form.elements.dmxPort.value = server.serialPort || '/dev/ttyUSB0';
       form.elements.dmxUniverse.value = server.universe || 0;
+      if (form.elements.routerId) {
+        const routerSelect = $('dmx-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'midi':
       if (form.elements.midiInput) form.elements.midiInput.value = server.inputPort || '';
       if (form.elements.midiOutput) form.elements.midiOutput.value = server.outputPort || '';
+      if (form.elements.routerId) {
+        const routerSelect = $('midi-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
     case 'socketio':
       if (form.elements.socketioMode) form.elements.socketioMode.value = server.mode || 'server';
       if (form.elements.socketioAddress) form.elements.socketioAddress.value = server.address || '0.0.0.0:3001';
       if (form.elements.socketioNamespace) form.elements.socketioNamespace.value = server.namespace || '/';
+      if (form.elements.routerId) {
+        const routerSelect = $('socketio-router-select');
+        if (routerSelect) {
+          populateRouterDropdowns(); // Populate first
+          routerSelect.value = server.connectedRouterId || server.routerId || '';
+      }
+      } else {
+      populateRouterDropdowns();
+      }
       break;
   }
 
@@ -1872,218 +2461,7 @@ function editServer(id) {
 // Output Target Management
 // ============================================
 
-function updateOutputTypeFields(outputType) {
-  // Hide all output fields
-  const allTypes = ['osc', 'midi', 'artnet', 'mqtt', 'websocket', 'http'];
-  allTypes.forEach(type => {
-    const fields = $(`output-${type}-fields`);
-    if (fields) fields.classList.add('hidden');
-  });
 
-  // Show appropriate fields
-  const targetFields = $(`output-${outputType}-fields`);
-  if (targetFields) targetFields.classList.remove('hidden');
-
-  // Update hint text
-  const hints = {
-    osc: 'Send OSC messages to other applications like Resolume, TouchDesigner, or Max',
-    midi: 'Send MIDI messages to hardware synths, DAWs, or other MIDI-enabled software',
-    artnet: 'Send DMX512 data over Art-Net to lighting fixtures and nodes',
-    mqtt: 'Publish messages to an MQTT broker for IoT integrations',
-    websocket: 'Send JSON messages to a WebSocket server',
-    http: 'POST signals to HTTP webhooks for web integrations',
-  };
-  const hintEl = $('output-type-hint');
-  if (hintEl) hintEl.textContent = hints[outputType] || '';
-
-  // Refresh MIDI ports if needed
-  if (outputType === 'midi') {
-    refreshMidiOutputPorts();
-  }
-}
-
-async function refreshMidiOutputPorts() {
-  if (!window.clasp) return;
-
-  try {
-    const ports = await window.clasp.listMidiPorts();
-    const select = $('midi-output-port-select');
-    if (select) {
-      const currentValue = select.value;
-      select.innerHTML = '';
-      for (const port of ports.outputs) {
-        const option = document.createElement('option');
-        option.value = port.id;
-        option.textContent = port.name;
-        select.appendChild(option);
-      }
-      if ([...select.options].some(o => o.value === currentValue)) {
-        select.value = currentValue;
-      }
-    }
-  } catch (e) {
-    console.error('Failed to list MIDI output ports:', e);
-  }
-}
-
-async function handleAddOutput(e) {
-  e.preventDefault();
-  const form = e.target;
-  const data = new FormData(form);
-  const outputType = data.get('outputType') || 'osc';
-  const isEditing = state.editingOutput !== null;
-
-  let outputConfig = {
-    id: isEditing ? state.editingOutput.id : Date.now().toString(),
-    type: outputType,
-    name: data.get('outputName') || `${protocolNames[outputType] || outputType} Output`,
-    status: 'available',
-  };
-
-  // Build config based on output type
-  switch (outputType) {
-    case 'osc':
-      outputConfig.host = data.get('oscHost') || '127.0.0.1';
-      outputConfig.port = parseInt(data.get('oscTargetPort')) || 7000;
-      outputConfig.address = `${outputConfig.host}:${outputConfig.port}`;
-      if (!data.get('outputName')) outputConfig.name = `OSC → ${outputConfig.address}`;
-      break;
-
-    case 'midi':
-      outputConfig.outputPort = data.get('midiOutputPort') || 'default';
-      outputConfig.address = outputConfig.outputPort;
-      if (!data.get('outputName')) outputConfig.name = `MIDI → ${outputConfig.outputPort}`;
-      break;
-
-    case 'artnet':
-      outputConfig.host = data.get('artnetHost') || '255.255.255.255';
-      outputConfig.universe = parseInt(data.get('artnetOutputUniverse')) || 0;
-      outputConfig.address = `${outputConfig.host} (U${outputConfig.universe})`;
-      if (!data.get('outputName')) outputConfig.name = `Art-Net → ${outputConfig.host}`;
-      break;
-
-    case 'mqtt':
-      outputConfig.host = data.get('mqttOutputHost') || 'localhost';
-      outputConfig.port = parseInt(data.get('mqttOutputPort')) || 1883;
-      outputConfig.baseTopic = data.get('mqttBaseTopic') || 'clasp/output';
-      outputConfig.address = `${outputConfig.host}:${outputConfig.port}`;
-      if (!data.get('outputName')) outputConfig.name = `MQTT → ${outputConfig.address}`;
-      break;
-
-    case 'websocket':
-      outputConfig.url = data.get('wsOutputUrl') || 'ws://localhost:8080';
-      outputConfig.address = outputConfig.url;
-      if (!data.get('outputName')) outputConfig.name = `WebSocket → ${outputConfig.url}`;
-      break;
-
-    case 'http':
-      outputConfig.url = data.get('httpOutputUrl') || '';
-      outputConfig.batch = data.get('httpBatch') === 'on';
-      outputConfig.address = outputConfig.url;
-      if (!data.get('outputName')) outputConfig.name = `HTTP → ${outputConfig.url || '(not set)'}`;
-      break;
-
-    default:
-      console.error('Unknown output type:', outputType);
-      return;
-  }
-
-  // Update existing or add new
-  if (isEditing) {
-    const idx = state.outputs.findIndex(o => o.id === outputConfig.id);
-    if (idx !== -1) {
-      state.outputs[idx] = outputConfig;
-    } else {
-      state.outputs.push(outputConfig);
-    }
-  } else {
-    state.outputs.push(outputConfig);
-  }
-
-  state.editingOutput = null;
-  saveOutputsToStorage();
-  renderOutputs();
-  $('output-modal')?.close();
-  form.reset();
-  updateOutputTypeFields('osc');
-}
-
-function deleteOutput(id) {
-  state.outputs = state.outputs.filter(o => o.id !== id);
-  saveOutputsToStorage();
-  renderOutputs();
-}
-
-function editOutput(id) {
-  const output = state.outputs.find(o => o.id === id);
-  if (!output) return;
-
-  state.editingOutput = output;
-
-  // Update modal title
-  const modalTitle = document.querySelector('#output-modal .modal-title');
-  if (modalTitle) modalTitle.textContent = 'EDIT OUTPUT TARGET';
-
-  // Set output type
-  const typeSelect = $('output-type');
-  if (typeSelect) {
-    typeSelect.value = output.type || 'osc';
-    updateOutputTypeFields(output.type);
-  }
-
-  // Populate fields based on output type
-  const form = $('output-form');
-  if (!form) return;
-
-  form.elements.outputName.value = output.name || '';
-
-  switch (output.type) {
-    case 'osc':
-      form.elements.oscHost.value = output.host || '127.0.0.1';
-      form.elements.oscTargetPort.value = output.port || 7000;
-      break;
-    case 'midi':
-      form.elements.midiOutputPort.value = output.outputPort || 'default';
-      break;
-    case 'artnet':
-      form.elements.artnetHost.value = output.host || '255.255.255.255';
-      form.elements.artnetOutputUniverse.value = output.universe || 0;
-      break;
-    case 'mqtt':
-      form.elements.mqttOutputHost.value = output.host || 'localhost';
-      form.elements.mqttOutputPort.value = output.port || 1883;
-      form.elements.mqttBaseTopic.value = output.baseTopic || 'clasp/output';
-      break;
-    case 'websocket':
-      form.elements.wsOutputUrl.value = output.url || 'ws://localhost:8080';
-      break;
-    case 'http':
-      form.elements.httpOutputUrl.value = output.url || '';
-      if (form.elements.httpBatch) form.elements.httpBatch.checked = output.batch !== false;
-      break;
-  }
-
-  $('output-modal')?.showModal();
-}
-
-function loadOutputsFromStorage() {
-  try {
-    const saved = localStorage.getItem('clasp-outputs');
-    if (saved) {
-      state.outputs = JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Failed to load outputs from storage:', e);
-  }
-}
-
-function saveOutputsToStorage() {
-  try {
-    localStorage.setItem('clasp-outputs', JSON.stringify(state.outputs));
-  } catch (e) {
-    console.error('Failed to save outputs:', e);
-  }
-}
 
 function loadMaxSignalsSetting() {
   try {
@@ -2116,6 +2494,20 @@ async function handleCreateBridge(e) {
   };
 
   try {
+    // Check for duplicate before creating
+    const existing = state.bridges.find(b => 
+      b.source === config.source && 
+      b.target === config.target &&
+      b.sourceAddr === config.sourceAddr &&
+      b.targetAddr === config.targetAddr
+    );
+    if (existing) {
+      console.warn('Bridge already exists, skipping duplicate');
+      $('bridge-modal')?.close();
+      form.reset();
+      return;
+    }
+    
     let bridge;
     if (window.clasp) {
       bridge = await window.clasp.createBridge(config);
@@ -2661,6 +3053,59 @@ function applyTransform(value, transform) {
 // Rendering
 // ============================================
 
+function renderRouters() {
+  const list = $('router-list');
+  if (!list) return;
+
+  if (state.routers.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state-small">
+        <span class="empty-state-text">No routers configured</span>
+      </div>
+    `;
+  } else {
+    list.innerHTML = state.routers.map(router => {
+      const isRemote = router.isRemote === true;
+      const statusClass = isRemote ? 'available' : getServerStatusClass(router.status);
+      const statusTitle = isRemote ? `Remote router at ${router.remoteAddress || router.address}` : getServerStatusTitle(router);
+      const hasError = !isRemote && (router.status === 'error' || router.error);
+      const badgeClass = isRemote ? 'remote' : 'clasp';
+      const badgeText = isRemote ? '↗ REMOTE' : 'CLASP';
+      
+      return `
+      <div class="device-item ${hasError ? 'device-item-error' : ''} ${isRemote ? 'device-item-remote' : ''}" data-id="${router.id}" title="${statusTitle}">
+        <div class="device-item-main">
+          <span class="status-dot ${statusClass}" title="${statusTitle}"></span>
+          <span class="device-protocol-badge ${badgeClass}">${badgeText}</span>
+          <span class="device-name">${router.name}</span>
+        </div>
+        ${isRemote ? `<div class="device-connection-info">${router.remoteAddress || router.address}</div>` : ''}
+        ${hasError ? `<div class="device-error-msg">${escapeHtml(router.error || 'Connection error')}</div>` : ''}
+        <div class="device-actions">
+          ${hasError && !isRemote ? `
+          <button class="btn-device-restart" data-action="restart-router" data-id="${router.id}" title="Restart router">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.24"/><path d="M21 3v6h-6"/></svg>
+          </button>
+          ` : ''}
+          ${!isRemote ? `
+          <button class="btn-device-edit" data-action="edit-router" data-id="${router.id}" title="Edit router">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          ` : ''}
+          <button class="btn-device-delete" data-action="delete-router" data-id="${router.id}" title="${isRemote ? 'Remove remote router' : 'Stop router'}">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+    }).join('');
+  }
+
+  // Update badge if exists
+  const badge = $('router-badge');
+  if (badge) badge.textContent = state.routers.length;
+}
+
 function renderServers() {
   const list = $('server-list');
   if (!list) return;
@@ -2668,7 +3113,7 @@ function renderServers() {
   if (state.servers.length === 0) {
     list.innerHTML = `
       <div class="empty-state-small">
-        <span class="empty-state-text">No servers running</span>
+        <span class="empty-state-text">No protocol connections</span>
       </div>
     `;
   } else {
@@ -2678,6 +3123,32 @@ function renderServers() {
       const hasError = server.status === 'error' || server.error;
       const serverType = server.type || server.protocol || 'clasp';
       
+      // Find connected router
+      let routerInfo = null;
+      if (server.routerId) {
+        const router = state.routers.find(r => r.id === server.routerId);
+        if (router) {
+          routerInfo = router;
+        }
+      } else if (server.connectedRouterId) {
+        // Use actually connected router ID if available
+        const router = state.routers.find(r => r.id === server.connectedRouterId);
+        if (router) {
+          routerInfo = router;
+        }
+      } else {
+        // Auto-selected - find first running router
+        const runningRouter = state.routers.find(r => r.status === 'running' || r.status === 'connected');
+        if (runningRouter) {
+          routerInfo = runningRouter;
+        }
+      }
+      
+      // Check actual router connection status
+      const isRouterConnected = server.routerConnected === true;
+      const routerConnectionError = server.routerError;
+      const routerConnectionStatus = isRouterConnected ? 'connected' : (routerConnectionError ? 'error' : 'disconnected');
+      
       return `
       <div class="device-item ${hasError ? 'device-item-error' : ''}" data-id="${server.id}" title="${statusTitle}">
         <div class="device-item-main">
@@ -2685,17 +3156,26 @@ function renderServers() {
           <span class="device-protocol-badge ${serverType}">${protocolNames[serverType] || serverType.toUpperCase()}</span>
           <span class="device-name">${server.name}</span>
         </div>
+        ${routerInfo ? `
+          <div class="device-connection-info">
+            → Router: ${routerInfo.name}
+            ${isRouterConnected ? '<span class="router-status-badge connected" title="Connected to router">●</span>' : ''}
+            ${routerConnectionError ? '<span class="router-status-badge error" title="Router connection failed">⚠</span>' : ''}
+            ${!isRouterConnected && !routerConnectionError && routerInfo ? '<span class="router-status-badge disconnected" title="Not connected to router">○</span>' : ''}
+          </div>
+        ` : ''}
+        ${routerConnectionError ? `<div class="device-error-msg">Router connection: ${escapeHtml(routerConnectionError)}</div>` : ''}
         ${hasError ? `<div class="device-error-msg">${escapeHtml(server.error || 'Connection error')}</div>` : ''}
         <div class="device-actions">
           ${hasError ? `
-          <button class="btn-device-restart" data-action="restart-server" data-id="${server.id}" title="Restart server">
+          <button class="btn-device-restart" data-action="restart-server" data-id="${server.id}" title="Restart connection">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.24"/><path d="M21 3v6h-6"/></svg>
           </button>
           ` : ''}
-          <button class="btn-device-edit" data-action="edit-server" data-id="${server.id}" title="Edit server">
+          <button class="btn-device-edit" data-action="edit-server" data-id="${server.id}" title="Edit connection">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-device-delete" data-action="delete-server" data-id="${server.id}" title="Stop server">
+          <button class="btn-device-delete" data-action="delete-server" data-id="${server.id}" title="Stop connection">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -2757,51 +3237,26 @@ function renderDevices() {
     return;
   }
 
-  list.innerHTML = state.devices.map(device => `
-    <div class="device-item" data-id="${device.id}">
+  list.innerHTML = state.devices.map(device => {
+    const address = device.address || device.host || '';
+    const port = device.port || 7330;
+    const displayAddress = address ? (address.includes(':') ? address : `${address}:${port}`) : '';
+    const tooltip = `Click to add as connection${displayAddress ? ` (${displayAddress})` : ''}`;
+    
+    return `
+    <div class="device-item device-item-clickable" data-id="${device.id}" title="${tooltip}">
       <span class="status-dot ${device.status || 'available'}"></span>
       <span class="device-protocol-badge ${device.protocol || 'clasp'}">${protocolNames[device.protocol] || device.protocol || 'CLASP'}</span>
       <span class="device-name">${device.name}</span>
+      <svg class="device-connect-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </div>
-  `).join('');
+  `}).join('');
 
   // Update badge
   const badge = $('device-badge');
   if (badge) badge.textContent = state.devices.length;
 }
 
-function renderOutputs() {
-  const list = $('output-list');
-  if (!list) return;
-
-  if (state.outputs.length === 0) {
-    list.innerHTML = `
-      <div class="empty-state-small">
-        <span class="empty-state-text">No output targets</span>
-      </div>
-    `;
-  } else {
-    list.innerHTML = state.outputs.map(output => `
-      <div class="device-item output-item" data-id="${output.id}">
-        <span class="status-dot ${output.status || 'available'}"></span>
-        <span class="device-protocol-badge ${output.type}">${protocolNames[output.type] || output.type}</span>
-        <span class="device-name">${output.name}</span>
-        <div class="device-actions">
-          <button class="btn-device-edit" data-action="edit-output" data-id="${output.id}" title="Edit output">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="btn-device-delete" data-action="delete-output" data-id="${output.id}" title="Remove output">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  // Update badge
-  const badge = $('output-badge');
-  if (badge) badge.textContent = state.outputs.length;
-}
 
 function renderBridges() {
   const list = $('bridge-list');
@@ -2811,8 +3266,8 @@ function renderBridges() {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">${icons.bridge}</div>
-        <div class="empty-state-text">No bridges configured</div>
-        <div class="empty-state-hint">Create a bridge to connect protocols</div>
+        <div class="empty-state-text">No direct connections configured</div>
+        <div class="empty-state-hint">Create a direct protocol-to-protocol bridge that bypasses the CLASP router (uses CLASP format for translation)</div>
       </div>
     `;
     return;
@@ -3559,8 +4014,8 @@ function renderFlowDiagram() {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, width, height);
 
-  // Check if we have any nodes
-  if (state.servers.length === 0 && state.bridges.length === 0) {
+  // Check if we have any nodes (routers, protocol connections, or bridges)
+  if (state.routers.length === 0 && state.servers.length === 0 && state.bridges.length === 0) {
     nodesContainer.innerHTML = `
       <div class="flow-empty">
         <div class="flow-empty-icon">
@@ -3568,8 +4023,8 @@ function renderFlowDiagram() {
             <path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>
           </svg>
         </div>
-        <div>No servers or bridges configured</div>
-        <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">Add servers from the sidebar to see them here</div>
+        <div>No routers, connections, or bridges configured</div>
+        <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">Add routers and protocol connections from the sidebar to see them here</div>
       </div>
     `;
     return;
@@ -3586,11 +4041,13 @@ function renderFlowDiagram() {
   const centerX = width / 2 - nodeWidth / 2;
   const rightX = width - padding - nodeWidth;
 
-  // Categorize servers by type (use 'type' field first, then 'protocol')
+  // Categorize by type (use 'type' field first, then 'protocol')
   const getServerType = (s) => s.type || s.protocol;
+  // Protocol connections (sources and targets)
   const sourceServers = state.servers.filter(s => ['osc', 'midi', 'mqtt', 'websocket', 'http'].includes(getServerType(s)));
   const targetServers = state.servers.filter(s => ['artnet', 'dmx'].includes(getServerType(s)));
-  const claspServers = state.servers.filter(s => getServerType(s) === 'clasp');
+  // CLASP routers (hubs) - now in separate state.routers array
+  const claspRouters = state.routers;
 
   // Calculate vertical centering
   const sourceCount = sourceServers.length;
@@ -3619,15 +4076,15 @@ function renderFlowDiagram() {
     });
   });
 
-  // CLASP hub (center)
-  if (claspServers.length > 0 || state.bridges.length > 0 || sourceServers.length > 0) {
+  // CLASP hub (center) - use routers from state.routers
+  if (claspRouters.length > 0 || state.bridges.length > 0 || sourceServers.length > 0) {
     nodes.push({
       id: 'clasp-hub',
       type: 'hub',
       x: centerX,
       y: hubY,
       width: nodeWidth,
-      server: claspServers[0] || { name: 'CLASP Hub', type: 'clasp', status: 'connected' },
+      server: claspRouters[0] || { name: 'CLASP Router', type: 'clasp', protocol: 'clasp', status: 'connected' },
     });
   }
 
@@ -3943,6 +4400,59 @@ function setupServerStatsUpdates() {
     // Update server list with live stats
     renderServerStats();
   });
+
+  // Listen for bridge service ready status
+  window.clasp.onBridgeReady?.((ready) => {
+    state.bridgeServiceReady = ready;
+    console.log(`Bridge service ready: ${ready}`);
+    updateBridgeServiceStatus();
+    if (!ready) {
+      showNotification('Bridge service disconnected', 'error');
+    } else {
+      showNotification('Bridge service connected', 'success');
+    }
+  });
+
+  // Listen for bridge-to-router connection status
+  window.clasp.onBridgeRouterStatus?.((status) => {
+    const server = state.servers.find(s => s.id === status.bridgeId);
+    if (server) {
+      server.routerConnected = status.connected;
+      server.routerError = status.error || null;
+      server.connectedRouterId = status.routerId || null;
+      renderServers();
+    }
+  });
+
+  // Check initial bridge status
+  checkBridgeServiceStatus();
+}
+
+async function checkBridgeServiceStatus() {
+  try {
+    const status = await window.clasp.getBridgeStatus();
+    state.bridgeServiceReady = status.ready;
+    console.log('Initial bridge service status:', status);
+    updateBridgeServiceStatus();
+  } catch (e) {
+    console.error('Failed to check bridge status:', e);
+    state.bridgeServiceReady = false;
+    updateBridgeServiceStatus();
+  }
+}
+
+function updateBridgeServiceStatus() {
+  // Update status bar or indicator
+  const statusEl = $('status-text');
+  if (statusEl && !state.bridgeServiceReady) {
+    // Show warning in status
+    statusEl.classList.add('warning');
+  } else if (statusEl) {
+    statusEl.classList.remove('warning');
+  }
+
+  // Update server cards that might show "Bridge service not ready"
+  renderServers();
 }
 
 function updateTestTargetDropdown() {
@@ -3950,20 +4460,12 @@ function updateTestTargetDropdown() {
   if (!select) return;
 
   const currentValue = select.value;
-  select.innerHTML = '<option value="">Select a server...</option>';
+  select.innerHTML = '<option value="">Select a protocol connection...</option>';
 
   for (const server of state.servers) {
     const option = document.createElement('option');
     option.value = server.id;
     option.textContent = `${server.name} (${server.protocol || server.type})`;
-    select.appendChild(option);
-  }
-
-  // Also add outputs
-  for (const output of state.outputs) {
-    const option = document.createElement('option');
-    option.value = `output:${output.id}`;
-    option.textContent = `[OUTPUT] ${output.name}`;
     select.appendChild(option);
   }
 
@@ -3986,7 +4488,7 @@ async function sendTestSignal() {
 
   if (!target) {
     if (resultEl) {
-      resultEl.textContent = 'Please select a target server';
+      resultEl.textContent = 'Please select a protocol connection';
       resultEl.className = 'form-hint error';
     }
     return;
@@ -4011,21 +4513,12 @@ async function sendTestSignal() {
       value = rawValue;
   }
 
-  // Find target config
+  // Find target config from servers (protocol connections)
   let protocol, address;
-  if (target.startsWith('output:')) {
-    const outputId = target.substring(7);
-    const output = state.outputs.find(o => o.id === outputId);
-    if (output) {
-      protocol = output.type;
-      address = output.address;
-    }
-  } else {
     const server = state.servers.find(s => s.id === target);
     if (server) {
       protocol = server.protocol || server.type;
       address = server.address;
-    }
   }
 
   if (!protocol || !address) {
@@ -4118,12 +4611,22 @@ function toggleContinuousTest() {
 
 async function runDiagnostics() {
   const outputEl = $('diagnostics-output');
-  if (!outputEl) return;
+  if (!outputEl) {
+    console.error('Diagnostics output element not found');
+    return;
+  }
 
   outputEl.innerHTML = '<div class="empty-state-small"><span class="empty-state-text">Running diagnostics...</span></div>';
 
   try {
+    if (!window.clasp || !window.clasp.runDiagnostics) {
+      throw new Error('CLASP API not available');
+    }
     const diagnostics = await window.clasp.runDiagnostics();
+    
+    if (!diagnostics) {
+      throw new Error('Diagnostics returned no data');
+    }
 
     outputEl.innerHTML = `
       <div class="diagnostics-section">
@@ -4183,8 +4686,17 @@ async function runDiagnostics() {
       </div>
     `;
   } catch (e) {
+    console.error('Diagnostics error:', e);
     outputEl.innerHTML = `<div class="diagnostics-section">
-      <div class="diagnostics-value error">Error running diagnostics: ${e.message}</div>
+      <div class="diagnostics-section-title">Error</div>
+      <div class="diagnostics-row">
+        <span class="diagnostics-label">Error running diagnostics:</span>
+        <span class="diagnostics-value error">${e.message || String(e)}</span>
+      </div>
+      ${e.stack ? `<div class="diagnostics-row">
+        <span class="diagnostics-label">Stack:</span>
+        <span class="diagnostics-value" style="font-size: 10px; font-family: monospace;">${e.stack}</span>
+      </div>` : ''}
     </div>`;
   }
 }
@@ -4199,7 +4711,7 @@ async function renderServerHealth() {
   if (state.servers.length === 0) {
     container.innerHTML = `
       <div class="empty-state-small">
-        <span class="empty-state-text">No servers running</span>
+        <span class="empty-state-text">No protocol connections running</span>
       </div>
     `;
     return;

@@ -219,6 +219,7 @@ async fn test_many_small_messages() -> TestResult {
                     id: None,
                     phase: None,
                     timestamp: None,
+                    timeline: None,
                 });
 
                 let encoded = encode(&msg).map_err(|e| format!("Encode {} failed: {:?}", i, e))?;

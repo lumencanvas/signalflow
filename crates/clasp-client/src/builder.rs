@@ -10,6 +10,8 @@ pub struct ClaspBuilder {
     token: Option<String>,
     reconnect: bool,
     reconnect_interval_ms: u64,
+    #[cfg(feature = "p2p")]
+    p2p_config: Option<clasp_core::P2PConfig>,
 }
 
 impl ClaspBuilder {
@@ -26,6 +28,8 @@ impl ClaspBuilder {
             token: None,
             reconnect: true,
             reconnect_interval_ms: 5000,
+            #[cfg(feature = "p2p")]
+            p2p_config: None,
         }
     }
 
@@ -59,6 +63,13 @@ impl ClaspBuilder {
         self
     }
 
+    /// Set P2P configuration (requires p2p feature)
+    #[cfg(feature = "p2p")]
+    pub fn p2p_config(mut self, config: clasp_core::P2PConfig) -> Self {
+        self.p2p_config = Some(config);
+        self
+    }
+
     /// Build and connect
     pub async fn connect(self) -> Result<Clasp> {
         let mut client = Clasp::new(
@@ -69,6 +80,14 @@ impl ClaspBuilder {
             self.reconnect,
             self.reconnect_interval_ms,
         );
+
+        // Set P2P config if provided
+        #[cfg(feature = "p2p")]
+        {
+            if let Some(p2p_config) = self.p2p_config {
+                client.set_p2p_config(p2p_config);
+            }
+        }
 
         client.do_connect().await?;
         Ok(client)

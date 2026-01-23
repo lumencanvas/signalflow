@@ -57,9 +57,9 @@ clasp.emit('/scene/activate', { name: 'movie-mode' });`
 // Connection handshake
 const handshakeFlow = `Client                           Server
   |                                |
-  |-- WebSocket Connect ---------->|  (ws://host:7330, subprotocol: clasp.v3)
+  |-- WebSocket Connect ---------->|  (ws://host:7330, subprotocol: clasp)
   |                                |
-  |-- HELLO ---------------------->|  { version: 3, name: "My App", features: [...] }
+  |-- HELLO ---------------------->|  { version: 1, name: "My App", features: [...] }
   |                                |
   |<--------- WELCOME -------------|  { session: "abc123", time: 1704067200000000 }
   |                                |
@@ -436,7 +436,7 @@ const benchmarks = {
 
             <p style="margin-top: 1rem;"><b>Key points:</b></p>
             <ul>
-              <li>WebSocket subprotocol is <code>clasp.v3</code></li>
+              <li>WebSocket subprotocol is <code>clasp</code></li>
               <li>Default port is <code>7330</code></li>
               <li>Server time is in <b>microseconds</b> (not milliseconds)</li>
               <li>After WELCOME, you can immediately SUBSCRIBE and start sending</li>

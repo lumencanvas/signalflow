@@ -1,4 +1,4 @@
-//! CLASP v3 Binary Codec
+//! CLASP Binary Codec
 //!
 //! Efficient binary encoding for all CLASP messages.
 //! Backward compatible: can decode v2 MessagePack frames.
@@ -15,8 +15,8 @@ use crate::{Error, Frame, QoS, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashMap;
 
-/// Protocol version (v3 = efficient binary encoding)
-pub const VERSION: u8 = 3;
+/// Encoding version (1 = binary encoding, 0 = MessagePack legacy)
+pub const ENCODING_VERSION: u8 = 1;
 
 /// Message type codes
 pub mod msg {
@@ -76,7 +76,7 @@ pub mod phase {
 // PUBLIC API
 // ============================================================================
 
-/// Encode a message to v3 binary format
+/// Encode a message to binary format
 #[inline]
 pub fn encode_message(message: &Message) -> Result<Bytes> {
     // Pre-allocate based on expected message size
@@ -101,7 +101,7 @@ fn estimate_message_size(msg: &Message) -> usize {
     }
 }
 
-/// Decode a message - auto-detects v2 (MessagePack) vs v3 (binary)
+/// Decode a message - auto-detects MessagePack (legacy) vs binary encoding
 #[inline]
 pub fn decode_message(bytes: &[u8]) -> Result<Message> {
     if bytes.is_empty() {
@@ -110,27 +110,27 @@ pub fn decode_message(bytes: &[u8]) -> Result<Message> {
 
     let first = bytes[0];
 
-    // v3 messages start with known message type codes (0x01-0x61)
+    // Binary encoded messages start with known message type codes (0x01-0x61)
     // v2 MessagePack maps start with 0x80-0x8F (fixmap) or 0xDE-0xDF (map16/map32)
     if is_msgpack_map(first) {
         // Legacy v2 format - use rmp-serde
         decode_v2_msgpack(bytes)
     } else {
-        // v3 binary format
+        // Binary encoding format
         decode_v3_binary(bytes)
     }
 }
 
-/// Encode a message into a complete frame (v3 binary)
+/// Encode a message into a complete frame (binary encoding)
 #[inline]
 pub fn encode(message: &Message) -> Result<Bytes> {
     let payload = encode_message(message)?;
     let mut frame = Frame::new(payload).with_qos(message.default_qos());
-    frame.flags.version = 1; // v3 binary encoding
+    frame.flags.version = 1; // binary encoding (1 = binary, 0 = MessagePack legacy)
     frame.encode()
 }
 
-/// Encode a message with options (v3 binary)
+/// Encode a message with options (binary encoding)
 pub fn encode_with_options(
     message: &Message,
     qos: Option<QoS>,
@@ -138,7 +138,7 @@ pub fn encode_with_options(
 ) -> Result<Bytes> {
     let payload = encode_message(message)?;
     let mut frame = Frame::new(payload);
-    frame.flags.version = 1; // v3 binary encoding
+    frame.flags.version = 1; // binary encoding (1 = binary, 0 = MessagePack legacy)
 
     if let Some(qos) = qos {
         frame = frame.with_qos(qos);
@@ -161,7 +161,7 @@ pub fn decode(bytes: &[u8]) -> Result<(Message, Frame)> {
     Ok((message, frame))
 }
 
-/// Helper to encode just the message payload (without frame) - v3 binary
+/// Helper to encode just the message payload (without frame) - binary encoding
 pub fn encode_payload(message: &Message) -> Result<Vec<u8>> {
     let bytes = encode_message(message)?;
     Ok(bytes.to_vec())
@@ -173,7 +173,7 @@ pub fn decode_payload(bytes: &[u8]) -> Result<Message> {
 }
 
 // ============================================================================
-// V3 BINARY ENCODING
+// BINARY ENCODING
 // ============================================================================
 
 fn encode_message_to_buf(buf: &mut BytesMut, msg: &Message) -> Result<()> {
@@ -776,7 +776,7 @@ fn gesture_phase_code(phase: GesturePhase) -> u8 {
 }
 
 // ============================================================================
-// V3 BINARY DECODING
+// BINARY DECODING
 // ============================================================================
 
 fn decode_v3_binary(bytes: &[u8]) -> Result<Message> {
@@ -883,6 +883,7 @@ fn decode_publish(buf: &mut &[u8]) -> Result<Message> {
         id,
         phase,
         timestamp,
+        timeline: None, // Timeline data is encoded separately when signal is Timeline
     }))
 }
 
@@ -1435,7 +1436,7 @@ mod tests {
     #[test]
     fn test_hello_roundtrip() {
         let msg = Message::Hello(HelloMessage {
-            version: 3,
+            version: 1,
             name: "Test Client".to_string(),
             features: vec!["param".to_string(), "event".to_string()],
             capabilities: None,
@@ -1447,7 +1448,7 @@ mod tests {
 
         match decoded {
             Message::Hello(hello) => {
-                assert_eq!(hello.version, 3);
+                assert_eq!(hello.version, 1);
                 assert_eq!(hello.name, "Test Client");
                 assert!(hello.features.contains(&"param".to_string()));
                 assert!(hello.features.contains(&"event".to_string()));
@@ -1456,7 +1457,7 @@ mod tests {
         }
 
         assert_eq!(frame.flags.qos, QoS::Fire);
-        assert_eq!(frame.flags.version, 1); // v3 encoding
+        assert_eq!(frame.flags.version, 1); // binary encoding
     }
 
     #[test]
@@ -1494,25 +1495,25 @@ mod tests {
             unlock: false,
         });
 
-        // v3 binary encoding
-        let v3_payload = encode_message(&msg).unwrap();
+        // Binary encoding
+        let binary_payload = encode_message(&msg).unwrap();
 
-        // v2 MessagePack encoding (named keys)
-        let v2_payload = rmp_serde::to_vec_named(&msg).unwrap();
+        // MessagePack encoding (named keys, legacy)
+        let msgpack_payload = rmp_serde::to_vec_named(&msg).unwrap();
 
-        println!("v3 binary payload: {} bytes", v3_payload.len());
-        println!("v2 msgpack payload: {} bytes", v2_payload.len());
+        println!("Binary payload: {} bytes", binary_payload.len());
+        println!("MessagePack payload: {} bytes", msgpack_payload.len());
 
-        // v3 should be significantly smaller (target: ~32 bytes vs ~69 bytes)
+        // Binary encoding should be significantly smaller (target: ~32 bytes vs ~69 bytes)
         assert!(
-            v3_payload.len() < v2_payload.len(),
-            "v3 ({}) should be smaller than v2 ({})",
-            v3_payload.len(),
-            v2_payload.len()
+            binary_payload.len() < msgpack_payload.len(),
+            "Binary encoding ({}) should be smaller than MessagePack ({})",
+            binary_payload.len(),
+            msgpack_payload.len()
         );
 
-        // v3 should be at least 40% smaller
-        let savings = 100 - (v3_payload.len() * 100 / v2_payload.len());
+        // Binary encoding should be at least 40% smaller
+        let savings = 100 - (binary_payload.len() * 100 / msgpack_payload.len());
         println!("Size reduction: {}%", savings);
         assert!(savings >= 40, "Expected at least 40% size reduction, got {}%", savings);
     }
@@ -1632,6 +1633,7 @@ mod tests {
             id: None,
             phase: None,
             timestamp: Some(1234567890),
+            timeline: None,
         });
 
         let encoded = encode(&msg).unwrap();

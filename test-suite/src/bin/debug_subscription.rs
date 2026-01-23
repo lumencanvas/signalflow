@@ -26,6 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         features: vec!["param".into()],
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 100,
+        gesture_coalescing: true,
+        gesture_coalesce_interval_ms: 16,
     });
     
     let addr_clone = addr.clone();

@@ -24,6 +24,8 @@ async fn test_late_joiner(param_count: usize) -> (u64, Duration, String) {
         features: vec!["param".into()],
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 100,
+        gesture_coalescing: true,
+        gesture_coalesce_interval_ms: 16,
     });
     
     let addr = format!("127.0.0.1:{}", port);

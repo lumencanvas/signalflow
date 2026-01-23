@@ -12,6 +12,7 @@ readme = "README.md"
 default = ["mdns", "broadcast"]
 mdns = ["mdns-sd"]
 broadcast = []
+rendezvous = ["axum", "tower-http", "reqwest", "dashmap"]
 
 [dependencies]
 clasp-core = { workspace = true }
@@ -24,6 +25,12 @@ async-trait = { workspace = true }
 
 # Discovery
 mdns-sd = { workspace = true, optional = true }
+
+# Rendezvous server (HTTP REST API)
+axum = { version = "0.7", optional = true, features = ["json"] }
+tower-http = { version = "0.5", optional = true, features = ["cors", "trace"] }
+reqwest = { version = "0.12", optional = true, features = ["json"] }
+dashmap = { workspace = true, optional = true }
 
 # Error handling
 thiserror = { workspace = true }
@@ -40,3 +47,5 @@ hostname = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+futures = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }

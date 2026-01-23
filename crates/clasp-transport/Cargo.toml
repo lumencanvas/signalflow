@@ -9,14 +9,15 @@ description = "Transport layer implementations for CLASP"
 readme = "README.md"
 
 [features]
-default = ["websocket", "udp", "quic"]
-full = ["websocket", "udp", "quic", "serial", "ble", "webrtc"]
+default = ["websocket", "tcp", "udp", "quic"]
+full = ["websocket", "tcp", "udp", "quic", "serial", "ble", "webrtc"]
 
 # WebSocket - native uses tokio-tungstenite, WASM uses web-sys
 websocket = ["tokio-tungstenite", "futures-util", "url"]
 wasm-websocket = ["wasm-bindgen", "wasm-bindgen-futures", "web-sys", "js-sys"]
 
 # Native-only transports (not available in WASM)
+tcp = ["socket2"]
 udp = []
 quic = ["quinn", "rustls", "rustls-native-certs"]
 serial = ["tokio-serial"]
@@ -65,6 +66,9 @@ uuid = { version = "1.0", optional = true }
 # WebRTC (optional)
 webrtc-rs = { package = "webrtc", version = "0.10", optional = true }
 serde_json = { version = "1.0", optional = true }
+
+# TCP keepalive (optional)
+socket2 = { version = "0.5", optional = true, features = ["all"] }
 
 # WASM (optional)
 wasm-bindgen = { version = "0.2", optional = true }

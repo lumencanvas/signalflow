@@ -1,11 +1,11 @@
-# Protocol Bridges
+# Protocol Connections
 
-CLASP supports bridging between multiple protocols. Each bridge translates between its native protocol and CLASP's internal message format.
+CLASP supports connecting multiple protocols to the central router. Each protocol connection translates bidirectionally between its native protocol and CLASP.
 
 ## Supported Protocols
 
-| Protocol | Type | Transport | Use Cases |
-|----------|------|-----------|-----------|
+| Protocol | Direction | Transport | Use Cases |
+|----------|-----------|-----------|-----------|
 | [OSC](osc.md) | Bidirectional | UDP | Audio software, VJ apps, TouchOSC |
 | [MIDI](midi.md) | Bidirectional | USB/Virtual | DAWs, controllers, synthesizers |
 | [Art-Net](artnet.md) | Bidirectional | UDP | DMX lighting over Ethernet |
@@ -15,9 +15,9 @@ CLASP supports bridging between multiple protocols. Each bridge translates betwe
 | [Socket.IO](socketio.md) | Bidirectional | TCP | Node.js apps, chat systems |
 | [HTTP](http.md) | Bidirectional | TCP | REST APIs, webhooks |
 
-## Bridge Architecture
+## Protocol Connection Architecture
 
-Each bridge implements the `Bridge` trait:
+Each protocol connection implements the `Bridge` trait:
 
 ```rust
 #[async_trait]
@@ -33,12 +33,12 @@ pub trait Bridge: Send + Sync {
 
 ### BridgeEvent
 
-Bridges emit events through a channel:
+Protocol connections emit events through a channel:
 
 ```rust
 pub enum BridgeEvent {
     ToClasp(Message),  // Message received from external protocol
-    Connected,              // Bridge connected successfully
+    Connected,              // Connection established successfully
     Disconnected { reason: Option<String> },
     Error(String),
 }
@@ -46,7 +46,7 @@ pub enum BridgeEvent {
 
 ## Common Configuration
 
-All bridges share some common configuration:
+All protocol connections share some common configuration:
 
 ```rust
 pub struct BridgeConfig {
@@ -59,10 +59,10 @@ pub struct BridgeConfig {
 
 ## Namespace Mapping
 
-Each bridge has a namespace that prefixes all addresses:
+Each protocol connection has a namespace that prefixes all addresses:
 
-| Bridge | Default Namespace | Example Address |
-|--------|-------------------|-----------------|
+| Protocol | Default Namespace | Example Address |
+|----------|-------------------|-----------------|
 | OSC | `/osc` | `/osc/1/fader1` |
 | MIDI | `/midi` | `/midi/ch1/note/60` |
 | MQTT | `/mqtt` | `/mqtt/sensors/temp` |
@@ -70,7 +70,7 @@ Each bridge has a namespace that prefixes all addresses:
 
 ## Next Steps
 
-- [OSC Bridge](osc.md) - Open Sound Control
-- [MIDI Bridge](midi.md) - Musical Instrument Digital Interface
-- [MQTT Bridge](mqtt.md) - IoT messaging
-- [WebSocket Bridge](websocket.md) - Real-time web
+- [OSC Connection](osc.md) - Open Sound Control
+- [MIDI Connection](midi.md) - Musical Instrument Digital Interface
+- [MQTT Connection](mqtt.md) - IoT messaging
+- [WebSocket Connection](websocket.md) - Real-time web

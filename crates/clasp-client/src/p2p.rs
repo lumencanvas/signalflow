@@ -188,6 +188,7 @@ impl P2PManager {
             id: None,
             phase: None,
             timestamp: None,
+            timeline: None,
         });
 
         self.signal_tx
@@ -201,7 +202,7 @@ impl P2PManager {
 
     /// Initiate a P2P connection to a peer
     #[cfg(feature = "p2p")]
-    pub async fn connect_to_peer(&self, peer_session_id: &str) -> Result<()> {
+    pub async fn connect_to_peer(self: &Arc<Self>, peer_session_id: &str) -> Result<()> {
         let our_session_id = self.session_id().ok_or(ClientError::NotConnected)?;
 
         // Generate correlation ID for this connection
@@ -227,6 +228,46 @@ impl P2PManager {
         let (transport, sdp_offer) = WebRtcTransport::new_offerer_with_config(webrtc_config)
             .await
             .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
+
+        // Set up connection monitoring for offerer (before storing transport)
+        let p2p_manager = Arc::clone(self);
+        let peer_id = peer_session_id.to_string();
+        info!("Setting up connection callback for offerer to peer {}", peer_id);
+        transport.on_connection_ready(move || {
+            info!("Connection callback invoked for offerer to peer {}", peer_id);
+            let p2p = Arc::clone(&p2p_manager);
+            let peer = peer_id.clone();
+            tokio::spawn(async move {
+                info!("Calling mark_connected for peer {}", peer);
+                if let Err(e) = p2p.mark_connected(&peer).await {
+                    warn!("Failed to mark connected: {}", e);
+                } else {
+                    info!("Successfully marked connected for peer {}", peer);
+                }
+            });
+        });
+
+        // Set up ICE candidate handler for offerer
+        let p2p_manager_ice = Arc::clone(self);
+        let peer_id_ice = peer_session_id.to_string();
+        let correlation_id_ice = correlation_id.clone();
+        transport.on_ice_candidate(move |candidate_json| {
+            debug!("ICE candidate generated for offerer to peer {}: {}", peer_id_ice, candidate_json);
+            let p2p = Arc::clone(&p2p_manager_ice);
+            let peer = peer_id_ice.clone();
+            let candidate = candidate_json.clone();
+            let corr_id = correlation_id_ice.clone();
+            tokio::spawn(async move {
+                let signal = P2PSignal::IceCandidate {
+                    from: p2p.session_id().unwrap_or_default(),
+                    candidate,
+                    correlation_id: corr_id,
+                };
+                if let Err(e) = p2p.send_signal(&peer, signal).await {
+                    warn!("Failed to send ICE candidate: {}", e);
+                }
+            });
+        });
 
         connection.transport = Some(transport);
 
@@ -255,9 +296,21 @@ impl P2PManager {
     }
 
     /// Handle incoming signaling message
-    pub async fn handle_signal(&self, address: &str, payload: &Value) -> Result<()> {
+    pub async fn handle_signal(self: &Arc<Self>, address: &str, payload: &Value) -> Result<()> {
         // Extract target session from address (for signals meant for us)
         if !address.starts_with(P2P_SIGNAL_PREFIX) {
+            return Ok(());
+        }
+
+        // Check if this signal is for us
+        let our_session = self.session_id();
+        if let Some(ref session) = our_session {
+            let expected_address = format!("{}{}", P2P_SIGNAL_PREFIX, session);
+            if address != expected_address {
+                // Not for us, ignore
+                return Ok(());
+            }
+        } else {
             return Ok(());
         }
 
@@ -387,7 +440,7 @@ impl P2PManager {
     // =========================================================================
 
     #[cfg(feature = "p2p")]
-    async fn handle_offer(&self, from: &str, sdp: &str, correlation_id: &str) -> Result<()> {
+    async fn handle_offer(self: &Arc<Self>, from: &str, sdp: &str, correlation_id: &str) -> Result<()> {
         let our_session_id = self.session_id().ok_or(ClientError::NotConnected)?;
 
         info!("Received P2P offer from {}", from);
@@ -402,6 +455,46 @@ impl P2PManager {
         let (transport, sdp_answer) = WebRtcTransport::new_answerer_with_config(sdp, webrtc_config)
             .await
             .map_err(|e| ClientError::ConnectionFailed(e.to_string()))?;
+
+        // Set up connection monitoring for answerer (before storing transport)
+        let p2p_manager = Arc::clone(self);
+        let peer_id = from.to_string();
+        info!("Setting up connection callback for answerer from peer {}", peer_id);
+        transport.on_connection_ready(move || {
+            info!("Connection callback invoked for answerer from peer {}", peer_id);
+            let p2p = Arc::clone(&p2p_manager);
+            let peer = peer_id.clone();
+            tokio::spawn(async move {
+                info!("Calling mark_connected for peer {}", peer);
+                if let Err(e) = p2p.mark_connected(&peer).await {
+                    warn!("Failed to mark connected: {}", e);
+                } else {
+                    info!("Successfully marked connected for peer {}", peer);
+                }
+            });
+        });
+
+        // Set up ICE candidate handler for answerer
+        let p2p_manager_ice = Arc::clone(self);
+        let peer_id_ice = from.to_string();
+        let correlation_id_ice = correlation_id.to_string();
+        transport.on_ice_candidate(move |candidate_json| {
+            debug!("ICE candidate generated for answerer from peer {}: {}", peer_id_ice, candidate_json);
+            let p2p = Arc::clone(&p2p_manager_ice);
+            let peer = peer_id_ice.clone();
+            let candidate = candidate_json.clone();
+            let corr_id = correlation_id_ice.clone();
+            tokio::spawn(async move {
+                let signal = P2PSignal::IceCandidate {
+                    from: p2p.session_id().unwrap_or_default(),
+                    candidate,
+                    correlation_id: corr_id,
+                };
+                if let Err(e) = p2p.send_signal(&peer, signal).await {
+                    warn!("Failed to send ICE candidate: {}", e);
+                }
+            });
+        });
 
         // Create connection entry
         let mut connection = P2PConnection::new(from.to_string(), correlation_id.to_string());
@@ -581,6 +674,7 @@ impl P2PManager {
             id: None,
             phase: None,
             timestamp: None,
+            timeline: None,
         });
 
         self.signal_tx

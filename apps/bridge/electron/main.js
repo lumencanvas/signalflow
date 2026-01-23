@@ -53,10 +53,21 @@ const getBinaryPath = (name) => {
 function startBridgeService() {
   const servicePath = getBinaryPath('clasp-service');
 
+  // Check if binary exists
+  if (!fs.existsSync(servicePath)) {
+    console.error(`Bridge service binary not found at: ${servicePath}`);
+    console.error('Please build it with: cargo build --release -p clasp-service');
+    return;
+  }
+
+  console.log(`Starting bridge service from: ${servicePath}`);
+
   try {
     bridgeService = spawn(servicePath, [], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
+
+    console.log(`Bridge service spawned with PID: ${bridgeService.pid}`);
 
     const rl = readline.createInterface({
       input: bridgeService.stdout,
@@ -64,6 +75,7 @@ function startBridgeService() {
     });
 
     rl.on('line', (line) => {
+      console.log(`[bridge-service stdout] ${line}`);
       try {
         const message = JSON.parse(line);
         handleBridgeMessage(message);
@@ -73,19 +85,39 @@ function startBridgeService() {
     });
 
     bridgeService.stderr.on('data', (data) => {
-      // Bridge service stderr output
+      // Bridge service stderr output (logs)
+      console.log(`[bridge-service stderr] ${data.toString().trim()}`);
     });
 
     bridgeService.on('close', (code) => {
+      console.log(`Bridge service exited with code: ${code}`);
       bridgeService = null;
       bridgeReady = false;
+      // Notify renderer that bridge is no longer ready
+      if (mainWindow) {
+        mainWindow.webContents.send('bridge-ready', false);
+      }
     });
 
     bridgeService.on('error', (err) => {
       console.error('Bridge service error:', err);
       bridgeService = null;
       bridgeReady = false;
+      // Notify renderer that bridge is no longer ready
+      if (mainWindow) {
+        mainWindow.webContents.send('bridge-ready', false);
+      }
     });
+
+    // Set a timeout to check if the service becomes ready
+    setTimeout(() => {
+      if (!bridgeReady) {
+        console.error('Bridge service did not become ready within 5 seconds');
+        if (mainWindow) {
+          mainWindow.webContents.send('bridge-ready', false);
+        }
+      }
+    }, 5000);
 
   } catch (err) {
     console.error('Failed to start bridge service:', err);
@@ -113,11 +145,252 @@ function sendToBridge(message) {
   }
 }
 
+// Find CLASP router by ID, or first running router if ID not provided
+function findClaspRouter(routerId = null) {
+  if (routerId) {
+    const server = runningServers.get(routerId);
+    if (server && server.config?.type === 'clasp' && server.status === 'running' && server.port) {
+      return {
+        id: routerId,
+        address: server.config.address || `localhost:${server.port}`,
+        port: server.port,
+        token: server.config.token,
+      };
+    }
+  }
+  
+  // Fall back to first running router
+  for (const [id, server] of runningServers) {
+    if (server.config?.type === 'clasp' && server.status === 'running' && server.port) {
+      return {
+        id,
+        address: server.config.address || `localhost:${server.port}`,
+        port: server.port,
+        token: server.config.token,
+      };
+    }
+  }
+  return null;
+}
+
+// Create or update router connection for a bridge
+async function connectBridgeToRouter(bridgeId, routerId = null) {
+  const bridge = runningServers.get(bridgeId);
+  const requestedRouterId = routerId || bridge?.config?.routerId;
+  const router = findClaspRouter(requestedRouterId);
+  if (!router) {
+    // No router available - notify UI
+    if (mainWindow) {
+      mainWindow.webContents.send('bridge-router-status', {
+        bridgeId,
+        connected: false,
+        error: 'No CLASP router available',
+      });
+    }
+    return false;
+  }
+
+  // Close existing connection if any
+  if (bridgeRouterConnections.has(bridgeId)) {
+    try {
+      const conn = bridgeRouterConnections.get(bridgeId);
+      if (conn.ws) {
+        conn.ws.close();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const wsUrl = router.address.startsWith('ws://') 
+    ? router.address 
+    : `ws://${router.address}`;
+
+  return new Promise((resolve) => {
+    // Connect without subprotocol requirement - CLASP handshake validates the connection
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'nodebuffer';
+    let connected = false;
+    let welcomed = false;
+
+    const connection = {
+      ws,
+      routerId: router.id,
+      routerAddress: router.address,
+      token: router.token,
+      welcomed: false,
+    };
+
+    ws.on('open', () => {
+      connected = true;
+      bridgeRouterConnections.set(bridgeId, connection);
+
+      // Send HELLO message
+      const helloMsg = {
+        type: MSG.HELLO,
+        version: 3,
+        name: `Bridge ${bridgeId}`,
+        features: ['param', 'event', 'stream'],
+      };
+      if (router.token) {
+        helloMsg.token = router.token;
+      }
+      const hello = encodeClaspFrame(helloMsg);
+      ws.send(hello);
+    });
+
+    ws.on('message', (data) => {
+      try {
+        const buffer = Buffer.from(data);
+        const msg = decodeClaspFrame(buffer);
+
+        if (msg.type === MSG.WELCOME) {
+          welcomed = true;
+          connection.welcomed = true;
+          
+          // Notify UI of successful connection
+          if (mainWindow) {
+            mainWindow.webContents.send('bridge-router-status', {
+              bridgeId,
+              connected: true,
+              routerId: router.id,
+              routerAddress: router.address,
+            });
+          }
+          resolve(true);
+          return;
+        }
+
+        if (msg.type === MSG.ERROR) {
+          const errorCode = msg.code || 0;
+          const errorMessage = msg.message || 'Unknown error';
+          
+          if (errorCode >= 300 && errorCode < 400) {
+            ws.close();
+            bridgeRouterConnections.delete(bridgeId);
+            
+            if (mainWindow) {
+              mainWindow.webContents.send('bridge-router-status', {
+                bridgeId,
+                connected: false,
+                error: `Authentication failed: ${errorMessage}`,
+              });
+            }
+            resolve(false);
+            return;
+          }
+        }
+
+        if (msg.type === MSG.PING) {
+          ws.send(encodeClaspFrame({ type: MSG.PONG }));
+          return;
+        }
+      } catch (e) {
+        // Decode error - silently ignore
+      }
+    });
+
+    ws.on('error', (err) => {
+      if (!connected) {
+        bridgeRouterConnections.delete(bridgeId);
+        if (mainWindow) {
+          mainWindow.webContents.send('bridge-router-status', {
+            bridgeId,
+            connected: false,
+            error: err.message,
+          });
+        }
+        resolve(false);
+      }
+    });
+
+    ws.on('close', () => {
+      const existingConn = bridgeRouterConnections.get(bridgeId);
+      if (existingConn && existingConn.routerId === router.id) {
+        bridgeRouterConnections.delete(bridgeId);
+        if (mainWindow) {
+          mainWindow.webContents.send('bridge-router-status', {
+            bridgeId,
+            connected: false,
+            error: 'Connection closed',
+          });
+        }
+        
+        // Attempt to reconnect after a delay if router is still running
+        setTimeout(() => {
+          const server = runningServers.get(router.id);
+          const bridge = runningServers.get(bridgeId);
+          if (server && server.status === 'running' && bridge) {
+            connectBridgeToRouter(bridgeId, bridge.config?.routerId);
+          }
+        }, 2000);
+      }
+    });
+
+    // Timeout for initial connection
+    setTimeout(() => {
+      if (!connected || !welcomed) {
+        if (ws) ws.terminate();
+        bridgeRouterConnections.delete(bridgeId);
+        if (mainWindow) {
+          mainWindow.webContents.send('bridge-router-status', {
+            bridgeId,
+            connected: false,
+            error: 'Connection timeout',
+          });
+        }
+        resolve(false);
+      }
+    }, 5000);
+  });
+}
+
+// Forward signal to CLASP router via bridge connection
+function forwardSignalToRouter(bridgeId, address, value) {
+  const connection = bridgeRouterConnections.get(bridgeId);
+  if (!connection || !connection.welcomed) {
+    return false;
+  }
+  
+  // Check if WebSocket is open (readyState === 1)
+  if (connection.ws.readyState !== 1) {
+    return false;
+  }
+
+  try {
+    // Send SET message to router
+    const setMsg = {
+      type: MSG.SET,
+      address: address,
+      value: value,
+    };
+    const frame = encodeClaspFrame(setMsg);
+    connection.ws.send(frame);
+    
+    // Update stats
+    const server = runningServers.get(bridgeId);
+    if (server && server.stats) {
+      server.stats.messagesOut++;
+      server.stats.lastActivity = Date.now();
+    }
+    
+    return true;
+  } catch (e) {
+    console.error(`Failed to forward signal to router for bridge ${bridgeId}:`, e);
+    return false;
+  }
+}
+
 // Handle messages from the bridge service
 function handleBridgeMessage(message) {
   switch (message.type) {
     case 'ready':
+      console.log('[bridge-service] Bridge service is now ready!');
       bridgeReady = true;
+      // Notify renderer that bridge is ready
+      if (mainWindow) {
+        mainWindow.webContents.send('bridge-ready', true);
+      }
       break;
 
     case 'signal':
@@ -137,6 +410,15 @@ function handleBridgeMessage(message) {
             port: server.port || server.config?.port || null,
             address: server.config?.address || server.config?.claspAddress || null,
           };
+        }
+      }
+
+      // Forward signal to CLASP router if bridge has 'internal' target
+      if (message.bridge_id) {
+        const server = runningServers.get(message.bridge_id);
+        if (server && server.config?.target_addr === 'internal') {
+          // Forward to router
+          forwardSignalToRouter(message.bridge_id, message.address, message.value);
         }
       }
 
@@ -285,6 +567,26 @@ async function startClaspServer(config) {
           status: serverState.status,
           exitCode: code,
         });
+        
+        // Close all bridge connections that were using this router
+        for (const [bridgeId, conn] of bridgeRouterConnections) {
+          if (conn.routerId === config.id) {
+            try {
+              conn.ws.close();
+            } catch (e) {
+              // ignore
+            }
+            bridgeRouterConnections.delete(bridgeId);
+            if (mainWindow) {
+              mainWindow.webContents.send('bridge-router-status', {
+                bridgeId,
+                connected: false,
+                error: 'Router stopped',
+              });
+            }
+          }
+        }
+        
         runningServers.delete(config.id);
       });
 
@@ -319,6 +621,15 @@ async function startClaspServer(config) {
           // CLASP monitor connection failed - non-critical
         }
 
+        // Connect any bridges waiting for a router
+        for (const [bridgeId, server] of runningServers) {
+          if (server.config?.target_addr === 'internal' && !bridgeRouterConnections.has(bridgeId)) {
+            connectBridgeToRouter(bridgeId, server.config?.routerId).catch(err => {
+              console.error(`Failed to connect bridge ${bridgeId} to new router:`, err);
+            });
+          }
+        }
+
         resolve({ id: config.id, status: serverState.status });
       }, 500);
 
@@ -330,6 +641,9 @@ async function startClaspServer(config) {
 
 // CLASP monitor connections
 const claspMonitors = new Map();
+
+// CLASP router connections for protocol bridges (target_addr: 'internal')
+const bridgeRouterConnections = new Map(); // bridgeId -> { ws, routerId, routerAddress, token, welcomed }
 
 // CLASP message type strings (matching Rust serde tags)
 const MSG = {
@@ -346,37 +660,46 @@ const MSG = {
   ERROR: 'ERROR',
 };
 
-// Encode a CLASP frame
+// Encode a CLASP frame - use @clasp-to/core for proper v3 encoding
 function encodeClaspFrame(message) {
-  const { encode } = require('@msgpack/msgpack');
-  const payload = Buffer.from(encode(message));
-
-  const frame = Buffer.alloc(4 + payload.length);
-  frame[0] = 0x53;  // Magic 'S' (for Streaming)
-  frame[1] = 0x00;  // Flags (QoS=0, no timestamp)
-  frame.writeUInt16BE(payload.length, 2);
-  payload.copy(frame, 4);
-
-  return frame;
+  try {
+    const { encodeMessage } = require('@clasp-to/core');
+    const encoded = encodeMessage(message);
+    return Buffer.from(encoded);
+  } catch (e) {
+    // Fallback to MessagePack for v2 compatibility
+    const { encode } = require('@msgpack/msgpack');
+    const payload = Buffer.from(encode(message));
+    const frame = Buffer.alloc(4 + payload.length);
+    frame[0] = 0x53;  // Magic 'S' (for Streaming)
+    frame[1] = 0x00;  // Flags (QoS=0, no timestamp, v2)
+    frame.writeUInt16BE(payload.length, 2);
+    payload.copy(frame, 4);
+    return frame;
+  }
 }
 
-// Decode a CLASP frame
+// Decode a CLASP frame - uses @clasp-to/core which handles both v2 and v3
 function decodeClaspFrame(buffer) {
-  const { decode } = require('@msgpack/msgpack');
-
-  if (buffer[0] !== 0x53) {
-    throw new Error(`Invalid magic byte: expected 0x53, got 0x${buffer[0].toString(16)}`);
+  try {
+    const { decodeMessage } = require('@clasp-to/core');
+    const uint8Array = new Uint8Array(buffer);
+    const result = decodeMessage(uint8Array);
+    return result.message;
+  } catch (e) {
+    // Fallback to MessagePack for v2 compatibility
+    const { decode } = require('@msgpack/msgpack');
+    if (buffer[0] !== 0x53) {
+      throw new Error(`Invalid magic byte: expected 0x53, got 0x${buffer[0].toString(16)}`);
+    }
+    const flags = buffer[1];
+    const hasTimestamp = (flags & 0x20) !== 0;
+    const payloadLength = buffer.readUInt16BE(2);
+    let payloadOffset = hasTimestamp ? 12 : 4;
+    const payload = buffer.slice(payloadOffset, payloadOffset + payloadLength);
+    const message = decode(payload);
+    return message;
   }
-
-  const flags = buffer[1];
-  const hasTimestamp = (flags & 0x20) !== 0;
-  const payloadLength = buffer.readUInt16BE(2);
-
-  let payloadOffset = hasTimestamp ? 12 : 4;
-  const payload = buffer.slice(payloadOffset, payloadOffset + payloadLength);
-  const message = decode(payload);
-
-  return message;
 }
 
 // Create a WebSocket monitor connection to observe CLASP traffic
@@ -389,7 +712,8 @@ async function createClaspMonitor(serverId, wsUrl, token = null) {
   }
 
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl, 'clasp');
+    // Connect without subprotocol requirement - CLASP handshake validates the connection
+    const ws = new WebSocket(wsUrl);
     ws.binaryType = 'nodebuffer';
     let connected = false;
     let welcomed = false;
@@ -401,7 +725,7 @@ async function createClaspMonitor(serverId, wsUrl, token = null) {
       // Send HELLO message with optional token
       const helloMsg = {
         type: MSG.HELLO,
-        version: 2,
+        version: 3,
         name: 'CLASP Bridge Monitor',
         features: ['param', 'event', 'stream'],
       };
@@ -557,7 +881,7 @@ async function startOscServer(config) {
 
   const serverState = {
     process: null, // managed by bridge service
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `OSC listening on ${addr}`, type: 'info' }],
     port: config.port || 9000,
@@ -565,6 +889,11 @@ async function startOscServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect OSC bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -591,7 +920,7 @@ async function startMqttServer(config) {
 
   const serverState = {
     process: null,
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `MQTT connecting to ${addr}`, type: 'info' }],
     port: config.port || 1883,
@@ -599,6 +928,11 @@ async function startMqttServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect MQTT bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -625,7 +959,7 @@ async function startWebSocketServer(config) {
 
   const serverState = {
     process: null,
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `WebSocket ${config.mode || 'server'} on ${addr}`, type: 'info' }],
     port: parseInt(addr.split(':')[1]) || 8080,
@@ -633,6 +967,11 @@ async function startWebSocketServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect WebSocket bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -660,7 +999,7 @@ async function startHttpServer(config) {
 
   const serverState = {
     process: null,
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `HTTP API on ${addr}${config.basePath || '/api'}`, type: 'info' }],
     port: parseInt(addr.split(':')[1]) || 3000,
@@ -668,6 +1007,11 @@ async function startHttpServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect HTTP bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -695,7 +1039,7 @@ async function startArtNetServer(config) {
 
   const serverState = {
     process: null,
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `Art-Net on ${addr} (${config.subnet}:${config.universe})`, type: 'info' }],
     port: 6454,
@@ -703,6 +1047,11 @@ async function startArtNetServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect Art-Net bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -729,7 +1078,7 @@ async function startDmxServer(config) {
 
   const serverState = {
     process: null,
-    config,
+    config: { ...config, target_addr: 'internal' },
     status: 'running',
     logs: [{ timestamp: Date.now(), message: `DMX on ${serialPort} (U${config.universe || 0})`, type: 'info' }],
     port: null,
@@ -737,6 +1086,11 @@ async function startDmxServer(config) {
   };
 
   runningServers.set(config.id, serverState);
+
+  // Connect to CLASP router if available
+  connectBridgeToRouter(config.id, config.routerId).catch(err => {
+    console.error(`Failed to connect DMX bridge ${config.id} to router:`, err);
+  });
 
   return { id: config.id, status: 'running' };
 }
@@ -783,6 +1137,20 @@ async function stopServer(id) {
         id: id,
       });
     }
+    
+    // Close router connection if exists
+    if (bridgeRouterConnections.has(id)) {
+      try {
+        const conn = bridgeRouterConnections.get(id);
+        if (conn.ws) {
+          conn.ws.close();
+        }
+      } catch (e) {
+        // ignore
+      }
+      bridgeRouterConnections.delete(id);
+    }
+    
     runningServers.delete(id);
   }
 
@@ -800,8 +1168,8 @@ async function stopAllServers() {
 // Create the main window
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 900,
+    width: 1152,
+    height: 810,
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
@@ -842,7 +1210,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  console.log('App ready, starting bridge service...');
   startBridgeService();
+  console.log('Creating window...');
   createWindow();
 });
 
@@ -963,21 +1333,38 @@ ipcMain.handle('scan-network', async () => {
 
   const portsToScan = [7330, 8080, 9000];
   const hosts = ['localhost', '127.0.0.1'];
+  
+  console.log('[SCAN] Starting network scan, ports:', portsToScan, 'initial hosts:', hosts);
 
-  // Get local network hosts
+  // Get local network hosts (include all interfaces, including internal)
   try {
     const interfaces = os.networkInterfaces();
+    const localIPs = new Set(['localhost', '127.0.0.1']);
+    
     for (const iface of Object.values(interfaces)) {
       for (const config of iface) {
-        if (config.family === 'IPv4' && !config.internal) {
-          const parts = config.address.split('.');
-          const subnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
-          for (let i = 1; i <= 10; i++) {
-            hosts.push(`${subnet}.${i}`);
+        if (config.family === 'IPv4') {
+          // Include all local IPs (including internal like 127.0.0.1, localhost variants)
+          localIPs.add(config.address);
+          
+          // For non-internal interfaces, also scan subnet
+          if (!config.internal) {
+            const parts = config.address.split('.');
+            const subnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
+            for (let i = 1; i <= 10; i++) {
+              hosts.push(`${subnet}.${i}`);
+            }
           }
         }
       }
     }
+    
+    // Add all local IPs to hosts list
+    localIPs.forEach(ip => {
+      if (!hosts.includes(ip)) {
+        hosts.push(ip);
+      }
+    });
   } catch (e) {
     // Network interface enumeration failed - continue with defaults
   }
@@ -985,26 +1372,44 @@ ipcMain.handle('scan-network', async () => {
   const discoveredDevices = [];
   const probePromises = [];
 
+  console.log(`[SCAN] Scanning ${hosts.length} hosts on ${portsToScan.length} ports = ${hosts.length * portsToScan.length} total probes`);
+  
   for (const host of hosts) {
     for (const port of portsToScan) {
       probePromises.push(probeServer(host, port));
     }
   }
 
+  console.log(`[SCAN] Waiting for ${probePromises.length} probes to complete...`);
   const results = await Promise.allSettled(probePromises);
+  console.log(`[SCAN] All probes completed, processing results...`);
 
   const seen = new Set();
+  let successCount = 0;
+  let failureCount = 0;
+  
   for (const result of results) {
-    if (result.status === 'fulfilled' && result.value) {
-      const server = result.value;
-      const key = `${server.host}:${server.port}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        discoveredDevices.push(server);
-        mainWindow?.webContents.send('device-found', server);
+    if (result.status === 'fulfilled') {
+      if (result.value) {
+        const server = result.value;
+        const key = `${server.host}:${server.port}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          discoveredDevices.push(server);
+          console.log(`[SCAN] Found CLASP server: ${server.name} at ${key}`);
+          mainWindow?.webContents.send('device-found', server);
+          successCount++;
+        }
+      } else {
+        failureCount++;
       }
+    } else {
+      failureCount++;
+      console.error(`[SCAN] Probe failed:`, result.reason);
     }
   }
+  
+  console.log(`[SCAN] Scan complete: ${successCount} servers found, ${failureCount} probes failed/no response`);
 
   for (const device of discoveredDevices) {
     const existing = state.devices.find(d => d.id === device.id);
@@ -1022,39 +1427,151 @@ async function probeServer(host, port) {
   return new Promise((resolve) => {
     const wsUrl = `ws://${host}:${port}`;
     let ws;
+    let resolved = false;
+    let welcomeTimeout;
+    let connectionTimeout;
 
-    const timeout = setTimeout(() => {
-      if (ws) ws.terminate();
-      resolve(null);
-    }, 2000);
+    const cleanup = () => {
+      if (!resolved) {
+        resolved = true;
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (welcomeTimeout) clearTimeout(welcomeTimeout);
+        if (ws) {
+          try {
+            // WebSocket readyState: CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3
+            if (ws.readyState === 1 || ws.readyState === 0) {
+              ws.terminate();
+            }
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+      }
+    };
+
+    connectionTimeout = setTimeout(() => {
+      if (!resolved) {
+        console.log(`[SCAN] Connection timeout for ${host}:${port}`);
+        cleanup();
+        resolve(null);
+      }
+    }, 3000); // Increased timeout for handshake
 
     try {
-      ws = new WebSocket(wsUrl, 'clasp');
+      // Don't require subprotocol for scanning - just probe if it's a CLASP server
+      // The handshake will confirm it's CLASP
+      ws = new WebSocket(wsUrl);
+      ws.binaryType = 'nodebuffer';
 
       ws.on('open', () => {
-        clearTimeout(timeout);
-        ws.close();
-        resolve({
-          id: `discovered-${host}-${port}`,
-          name: `CLASP Server (${host}:${port})`,
-          host,
-          port,
-          address: wsUrl,
-          protocol: 'clasp',
-          status: 'available',
-        });
+        if (resolved) return;
+        console.log(`[SCAN] WebSocket opened to ${host}:${port}`);
+        
+        // Send HELLO message to complete CLASP handshake
+        try {
+          const helloMsg = {
+            type: MSG.HELLO,
+            version: 3,
+            name: 'CLASP Scanner',
+            features: ['param', 'event', 'stream'],
+          };
+          const hello = encodeClaspFrame(helloMsg);
+          ws.send(hello);
+          console.log(`[SCAN] Sent HELLO to ${host}:${port}`);
+          
+          // Set timeout for WELCOME response
+          welcomeTimeout = setTimeout(() => {
+            if (!resolved) {
+              // No WELCOME received, but connection opened - might still be a CLASP server
+              console.log(`[SCAN] No WELCOME from ${host}:${port}, but connection opened - treating as CLASP server`);
+              const device = {
+                id: `discovered-${host}-${port}`,
+                name: `CLASP Server (${host}:${port})`,
+                host,
+                port,
+                address: wsUrl,
+                protocol: 'clasp',
+                status: 'available',
+              };
+              cleanup();
+              try {
+                ws.close();
+              } catch (e) {
+                // Ignore close errors
+              }
+              resolve(device);
+            }
+          }, 2000); // Wait 2 seconds for WELCOME
+        } catch (e) {
+          console.error(`[SCAN] Failed to send HELLO to ${host}:${port}:`, e.message);
+          cleanup();
+          resolve(null);
+        }
       });
 
-      ws.on('error', () => {
-        clearTimeout(timeout);
+      ws.on('message', (data) => {
+        if (resolved) return;
+        try {
+          const buffer = Buffer.from(data);
+          const msg = decodeClaspFrame(buffer);
+          console.log(`[SCAN] Received message from ${host}:${port}:`, msg.type);
+          
+          // If we get a WELCOME, it's definitely a CLASP server
+          if (msg.type === MSG.WELCOME) {
+            console.log(`[SCAN] Got WELCOME from ${host}:${port} - confirmed CLASP server!`);
+            if (!resolved) {
+              resolved = true;
+              if (connectionTimeout) clearTimeout(connectionTimeout);
+              if (welcomeTimeout) clearTimeout(welcomeTimeout);
+              const device = {
+                id: `discovered-${host}-${port}`,
+                name: `CLASP Server (${host}:${port})`,
+                host,
+                port,
+                address: wsUrl,
+                protocol: 'clasp',
+                status: 'available',
+              };
+              try {
+                ws.close();
+              } catch (e) {
+                // Ignore close errors
+              }
+              resolve(device);
+            }
+          }
+        } catch (e) {
+          // Not a CLASP message or decode error - log for debugging
+          console.debug(`[SCAN] Failed to decode message from ${host}:${port}:`, e.message);
+        }
+      });
+
+      ws.on('error', (err) => {
+        if (resolved) return;
+        // Log all errors for debugging
+        if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+          // Normal - server not available, don't spam logs
+        } else {
+          console.log(`[SCAN] Error probing ${host}:${port}:`, err.code, err.message);
+        }
+        cleanup();
         resolve(null);
       });
 
       ws.on('close', () => {
-        clearTimeout(timeout);
+        // Connection closed - already resolved or will be resolved by timeout
+      });
+
+      ws.on('unexpected-response', (req, res) => {
+        if (resolved) return;
+        console.log(`[SCAN] Unexpected response from ${host}:${port} (not a WebSocket server)`);
+        cleanup();
+        resolve(null);
       });
     } catch (e) {
-      clearTimeout(timeout);
+      if (resolved) return;
+      console.error(`[SCAN] Exception creating WebSocket for ${host}:${port}:`, e.message);
+      cleanup();
       resolve(null);
     }
   });
@@ -1164,7 +1681,8 @@ ipcMain.handle('test-connection', async (event, address) => {
     let timeout;
 
     try {
-      ws = new WebSocket(wsUrl, 'clasp');
+      // Connect without subprotocol requirement - just test if WebSocket connects
+      ws = new WebSocket(wsUrl);
 
       timeout = setTimeout(() => {
         if (ws) ws.terminate();
@@ -1748,6 +2266,15 @@ ipcMain.handle('health-check', async (event, id) => {
     checks,
     status: server.status,
     uptime: stats.startTime ? Date.now() - stats.startTime : 0,
+  };
+});
+
+// Get bridge service ready status
+ipcMain.handle('get-bridge-status', async () => {
+  return {
+    ready: bridgeReady,
+    running: bridgeService !== null,
+    pid: bridgeService?.pid || null,
   };
 });
 

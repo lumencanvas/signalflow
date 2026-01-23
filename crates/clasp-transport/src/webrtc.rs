@@ -68,8 +68,10 @@ impl Default for WebRtcConfig {
 pub struct WebRtcTransport {
     config: WebRtcConfig,
     peer_connection: Arc<RTCPeerConnection>,
-    unreliable_channel: Option<Arc<RTCDataChannel>>,
-    reliable_channel: Option<Arc<RTCDataChannel>>,
+    unreliable_channel: Arc<Mutex<Option<Arc<RTCDataChannel>>>>,
+    reliable_channel: Arc<Mutex<Option<Arc<RTCDataChannel>>>>,
+    connection_callback: Arc<Mutex<Option<Box<dyn Fn() + Send + Sync>>>>,
+    ice_candidate_callback: Arc<Mutex<Option<Box<dyn Fn(String) + Send + Sync>>>>,
 }
 
 #[cfg(feature = "webrtc")]
@@ -111,15 +113,48 @@ impl WebRtcTransport {
 
         let sdp = offer.sdp;
 
-        Ok((
-            Self {
-                config,
-                peer_connection,
-                unreliable_channel,
-                reliable_channel,
-            },
-            sdp,
-        ))
+        // Set up connection callback for offerer channels
+        let connection_callback: Arc<Mutex<Option<Box<dyn Fn() + Send + Sync>>>> =
+            Arc::new(Mutex::new(None));
+        let ice_candidate_callback: Arc<Mutex<Option<Box<dyn Fn(String) + Send + Sync>>>> =
+            Arc::new(Mutex::new(None));
+
+        // Set up on_open handlers for created channels
+        if let Some(ref reliable) = reliable_channel {
+            let callback = connection_callback.clone();
+            // Check if channel is already open
+            use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
+            let is_already_open = reliable.ready_state() == RTCDataChannelState::Open;
+            
+            if is_already_open {
+                // Channel already open, call callback immediately if set
+                if let Some(ref cb) = *callback.lock() {
+                    cb();
+                }
+            } else {
+                // Set up handler for when channel opens
+                reliable.on_open(Box::new(move || {
+                    if let Some(ref cb) = *callback.lock() {
+                        cb();
+                    }
+                    Box::pin(async {})
+                }));
+            }
+        }
+
+        let transport = Self {
+            config,
+            peer_connection: peer_connection.clone(),
+            unreliable_channel: Arc::new(Mutex::new(unreliable_channel)),
+            reliable_channel: Arc::new(Mutex::new(reliable_channel)),
+            connection_callback,
+            ice_candidate_callback: ice_candidate_callback.clone(),
+        };
+
+        // Set up ICE candidate handler
+        Self::setup_ice_candidate_handler(&peer_connection, ice_candidate_callback);
+
+        Ok((transport, sdp))
     }
 
     /// Create a new WebRTC transport as the answerer, returns (transport, SDP answer)
@@ -159,16 +194,107 @@ impl WebRtcTransport {
 
         let sdp = answer.sdp;
 
-        // Data channels will be created by the offerer and received via on_data_channel
-        Ok((
-            Self {
-                config,
-                peer_connection,
-                unreliable_channel: None,
-                reliable_channel: None,
-            },
-            sdp,
-        ))
+        // Set up handler for incoming data channels (from offerer)
+        let unreliable_channel_ref = Arc::new(Mutex::new(None::<Arc<RTCDataChannel>>));
+        let reliable_channel_ref = Arc::new(Mutex::new(None::<Arc<RTCDataChannel>>));
+        let connection_callback: Arc<Mutex<Option<Box<dyn Fn() + Send + Sync>>>> =
+            Arc::new(Mutex::new(None));
+        let ice_candidate_callback: Arc<Mutex<Option<Box<dyn Fn(String) + Send + Sync>>>> =
+            Arc::new(Mutex::new(None));
+
+        let unreliable_clone = unreliable_channel_ref.clone();
+        let reliable_clone = reliable_channel_ref.clone();
+        let callback_clone = connection_callback.clone();
+
+        peer_connection.on_data_channel(Box::new(move |channel: Arc<RTCDataChannel>| {
+            let label: String = channel.label().to_string();
+            info!("Received data channel from offerer: {}", label);
+
+            // Set up channel handlers
+            let (tx, _rx) = mpsc::channel(100);
+            let tx_clone = tx.clone();
+
+            let channel_for_message = channel.clone();
+            channel_for_message.on_message(Box::new(move |msg: DataChannelMessage| {
+                let data = Bytes::copy_from_slice(&msg.data);
+                let tx = tx_clone.clone();
+                Box::pin(async move {
+                    let _ = tx.send(TransportEvent::Data(data)).await;
+                })
+            }));
+
+            // Store channel first
+            if label == "clasp-reliable" {
+                *reliable_clone.lock() = Some(channel.clone());
+            } else if label == "clasp" {
+                *unreliable_clone.lock() = Some(channel.clone());
+            }
+
+            // Set up channel handlers (message, open, close)
+            let tx_open = tx.clone();
+            let is_reliable = label == "clasp-reliable";
+            let callback = callback_clone.clone();
+            let label_for_open = label.clone();
+            
+            // Check if channel is already open
+            use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
+            let channel_for_check = channel.clone();
+            let is_already_open = channel_for_check.ready_state() == RTCDataChannelState::Open;
+            
+            if is_already_open && is_reliable {
+                // Channel already open, call callback immediately if set
+                if let Some(ref cb) = *callback.lock() {
+                    cb();
+                }
+            }
+            
+            let channel_for_open = channel.clone();
+            channel_for_open.on_open(Box::new(move || {
+                let tx = tx_open.clone();
+                let callback = callback.clone();
+                let is_reliable = is_reliable;
+                let label = label_for_open.clone();
+                Box::pin(async move {
+                    info!("DataChannel '{}' opened (answerer)", label);
+                    let _ = tx.send(TransportEvent::Connected).await;
+                    // Also call connection callback for reliable channel
+                    if is_reliable {
+                        info!("Reliable channel opened (answerer), calling connection callback");
+                        if let Some(ref cb) = *callback.lock() {
+                            cb();
+                            info!("Connection callback called (answerer)");
+                        } else {
+                            warn!("Connection callback not set when reliable channel opened (answerer)");
+                        }
+                    }
+                })
+            }));
+
+            let tx_close = tx.clone();
+            let channel_for_close = channel.clone();
+            channel_for_close.on_close(Box::new(move || {
+                let tx = tx_close.clone();
+                Box::pin(async move {
+                    let _ = tx.send(TransportEvent::Disconnected { reason: None }).await;
+                })
+            }));
+            
+            Box::pin(async {})
+        }));
+
+        let transport = Self {
+            config,
+            peer_connection: peer_connection.clone(),
+            unreliable_channel: unreliable_channel_ref,
+            reliable_channel: reliable_channel_ref,
+            connection_callback,
+            ice_candidate_callback: ice_candidate_callback.clone(),
+        };
+
+        // Set up ICE candidate handler
+        Self::setup_ice_candidate_handler(&peer_connection, ice_candidate_callback);
+
+        Ok((transport, sdp))
     }
 
     /// Set the remote SDP answer (for offerer after receiving answer)
@@ -203,9 +329,35 @@ impl WebRtcTransport {
         Ok(())
     }
 
+    /// Set callback to be called when connection is ready (reliable channel opens)
+    pub fn on_connection_ready<F>(&self, callback: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        *self.connection_callback.lock() = Some(Box::new(callback));
+        
+        // Check if reliable channel is already open and call callback immediately
+        use webrtc_rs::data_channel::data_channel_state::RTCDataChannelState;
+        if let Some(ref channel) = *self.reliable_channel.lock() {
+            if channel.ready_state() == RTCDataChannelState::Open {
+                if let Some(ref cb) = *self.connection_callback.lock() {
+                    cb();
+                }
+            }
+        }
+    }
+
+    /// Set callback to be called when ICE candidates are generated
+    pub fn on_ice_candidate<F>(&self, callback: F)
+    where
+        F: Fn(String) + Send + Sync + 'static,
+    {
+        *self.ice_candidate_callback.lock() = Some(Box::new(callback));
+    }
+
     /// Get sender/receiver pair for the unreliable channel (streams)
     pub fn unreliable_channel(&self) -> Option<(WebRtcSender, WebRtcReceiver)> {
-        self.unreliable_channel.as_ref().map(|dc| {
+        self.unreliable_channel.lock().as_ref().map(|dc| {
             let (tx, rx) = Self::setup_channel_handlers(dc.clone());
             (
                 WebRtcSender {
@@ -219,7 +371,7 @@ impl WebRtcTransport {
 
     /// Get sender/receiver pair for the reliable channel (params/events)
     pub fn reliable_channel(&self) -> Option<(WebRtcSender, WebRtcReceiver)> {
-        self.reliable_channel.as_ref().map(|dc| {
+        self.reliable_channel.lock().as_ref().map(|dc| {
             let (tx, rx) = Self::setup_channel_handlers(dc.clone());
             (
                 WebRtcSender {
@@ -272,6 +424,36 @@ impl WebRtcTransport {
         }));
 
         Ok(Arc::new(peer_connection))
+    }
+
+    /// Set up ICE candidate handler on peer connection
+    fn setup_ice_candidate_handler(
+        pc: &Arc<RTCPeerConnection>,
+        callback: Arc<Mutex<Option<Box<dyn Fn(String) + Send + Sync>>>>,
+    ) {
+        use webrtc_rs::ice_transport::ice_candidate::RTCIceCandidate;
+
+        pc.on_ice_candidate(Box::new(move |candidate: Option<RTCIceCandidate>| {
+            if let Some(candidate) = candidate {
+                // Convert candidate to JSON format
+                match candidate.to_json() {
+                    Ok(candidate_init) => {
+                        // Serialize RTCIceCandidateInit to JSON string
+                        if let Ok(candidate_json) = serde_json::to_string(&candidate_init) {
+                            if let Some(ref cb) = *callback.lock() {
+                                cb(candidate_json);
+                            }
+                        } else {
+                            warn!("Failed to serialize ICE candidate to JSON");
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to convert ICE candidate to JSON: {}", e);
+                    }
+                }
+            }
+            Box::pin(async {})
+        }));
     }
 
     async fn create_unreliable_channel(pc: &Arc<RTCPeerConnection>) -> Result<Arc<RTCDataChannel>> {

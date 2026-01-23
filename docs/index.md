@@ -2,14 +2,14 @@
 
 **Creative Low-Latency Application Streaming Protocol**
 
-CLASP is a universal protocol bridge and API gateway for creative applications. It connects disparate protocols like OSC, MIDI, DMX, Art-Net, MQTT, WebSockets, Socket.IO, and HTTP/REST into a unified, routable message system.
+CLASP is a universal protocol router for creative applications. It connects disparate protocols like OSC, MIDI, DMX, Art-Net, MQTT, WebSockets, Socket.IO, and HTTP/REST into a unified, routable message system.
 
 ## What is CLASP?
 
 CLASP provides:
 
-- **Protocol Bridges** - Connect any protocol to any other protocol
-- **Signal Mapping** - Route and transform signals between systems
+- **Protocol Connections** - Connect any protocol to the CLASP router for unified messaging
+- **Signal Routing** - Route and transform signals between any connected protocols
 - **REST API Gateway** - Stand up API endpoints that trigger protocol messages
 - **Real-time Monitoring** - Watch signals flow through your system
 - **Learn Mode** - Automatically capture addresses from incoming signals
@@ -36,20 +36,23 @@ cargo install clasp-cli
 
 # Or download the desktop app from releases
 
-# Start the bridge service
-clasp serve
+# Start the CLASP router (central message hub)
+clasp server --port 7330
 
-# Create an OSC to MIDI bridge
-clasp bridge create --source osc:8000 --target midi:default
+# Add protocol connections (these connect to the router)
+clasp osc --port 9000      # OSC on port 9000 → CLASP Router
+clasp mqtt --host broker.local  # MQTT broker → CLASP Router
 ```
 
 ## Documentation
 
-- [Getting Started](./getting-started/installation.md)
-- [Protocol Bridges](./protocols/)
-- [Signal Mapping](./concepts/mappings.md)
-- [REST API Designer](./app/api-designer.md)
-- [Examples](./examples/)
+- [Getting Started](./getting-started/README.md)
+- [Bridge Setup Guide](./guides/bridge-setup.md) - How to set up routers and protocol connections
+- [Desktop App: Understanding Protocol Connections](./guides/desktop-app-servers.md) - How protocol connections work
+- [Protocol Mapping Examples](./guides/protocol-mapping.md) - See how messages translate between protocols
+- [Protocol Documentation](./protocols/) - Protocol-specific guides
+- [Troubleshooting](./guides/troubleshooting.md)
+- [Architecture](./architecture.md)
 
 ## Supported Protocols
 
@@ -75,7 +78,8 @@ clasp bridge create --source osc:8000 --target midi:default
 ┌──────────────────────────────────────────────────────┐
 │                    CLASP Router                       │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
-│  │OSC Brg  │  │MQTT Brg │  │HTTP Brg │  │MIDI Brg │  │
+│  │  OSC    │  │  MQTT   │  │  HTTP   │  │  MIDI   │  │
+│  │  Conn   │  │  Conn   │  │  Conn   │  │  Conn   │  │
 │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  │
 │                                                       │
 │              Signal Routing & Transforms              │
@@ -91,7 +95,7 @@ clasp bridge create --source osc:8000 --target midi:default
 
 The CLASP desktop app provides a visual interface for:
 
-- Creating and managing protocol bridges
+- Creating and managing protocol connections
 - Designing signal mappings with transforms
 - Building REST API endpoints
 - Monitoring real-time signal flow
