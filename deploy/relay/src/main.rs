@@ -77,6 +77,8 @@ async fn main() -> Result<()> {
             "stream".to_string(),
         ],
         max_subscriptions_per_session: 100,
+        gesture_coalescing: false,
+        gesture_coalesce_interval_ms: 16,
     };
 
     let router = Router::new(config);
