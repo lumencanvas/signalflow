@@ -38,7 +38,7 @@ use tracing_subscriber::EnvFilter;
 #[command(version)]
 struct Cli {
     /// WebSocket listen port (default: 7330)
-    #[arg(short = 'p', long = "ws-port", default_value = "7330")]
+    #[arg(short = 'p', long = "ws-port", alias = "port", default_value = "7330")]
     ws_port: u16,
 
     /// Listen host
