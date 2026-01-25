@@ -8,17 +8,17 @@ Discovery mechanisms for finding CLASP routers.
 
 ```toml
 [dependencies]
-clasp-discovery = "3.0"
+clasp-discovery = "3.1"
 ```
 
 ## Features
 
 ```toml
 # All discovery methods
-clasp-discovery = { version = "3.0", features = ["full"] }
+clasp-discovery = { version = "3.1", features = ["full"] }
 
 # Individual methods
-clasp-discovery = { version = "3.0", features = ["mdns", "udp"] }
+clasp-discovery = { version = "3.1", features = ["mdns", "udp"] }
 ```
 
 ## mDNS Discovery

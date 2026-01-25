@@ -43,7 +43,9 @@ client = await Clasp.connect('ws://localhost:7330')
 ### Rust
 
 ```rust
-let client = Client::connect("ws://localhost:7330").await?;
+use clasp_client::Clasp;
+
+let client = Clasp::connect_to("ws://localhost:7330").await?;
 ```
 
 ## Server Configuration

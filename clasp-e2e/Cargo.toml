@@ -83,6 +83,14 @@ name = "relay-e2e"
 path = "src/bin/relay_e2e.rs"
 
 [[bin]]
+name = "public-relay-tests"
+path = "src/bin/public_relay_tests.rs"
+
+[[bin]]
+name = "relay-stress-tests"
+path = "src/bin/relay_stress_tests.rs"
+
+[[bin]]
 name = "clasp-to-clasp"
 path = "src/bin/clasp_to_clasp.rs"
 

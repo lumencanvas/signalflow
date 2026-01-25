@@ -155,18 +155,11 @@ client = await Clasp.connect(
 ### Rust
 
 ```rust
-use clasp_client::Client;
+use clasp_client::ClaspBuilder;
 
-// Standard TLS
-let client = Client::connect("wss://clasp.example.com:7330").await?;
-
-// Custom TLS config
-let tls_config = TlsConfig::builder()
-    .add_root_certificate(cert)
-    .build()?;
-
-let client = Client::builder("wss://192.168.1.100:7330")
-    .tls_config(tls_config)
+// TLS is automatic when using wss:// URLs
+let client = ClaspBuilder::new("wss://clasp.example.com:7330")
+    .name("My App")
     .connect()
     .await?;
 ```

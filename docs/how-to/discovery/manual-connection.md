@@ -52,18 +52,17 @@ client = await Clasp.connect(
 ### Rust
 
 ```rust
-use clasp_client::Client;
+use clasp_client::{Clasp, ClaspBuilder};
 
 // Basic connection
-let client = Client::connect("ws://192.168.1.100:7330").await?;
+let client = Clasp::connect_to("ws://192.168.1.100:7330").await?;
 
-// With TLS
-let client = Client::connect("wss://192.168.1.100:7330").await?;
+// With TLS (automatic with wss://)
+let client = Clasp::connect_to("wss://192.168.1.100:7330").await?;
 
-// With builder
-let client = Client::builder("ws://192.168.1.100:7330")
+// With builder for more options
+let client = ClaspBuilder::new("ws://192.168.1.100:7330")
     .name("my-client")
-    .timeout(Duration::from_secs(10))
     .connect()
     .await?;
 ```

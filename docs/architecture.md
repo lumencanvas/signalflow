@@ -324,23 +324,23 @@ Most crates use feature flags to minimize binary size:
 
 ```toml
 [dependencies]
-clasp-transport = { version = "3.0", features = ["websocket"] }
+clasp-transport = { version = "3.1", features = ["websocket"] }
 # Or for all transports:
-clasp-transport = { version = "3.0", features = ["full"] }
+clasp-transport = { version = "3.1", features = ["full"] }
 ```
 
 ### clasp-router
 
 ```toml
 [dependencies]
-clasp-router = { version = "3.0", features = ["websocket"] }
+clasp-router = { version = "3.1", features = ["websocket"] }
 ```
 
 ### clasp-embedded
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", features = ["client"] }
+clasp-embedded = { version = "3.1", features = ["client"] }
 # Or for server mode:
-clasp-embedded = { version = "3.0", features = ["server"] }
+clasp-embedded = { version = "3.1", features = ["server"] }
 ```

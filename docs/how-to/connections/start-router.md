@@ -19,7 +19,11 @@ CLASP router started on ws://0.0.0.0:7330
 |--------|---------|-------------|
 | `--port` | 7330 | WebSocket port |
 | `--bind` | 0.0.0.0 | Bind address |
-| `--quic-port` | 7331 | QUIC port (if enabled) |
+| `--quic-port` | - | QUIC port (requires --cert and --key) |
+| `--mqtt-port` | - | MQTT server port |
+| `--mqtt-namespace` | /mqtt | MQTT topic namespace prefix |
+| `--osc-port` | - | OSC server port |
+| `--osc-namespace` | /osc | OSC address namespace prefix |
 
 ```bash
 # Custom port
@@ -28,9 +32,26 @@ clasp server --port 8080
 # Bind to localhost only
 clasp server --bind 127.0.0.1 --port 7330
 
-# Enable QUIC
-clasp server --port 7330 --quic-port 7331
+# Enable QUIC (requires TLS)
+clasp server --port 7330 --quic-port 7331 --cert cert.pem --key key.pem
 ```
+
+### Multi-Protocol Server
+
+Accept clients via multiple protocols simultaneously:
+
+```bash
+# WebSocket + MQTT
+clasp server --port 7330 --mqtt-port 1883
+
+# WebSocket + OSC
+clasp server --port 7330 --osc-port 8000
+
+# All protocols
+clasp server --port 7330 --mqtt-port 1883 --osc-port 8000 --quic-port 7331 --cert cert.pem --key key.pem
+```
+
+When multiple protocols are enabled, they all share the same router state. An MQTT client publishing to `sensors/temp` can be received by a WebSocket client subscribed to `/mqtt/sensors/**`.
 
 ## Using Desktop App
 
@@ -74,6 +95,35 @@ async fn main() -> anyhow::Result<()> {
 
     // Accept connections
     router.serve_websocket("0.0.0.0:7330").await
+}
+```
+
+### Multi-Protocol (Rust)
+
+```rust
+use clasp_router::{Router, RouterConfig, MultiProtocolConfig, MqttServerConfig, OscServerConfig};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let router = Router::new(RouterConfig::default());
+
+    let config = MultiProtocolConfig {
+        websocket_addr: Some("0.0.0.0:7330".into()),
+        mqtt: Some(MqttServerConfig {
+            bind_addr: "0.0.0.0:1883".into(),
+            namespace: "/mqtt".into(),
+            ..Default::default()
+        }),
+        osc: Some(OscServerConfig {
+            bind_addr: "0.0.0.0:8000".into(),
+            namespace: "/osc".into(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    // All protocols share the same router state
+    router.serve_all(config).await
 }
 ```
 

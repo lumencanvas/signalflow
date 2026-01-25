@@ -4,6 +4,22 @@ All notable changes to CLASP.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-01-25
+
+### Added
+- MQTT server adapter: accept MQTT clients directly on the router without an external broker
+- OSC server adapter: accept OSC clients via UDP with automatic session tracking
+- Multi-protocol serving via `serve_all()` method
+- `MultiProtocolConfig` for configuring which protocols to serve
+- Rate limiting: configurable per-client message rate limits (`max_messages_per_second`)
+- `try_send()` method on `TransportSender` for non-blocking sends
+- `close()` method on `TransportSender` for explicit connection closing
+- Relay CLI options for multi-protocol: `--mqtt-port`, `--osc-port`, `--quic-port`
+
+### Changed
+- Updated all crates to version 3.1.0
+- `RouterConfig` now includes `rate_limiting_enabled` and `max_messages_per_second` fields
+
 ## [3.0.1] - 2026-01-23
 
 ### Fixed

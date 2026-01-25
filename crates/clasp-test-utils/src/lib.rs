@@ -110,6 +110,8 @@ impl TestRouter {
             max_subscriptions_per_session: 1000,
             gesture_coalescing: true,
             gesture_coalesce_interval_ms: 16,
+            max_messages_per_second: 0, // Disable rate limiting for tests
+            rate_limiting_enabled: false,
         })
         .await
     }

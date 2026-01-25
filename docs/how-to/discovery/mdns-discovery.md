@@ -29,16 +29,15 @@ server:
 ### Programmatic (Rust)
 
 ```rust
-use clasp_router::{Router, Config};
+use clasp_router::{Router, RouterConfig};
 
-let config = Config::builder()
-    .port(7330)
-    .mdns_enabled(true)
-    .mdns_name("Studio Router")
-    .build();
+let config = RouterConfig {
+    name: "Studio Router".into(),
+    ..Default::default()
+};
 
-let router = Router::new(config).await?;
-router.run().await?;
+let router = Router::new(config);
+router.serve_websocket("0.0.0.0:7330").await?;
 ```
 
 ## Discover Routers

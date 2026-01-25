@@ -6,7 +6,7 @@ Cargo feature flags for CLASP Rust crates.
 
 ```toml
 [dependencies]
-clasp-core = { version = "3.0", features = ["..."] }
+clasp-core = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -18,14 +18,14 @@ clasp-core = { version = "3.0", features = ["..."] }
 ### no_std Usage
 
 ```toml
-clasp-core = { version = "3.0", default-features = false }
+clasp-core = { version = "3.1", default-features = false }
 ```
 
 ## clasp-client
 
 ```toml
 [dependencies]
-clasp-client = { version = "3.0", features = ["..."] }
+clasp-client = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -39,20 +39,20 @@ clasp-client = { version = "3.0", features = ["..."] }
 ### Minimal Client
 
 ```toml
-clasp-client = { version = "3.0", default-features = false, features = ["websocket"] }
+clasp-client = { version = "3.1", default-features = false, features = ["websocket"] }
 ```
 
 ### Full Client
 
 ```toml
-clasp-client = { version = "3.0", features = ["quic", "discovery"] }
+clasp-client = { version = "3.1", features = ["quic", "discovery"] }
 ```
 
 ## clasp-router
 
 ```toml
 [dependencies]
-clasp-router = { version = "3.0", features = ["..."] }
+clasp-router = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -60,18 +60,31 @@ clasp-router = { version = "3.0", features = ["..."] }
 | `websocket` | Yes | WebSocket transport |
 | `quic` | No | QUIC transport |
 | `udp` | No | UDP transport |
+| `tcp` | No | Raw TCP transport |
 | `tls` | Yes | TLS support |
 | `mdns` | Yes | mDNS discovery |
 | `persistence` | No | State persistence |
 | `metrics` | No | Prometheus metrics |
+| `mqtt-server` | No | Accept MQTT clients directly |
+| `osc-server` | No | Accept OSC clients via UDP |
+| `full` | No | All features enabled |
 
 ### Production Router
 
 ```toml
-clasp-router = { version = "3.0", features = [
+clasp-router = { version = "3.1", features = [
     "quic",
     "persistence",
     "metrics"
+] }
+```
+
+### Multi-Protocol Router
+
+```toml
+clasp-router = { version = "3.1", features = [
+    "mqtt-server",
+    "osc-server"
 ] }
 ```
 
@@ -79,7 +92,7 @@ clasp-router = { version = "3.0", features = [
 
 ```toml
 [dependencies]
-clasp-bridge = { version = "3.0", features = ["..."] }
+clasp-bridge = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -96,20 +109,20 @@ clasp-bridge = { version = "3.0", features = ["..."] }
 ### Select Bridges
 
 ```toml
-clasp-bridge = { version = "3.0", features = ["osc", "midi"] }
+clasp-bridge = { version = "3.1", features = ["osc", "midi"] }
 ```
 
 ### All Bridges
 
 ```toml
-clasp-bridge = { version = "3.0", features = ["full"] }
+clasp-bridge = { version = "3.1", features = ["full"] }
 ```
 
 ## clasp-transport
 
 ```toml
 [dependencies]
-clasp-transport = { version = "3.0", features = ["..."] }
+clasp-transport = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -127,7 +140,7 @@ clasp-transport = { version = "3.0", features = ["..."] }
 
 ```toml
 [dependencies]
-clasp-discovery = { version = "3.0", features = ["..."] }
+clasp-discovery = { version = "3.1", features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -139,7 +152,7 @@ clasp-discovery = { version = "3.0", features = ["..."] }
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", default-features = false, features = ["..."] }
+clasp-embedded = { version = "3.1", default-features = false, features = ["..."] }
 ```
 
 | Feature | Default | Description |
@@ -151,7 +164,7 @@ clasp-embedded = { version = "3.0", default-features = false, features = ["..."]
 ### ESP32 Project
 
 ```toml
-clasp-embedded = { version = "3.0", default-features = false, features = ["esp32"] }
+clasp-embedded = { version = "3.1", default-features = false, features = ["esp32"] }
 ```
 
 ## Build Profiles

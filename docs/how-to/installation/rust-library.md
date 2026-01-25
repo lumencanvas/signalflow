@@ -8,8 +8,8 @@ For a client application:
 
 ```toml
 [dependencies]
-clasp-client = "3.0"
-clasp-core = "3.0"
+clasp-client = "3.1"
+clasp-core = "3.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -17,8 +17,8 @@ For building a router:
 
 ```toml
 [dependencies]
-clasp-router = "3.0"
-clasp-core = "3.0"
+clasp-router = "3.1"
+clasp-core = "3.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -56,13 +56,13 @@ async fn main() -> anyhow::Result<()> {
 
 ```toml
 # Default (WebSocket + UDP + QUIC)
-clasp-transport = "3.0"
+clasp-transport = "3.1"
 
 # Specific transports
-clasp-transport = { version = "3.0", features = ["websocket", "quic"] }
+clasp-transport = { version = "3.1", features = ["websocket", "quic"] }
 
 # All transports
-clasp-transport = { version = "3.0", features = ["full"] }
+clasp-transport = { version = "3.1", features = ["full"] }
 ```
 
 Available features:
@@ -77,10 +77,10 @@ Available features:
 
 ```toml
 # Specific bridges
-clasp-bridge = { version = "3.0", features = ["osc", "midi"] }
+clasp-bridge = { version = "3.1", features = ["osc", "midi"] }
 
 # All bridges
-clasp-bridge = { version = "3.0", features = ["full"] }
+clasp-bridge = { version = "3.1", features = ["full"] }
 ```
 
 Available features:
@@ -96,7 +96,7 @@ For microcontrollers:
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", features = ["client"] }
+clasp-embedded = { version = "3.1", features = ["client"] }
 ```
 
 ```rust

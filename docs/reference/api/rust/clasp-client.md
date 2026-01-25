@@ -8,18 +8,21 @@ CLASP client library for Rust applications.
 
 ```toml
 [dependencies]
-clasp-client = "3.0"
+clasp-client = "3.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
 ## Quick Start
 
 ```rust
-use clasp_client::Client;
+use clasp_client::{Clasp, ClaspBuilder};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::connect("ws://localhost:7330").await?;
+    let client = ClaspBuilder::new("ws://localhost:7330")
+        .name("My App")
+        .connect()
+        .await?;
 
     // Set a value
     client.set("/sensors/temp", 23.5).await?;
@@ -31,39 +34,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Subscribe to changes
     client.on("/sensors/**", |value, address| async move {
         println!("{}: {:?}", address, value);
-    }).await;
+    }).await?;
 
     Ok(())
 }
 ```
 
-## Client Builder
+## Connection Methods
 
-### Basic Connection
-
-```rust
-use clasp_client::Client;
-
-let client = Client::connect("ws://localhost:7330").await?;
-```
-
-### With Options
+### Using ClaspBuilder
 
 ```rust
-use clasp_client::Client;
-use std::time::Duration;
+use clasp_client::ClaspBuilder;
 
-let client = Client::builder("ws://localhost:7330")
+let client = ClaspBuilder::new("ws://localhost:7330")
     .name("my-rust-client")
-    .timeout(Duration::from_secs(10))
     .connect()
     .await?;
 ```
 
-### With Authentication
+### Using Clasp::connect_to
 
 ```rust
-let client = Client::builder("wss://router.example.com:7330")
+use clasp_client::Clasp;
+
+let client = Clasp::connect_to("ws://localhost:7330").await?;
+```
+
+### Using Clasp::builder
+
+```rust
+use clasp_client::Clasp;
+
+let client = Clasp::builder("ws://localhost:7330")
+    .name("my-client")
     .token("eyJhbGciOi...")
     .connect()
     .await?;
@@ -72,14 +76,11 @@ let client = Client::builder("wss://router.example.com:7330")
 ### With TLS
 
 ```rust
-use clasp_client::{Client, TlsConfig};
+use clasp_client::ClaspBuilder;
 
-let tls = TlsConfig::builder()
-    .add_root_certificate(cert)
-    .build()?;
-
-let client = Client::builder("wss://localhost:7330")
-    .tls_config(tls)
+// TLS is automatic when using wss:// URLs
+let client = ClaspBuilder::new("wss://localhost:7330")
+    .name("My App")
     .connect()
     .await?;
 ```
@@ -87,10 +88,12 @@ let client = Client::builder("wss://localhost:7330")
 ### With Auto-Reconnect
 
 ```rust
-let client = Client::builder("ws://localhost:7330")
-    .auto_reconnect(true)
-    .reconnect_interval(Duration::from_secs(1))
-    .max_reconnect_attempts(10)
+use clasp_client::ClaspBuilder;
+
+let client = ClaspBuilder::new("ws://localhost:7330")
+    .name("my-client")
+    .reconnect(true)
+    .reconnect_interval(5000)  // 5 seconds
     .connect()
     .await?;
 ```
@@ -108,11 +111,6 @@ client.set("/path/to/value", true).await?;
 // Set with explicit Value
 use clasp_core::Value;
 client.set("/path/to/value", Value::Float(3.14)).await?;
-
-// Set with struct (requires serde feature)
-#[derive(Serialize)]
-struct Data { x: f64, y: f64 }
-client.set("/position", Data { x: 1.0, y: 2.0 }).await?;
 ```
 
 ### Get
@@ -120,39 +118,26 @@ client.set("/position", Data { x: 1.0, y: 2.0 }).await?;
 ```rust
 // Get raw value
 let value: Value = client.get("/path/to/value").await?;
-
-// Get with type conversion
-let temp: f64 = client.get_as("/sensors/temp").await?;
-let name: String = client.get_as("/device/name").await?;
-
-// Get with default
-let value = client.get_or("/config/timeout", 30).await;
+println!("Value: {:?}", value);
 ```
 
 ### Emit (Events)
 
 ```rust
-// Emit event
-client.emit("/events/button_pressed", json!({ "button": 1 })).await?;
+use clasp_core::Value;
+
+// Emit event with payload
+client.emit("/events/button_pressed", Value::Int(1)).await?;
 
 // Emit without payload
 client.emit("/events/ping", Value::Null).await?;
 ```
 
-### Delete
+### Stream (High-Rate Data)
 
 ```rust
-client.delete("/path/to/value").await?;
-```
-
-### List
-
-```rust
-// List all addresses matching pattern
-let addresses = client.list("/sensors/**").await?;
-for addr in addresses {
-    println!("{}", addr);
-}
+// Send continuous data
+client.stream("/audio/level", 0.75).await?;
 ```
 
 ## Subscriptions
@@ -160,151 +145,92 @@ for addr in addresses {
 ### Subscribe to Pattern
 
 ```rust
-// Subscribe with closure
+// Subscribe with async closure
 client.on("/sensors/**", |value, address| async move {
     println!("{}: {:?}", address, value);
-}).await;
-
-// Subscribe with function
-async fn handle_sensor(value: Value, address: String) {
-    println!("{}: {:?}", address, value);
-}
-
-client.on("/sensors/**", handle_sensor).await;
+}).await?;
 ```
 
-### Subscription Options
+### Subscribe (Alias)
 
 ```rust
-use clasp_client::SubscribeOptions;
-
-client.on_with_options(
-    "/sensors/**",
-    |value, address| async move { /* ... */ },
-    SubscribeOptions {
-        max_rate: Some(30.0),      // Max 30 updates/sec
-        debounce: Some(100),       // 100ms debounce
-        include_initial: true,     // Receive current value immediately
-    }
-).await;
+// subscribe() is an alias for on()
+client.subscribe("/sensors/**", |value, address| async move {
+    println!("{}: {:?}", address, value);
+}).await?;
 ```
 
 ### Unsubscribe
 
 ```rust
-// Store subscription handle
-let handle = client.on("/sensors/**", handler).await;
+// Store subscription ID
+let sub_id = client.on("/sensors/**", handler).await?;
 
 // Unsubscribe when done
-handle.unsubscribe().await;
+client.unsubscribe(sub_id).await?;
 ```
 
-### One-Time Subscription
+## Gestures
+
+For phased interactions (touch, drag, etc.):
 
 ```rust
-// Wait for single value
-let value = client.once("/events/ready").await?;
+use clasp_core::{Value, GesturePhase};
+
+// Begin gesture
+client.gesture(
+    "/draw/stroke",
+    GesturePhase::Begin,
+    Value::Map(vec![
+        ("x".into(), Value::Float(100.0)),
+        ("y".into(), Value::Float(100.0)),
+    ].into_iter().collect())
+).await?;
+
+// Update during gesture
+client.gesture(
+    "/draw/stroke",
+    GesturePhase::Update,
+    Value::Map(vec![
+        ("x".into(), Value::Float(150.0)),
+        ("y".into(), Value::Float(120.0)),
+    ].into_iter().collect())
+).await?;
+
+// End gesture
+client.gesture(
+    "/draw/stroke",
+    GesturePhase::End,
+    Value::Map(vec![
+        ("x".into(), Value::Float(200.0)),
+        ("y".into(), Value::Float(150.0)),
+    ].into_iter().collect())
+).await?;
 ```
 
 ## Bundles
 
-### Atomic Operations
+Send multiple messages atomically:
 
 ```rust
-use clasp_client::BundleBuilder;
+use clasp_core::Message;
 
-client.bundle()
-    .set("/lights/1", 255)
-    .set("/lights/2", 128)
-    .set("/lights/3", 64)
-    .emit("/cue/fired", json!({ "cue": 1 }))
-    .execute()
-    .await?;
+let messages = vec![
+    Message::set("/lights/1", Value::Int(255)),
+    Message::set("/lights/2", Value::Int(128)),
+];
+
+client.bundle(messages).await?;
 ```
 
 ### Scheduled Bundle
 
 ```rust
-use std::time::{SystemTime, UNIX_EPOCH};
-
-let timestamp = SystemTime::now()
-    .duration_since(UNIX_EPOCH)?
+let timestamp = std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)?
     .as_millis() as u64 + 5000;  // 5 seconds from now
 
-client.bundle()
-    .set("/lights/1", 255)
-    .set("/lights/2", 255)
-    .at_time(timestamp)
-    .execute()
-    .await?;
-```
-
-## QoS Levels
-
-```rust
-use clasp_core::QoS;
-
-// Fire and forget (default)
-client.set("/data", value).await?;
-
-// With confirmation
-client.set_with_qos("/data", value, QoS::Confirm).await?;
-
-// Exactly-once delivery
-client.set_with_qos("/critical", value, QoS::Commit).await?;
-```
-
-## Streams
-
-For high-rate continuous data:
-
-```rust
-use tokio::time::{interval, Duration};
-
-// Create stream
-let stream = client.stream("/audio/level").await?;
-
-// Send at high rate
-let mut ticker = interval(Duration::from_millis(10));
-loop {
-    ticker.tick().await;
-    let level = get_audio_level();
-    stream.send(level).await?;
-}
-```
-
-## Gestures
-
-For phased interactions:
-
-```rust
-// Begin gesture
-let gesture = client.gesture_begin("/draw/stroke", json!({
-    "x": 100, "y": 100
-})).await?;
-
-// Update during gesture
-gesture.update(json!({ "x": 150, "y": 120 })).await?;
-gesture.update(json!({ "x": 200, "y": 150 })).await?;
-
-// End gesture
-gesture.end(json!({ "x": 250, "y": 180 })).await?;
-```
-
-## Connection Events
-
-```rust
-client.on_connected(|| {
-    println!("Connected to router");
-});
-
-client.on_disconnected(|reason| {
-    println!("Disconnected: {:?}", reason);
-});
-
-client.on_error(|error| {
-    eprintln!("Error: {:?}", error);
-});
+client.bundle_at(messages, timestamp).await?;
 ```
 
 ## Connection State
@@ -312,68 +238,68 @@ client.on_error(|error| {
 ```rust
 // Check if connected
 if client.is_connected() {
-    // ...
+    println!("Connected!");
 }
 
-// Wait for connection
-client.wait_connected().await?;
-
-// Ping router
-let latency = client.ping().await?;
-println!("Latency: {:?}", latency);
-```
-
-## Clock Synchronization
-
-```rust
-// Sync clock with router
-client.sync_clock().await?;
+// Get session ID
+if let Some(session_id) = client.session_id() {
+    println!("Session: {}", session_id);
+}
 
 // Get synchronized time
-let synced_time = client.synced_time()?;
+let time = client.time();
 ```
 
-## Locks
+## Cached Values
+
+Access locally cached state:
 
 ```rust
-// Acquire lock
-let lock = client.lock("/exclusive/resource").await?;
-
-// Use the locked resource
-client.set("/exclusive/resource", value).await?;
-
-// Release lock
-lock.release().await?;
-
-// Or use RAII guard
-{
-    let _lock = client.lock("/exclusive/resource").await?;
-    // Lock released when _lock goes out of scope
+// Get cached value (no network request)
+if let Some(value) = client.cached("/sensors/temp") {
+    println!("Cached: {:?}", value);
 }
 ```
 
-## Graceful Shutdown
+## Signal Discovery
 
 ```rust
-// Disconnect gracefully
-client.disconnect().await?;
+// Get all announced signals
+let signals = client.signals();
+for signal in signals {
+    println!("{}: {:?}", signal.address, signal.signal_type);
+}
 
-// Or with drop
-drop(client);
+// Query signals matching pattern
+let temp_signals = client.query_signals("/sensors/**");
 ```
 
 ## Error Handling
 
 ```rust
-use clasp_client::Error;
+use clasp_client::ClientError;
 
 match client.get("/path").await {
     Ok(value) => println!("{:?}", value),
-    Err(Error::NotFound(addr)) => println!("Not found: {}", addr),
-    Err(Error::PermissionDenied) => println!("Access denied"),
-    Err(Error::Timeout) => println!("Request timed out"),
+    Err(ClientError::NotConnected) => println!("Not connected"),
+    Err(ClientError::Timeout) => println!("Request timed out"),
     Err(e) => println!("Error: {:?}", e),
 }
+
+// Get last error
+if let Some(error) = client.last_error() {
+    println!("Last error: {:?}", error);
+}
+
+// Clear error state
+client.clear_error();
+```
+
+## Graceful Shutdown
+
+```rust
+// Close connection gracefully
+client.close().await;
 ```
 
 ## See Also

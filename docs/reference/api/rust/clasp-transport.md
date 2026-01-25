@@ -8,20 +8,20 @@ Transport layer implementations for CLASP.
 
 ```toml
 [dependencies]
-clasp-transport = "3.0"
+clasp-transport = "3.1"
 
 # Or select specific transports
-clasp-transport = { version = "3.0", features = ["websocket", "quic"] }
+clasp-transport = { version = "3.1", features = ["websocket", "quic"] }
 ```
 
 ## Features
 
 ```toml
 # All transports
-clasp-transport = { version = "3.0", features = ["full"] }
+clasp-transport = { version = "3.1", features = ["full"] }
 
 # Individual transports
-clasp-transport = { version = "3.0", features = [
+clasp-transport = { version = "3.1", features = [
     "websocket",
     "quic",
     "udp",

@@ -8,20 +8,20 @@ Core types and codec for the CLASP protocol.
 
 ```toml
 [dependencies]
-clasp-core = "3.0"
+clasp-core = "3.1"
 ```
 
 ## Features
 
 ```toml
 # Default features
-clasp-core = "3.0"
+clasp-core = "3.1"
 
 # No-std support (embedded)
-clasp-core = { version = "3.0", default-features = false }
+clasp-core = { version = "3.1", default-features = false }
 
 # With serde serialization
-clasp-core = { version = "3.0", features = ["serde"] }
+clasp-core = { version = "3.1", features = ["serde"] }
 ```
 
 ## Message Types

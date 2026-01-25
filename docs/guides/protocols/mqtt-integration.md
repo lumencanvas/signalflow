@@ -1,13 +1,100 @@
 # MQTT Integration Guide
 
-This guide explains how to integrate MQTT (Message Queuing Telemetry Transport) with CLASP using the MQTT bridge.
+This guide explains how to integrate MQTT (Message Queuing Telemetry Transport) with CLASP.
 
-## Overview
+## Two Integration Modes
 
-The MQTT bridge provides bidirectional translation between MQTT topics and CLASP addresses:
+CLASP supports MQTT in two modes:
 
-- **MQTT → CLASP**: MQTT messages published to subscribed topics are translated to CLASP SET messages
-- **CLASP → MQTT**: CLASP SET/PUBLISH messages are translated to MQTT publish operations
+1. **MQTT Server Adapter** (new in 3.1.0): The CLASP router accepts MQTT clients directly, no external broker needed
+2. **MQTT Bridge**: Connect to an external MQTT broker and bridge messages bidirectionally
+
+## MQTT Server Adapter (Recommended)
+
+The MQTT server adapter lets the CLASP router accept MQTT clients directly on port 1883. This eliminates the need for an external broker.
+
+### Setup
+
+Enable the `mqtt-server` feature:
+
+```toml
+[dependencies]
+clasp-router = { version = "3.1", features = ["mqtt-server"] }
+```
+
+### Configuration
+
+```rust
+use clasp_router::{Router, RouterConfig, MultiProtocolConfig, MqttServerConfig};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let router = Router::new(RouterConfig::default());
+
+    let config = MultiProtocolConfig {
+        websocket_addr: Some("0.0.0.0:7330".into()),
+        mqtt: Some(MqttServerConfig {
+            bind_addr: "0.0.0.0:1883".into(),
+            namespace: "/mqtt".into(),
+            require_auth: false,
+            max_clients: 100,
+            session_timeout_secs: 300,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    router.serve_all(config).await?;
+    Ok(())
+}
+```
+
+### Using the Relay CLI
+
+```bash
+# Start relay with MQTT support
+clasp-relay --mqtt-port 1883
+
+# Custom namespace
+clasp-relay --mqtt-port 1883 --mqtt-namespace /iot
+```
+
+### Connecting MQTT Clients
+
+Any standard MQTT client can connect:
+
+```bash
+# Subscribe
+mosquitto_sub -h localhost -p 1883 -t "sensors/#"
+
+# Publish
+mosquitto_pub -h localhost -p 1883 -t "sensors/temp" -m "25.5"
+```
+
+### Topic to Address Mapping
+
+MQTT topics are prefixed with the configured namespace:
+
+| MQTT Topic | CLASP Address |
+|------------|---------------|
+| `sensors/temp` | `/mqtt/sensors/temp` |
+| `home/living/light` | `/mqtt/home/living/light` |
+
+MQTT wildcards are converted to CLASP patterns:
+
+| MQTT Pattern | CLASP Pattern |
+|--------------|---------------|
+| `sensors/#` | `/mqtt/sensors/**` |
+| `sensors/+/temp` | `/mqtt/sensors/*/temp` |
+
+---
+
+## MQTT Bridge (External Broker)
+
+The MQTT bridge connects to an external MQTT broker and translates messages bidirectionally:
+
+- **MQTT to CLASP**: MQTT messages published to subscribed topics are translated to CLASP SET messages
+- **CLASP to MQTT**: CLASP SET/PUBLISH messages are translated to MQTT publish operations
 
 ## Basic Setup
 

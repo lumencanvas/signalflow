@@ -73,13 +73,43 @@ docker build -f deploy/relay/Dockerfile.dev -t clasp-relay-dev .
 clasp-relay [OPTIONS]
 
 Options:
-  -p, --port <PORT>    Listen port [default: 7330]
-      --host <HOST>    Listen host [default: 0.0.0.0]
-  -n, --name <NAME>    Server name [default: CLASP Relay]
-  -v, --verbose        Enable verbose logging
-  -h, --help           Print help
-  -V, --version        Print version
+  -p, --ws-port <PORT>         WebSocket listen port [default: 7330]
+      --host <HOST>            Listen host [default: 0.0.0.0]
+  -n, --name <NAME>            Server name [default: CLASP Relay]
+  -v, --verbose                Enable verbose logging
+      --quic-port <PORT>       Enable QUIC on this port (requires --cert and --key)
+      --mqtt-port <PORT>       Enable MQTT server on this port
+      --mqtt-namespace <NS>    MQTT namespace prefix [default: /mqtt]
+      --osc-port <PORT>        Enable OSC server on this port
+      --osc-namespace <NS>     OSC namespace prefix [default: /osc]
+      --cert <PATH>            TLS certificate file (PEM format)
+      --key <PATH>             TLS private key file (PEM format)
+      --max-sessions <N>       Maximum clients [default: 1000]
+      --session-timeout <SEC>  Session timeout [default: 300]
+      --no-websocket           Disable WebSocket (use other protocols only)
+  -h, --help                   Print help
+  -V, --version                Print version
 ```
+
+### Multi-Protocol Examples
+
+```bash
+# WebSocket only (default)
+clasp-relay
+
+# WebSocket + MQTT
+clasp-relay --mqtt-port 1883
+
+# WebSocket + OSC
+clasp-relay --osc-port 8000
+
+# All protocols with QUIC
+clasp-relay --mqtt-port 1883 --osc-port 8000 --quic-port 7331 --cert cert.pem --key key.pem
+```
+
+When multiple protocols are enabled, they all share the same router state. This means:
+- An MQTT client publishing to `sensors/temp` can be received by a WebSocket client subscribed to `/mqtt/sensors/**`
+- An OSC message to `/synth/volume` can be received by any client subscribed to `/osc/synth/**`
 
 ### Environment Variables
 

@@ -294,17 +294,23 @@ asyncio.run(main())
 
 ```rust
 // Rust client
-use clasp_client::Client;
+use clasp_client::{Clasp, ClaspBuilder};
 
 #[tokio::main]
-async fn main() {
-    let client = Client::connect("ws://localhost:7330").await?;
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = ClaspBuilder::new("ws://localhost:7330")
+        .name("Rust Worker")
+        .connect()
+        .await?;
 
-    client.on("/js/request", |value| async {
+    client.on("/js/request", |value, _addr| async move {
         // Process with Rust's performance
         let result = heavy_computation(value);
-        client.set("/rust/result", result).await?;
-    }).await;
+        // Note: would need client reference here in real code
+        Ok(())
+    }).await?;
+
+    Ok(())
 }
 ```
 

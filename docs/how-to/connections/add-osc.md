@@ -7,7 +7,37 @@ Connect OSC (Open Sound Control) devices and applications to CLASP.
 - Running CLASP router
 - OSC-capable device or application (TouchOSC, Resolume, etc.)
 
-## Start OSC Bridge
+## Two Integration Modes
+
+CLASP supports OSC in two ways:
+
+1. **OSC Server Adapter** (new in 3.1.0): The router accepts OSC messages directly via UDP
+2. **OSC Bridge**: A separate process that translates between OSC and CLASP
+
+## OSC Server Adapter (Recommended)
+
+The OSC server adapter lets the router accept OSC messages directly on a UDP port. No separate bridge process needed.
+
+```bash
+# Start router with OSC support
+clasp server --osc-port 8000
+
+# Custom namespace
+clasp server --osc-port 8000 --osc-namespace /touchosc
+```
+
+OSC sources are tracked as sessions. Sessions expire after 30 seconds of inactivity by default.
+
+### Address Mapping
+
+| OSC Address | CLASP Address |
+|-------------|---------------|
+| `/synth/volume` | `/osc/synth/volume` |
+| `/fader/1` | `/osc/fader/1` |
+
+---
+
+## OSC Bridge
 
 ### CLI
 

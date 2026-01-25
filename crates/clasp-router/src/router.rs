@@ -368,6 +368,11 @@ impl Router {
 
     /// Start background task to flush stale gesture moves
     fn start_gesture_flush_task(&self, registry: Arc<GestureRegistry>) {
+        // Skip gesture flush task if coalescing is disabled (interval is 0)
+        if self.config.gesture_coalesce_interval_ms == 0 {
+            return;
+        }
+
         let sessions = Arc::clone(&self.sessions);
         let subscriptions = Arc::clone(&self.subscriptions);
         let running = Arc::clone(&self.running);

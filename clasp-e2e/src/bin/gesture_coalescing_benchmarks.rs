@@ -52,7 +52,9 @@ async fn benchmark_120hz_touch() {
     // Test WITH coalescing
     let router_with = Router::new(RouterConfig {
         gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+        gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
         ..Default::default()
     });
 
@@ -215,7 +217,9 @@ async fn benchmark_240hz_pen() {
 
     let router = Router::new(RouterConfig {
         gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+        gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
         ..Default::default()
     });
 
@@ -309,7 +313,9 @@ async fn benchmark_fanout() {
 
     let router = Router::new(RouterConfig {
         gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+        gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
         ..Default::default()
     });
 
@@ -416,7 +422,9 @@ async fn benchmark_multitouch() {
 
     let router = Router::new(RouterConfig {
         gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+        gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
         ..Default::default()
     });
 

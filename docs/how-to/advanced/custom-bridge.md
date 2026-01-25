@@ -25,10 +25,10 @@ External System ←→ Bridge ←→ CLASP Router
 
 ```rust
 use clasp_bridge::{Bridge, BridgeConfig, Message};
-use clasp_client::Client;
+use clasp_client::{Clasp, ClaspBuilder};
 
 struct MyBridge {
-    client: Client,
+    client: Clasp,
     external: ExternalConnection,
 }
 
@@ -50,7 +50,10 @@ impl Bridge for MyBridge {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let client = Client::connect("ws://localhost:7330").await?;
+    let client = ClaspBuilder::new("ws://localhost:7330")
+        .name("My Bridge")
+        .connect()
+        .await?;
     let external = ExternalConnection::connect("192.168.1.50:5000").await?;
 
     let mut bridge = MyBridge { client, external };

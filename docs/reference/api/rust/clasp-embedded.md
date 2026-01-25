@@ -8,7 +8,7 @@ No-std CLASP client for embedded systems.
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", default-features = false }
+clasp-embedded = { version = "3.1", default-features = false }
 ```
 
 ## Features
@@ -321,21 +321,21 @@ fn send_message() {
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", features = ["cortex-m"] }
+clasp-embedded = { version = "3.1", features = ["cortex-m"] }
 ```
 
 ### RISC-V
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", features = ["riscv"] }
+clasp-embedded = { version = "3.1", features = ["riscv"] }
 ```
 
 ### ESP32
 
 ```toml
 [dependencies]
-clasp-embedded = { version = "3.0", features = ["esp32"] }
+clasp-embedded = { version = "3.1", features = ["esp32"] }
 ```
 
 ## Error Handling
@@ -370,7 +370,7 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-clasp-embedded = { version = "3.0", default-features = false }
+clasp-embedded = { version = "3.1", default-features = false }
 ```
 
 Typical sizes:

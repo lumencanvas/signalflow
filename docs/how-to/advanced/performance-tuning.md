@@ -56,12 +56,51 @@ server:
 
   # Message limits
   max_message_size: 65536  # 64KB
-  max_messages_per_second: 100000
 
   # Memory limits
   max_state_entries: 1000000
   max_subscriptions: 100000
+
+  # Rate limiting (per client)
+  rate_limiting:
+    enabled: true
+    max_messages_per_second: 1000
+
+  # Gesture coalescing
+  gesture:
+    coalescing: true
+    coalesce_interval_ms: 16  # 60fps
 ```
+
+### Server-Side Rate Limiting
+
+Rate limiting prevents individual clients from overwhelming the router:
+
+```rust
+use clasp_router::RouterConfig;
+
+let config = RouterConfig {
+    rate_limiting_enabled: true,
+    max_messages_per_second: 500,  // Per client
+    ..Default::default()
+};
+```
+
+When a client exceeds the limit, excess messages are dropped and a warning is logged. Set `max_messages_per_second` to `0` for unlimited.
+
+### Gesture Coalescing
+
+High-frequency gesture streams (like touchpad moves) can be coalesced to reduce bandwidth:
+
+```rust
+let config = RouterConfig {
+    gesture_coalescing: true,
+    gesture_coalesce_interval_ms: 16,  // ~60fps
+    ..Default::default()
+};
+```
+
+With coalescing enabled, rapid gesture moves within the interval are combined into a single message.
 
 ### Thread Pool
 

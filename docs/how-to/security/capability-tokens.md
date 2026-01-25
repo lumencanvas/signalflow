@@ -133,7 +133,9 @@ client = await Clasp.connect(
 ### Rust
 
 ```rust
-let client = Client::builder("ws://localhost:7330")
+use clasp_client::ClaspBuilder;
+
+let client = ClaspBuilder::new("ws://localhost:7330")
     .token("eyJhbGciOi...")
     .connect()
     .await?;

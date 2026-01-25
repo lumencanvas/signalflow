@@ -34,8 +34,8 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-clasp-core = "3.0"
-clasp-bridge = { version = "3.0", features = ["osc", "mqtt"] }
+clasp-core = "3.1"
+clasp-bridge = { version = "3.1", features = ["osc", "mqtt"] }
 ```
 
 ## Quick Start

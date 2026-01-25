@@ -4,27 +4,40 @@ CLASP router library for building routers and servers.
 
 ## Overview
 
-`clasp-router` provides a high-performance router implementation.
+`clasp-router` provides a high-performance router implementation with support for multiple protocols.
 
 ```toml
 [dependencies]
-clasp-router = "3.0"
+clasp-router = "3.1"
 tokio = { version = "1", features = ["full"] }
+
+# Optional: Enable protocol adapters
+clasp-router = { version = "3.1", features = ["mqtt-server", "osc-server"] }
 ```
+
+## Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `websocket` | WebSocket transport (default) |
+| `quic` | QUIC transport with built-in TLS |
+| `tcp` | Raw TCP transport |
+| `mqtt-server` | Accept MQTT clients directly |
+| `osc-server` | Accept OSC clients via UDP |
+| `full` | All features enabled |
 
 ## Quick Start
 
 ```rust
-use clasp_router::{Router, Config};
+use clasp_router::{Router, RouterConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::builder()
-        .port(7330)
-        .build();
+    let config = RouterConfig::default();
+    let router = Router::new(config);
 
-    let router = Router::new(config).await?;
-    router.run().await?;
+    // Serve on WebSocket (blocks until error or shutdown)
+    router.serve_websocket("0.0.0.0:7330").await?;
 
     Ok(())
 }
@@ -32,343 +45,226 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Configuration
 
-### Basic Config
+### Using RouterConfig
 
 ```rust
-use clasp_router::Config;
+use clasp_router::RouterConfig;
+use clasp_core::SecurityMode;
 
-let config = Config::builder()
-    .port(7330)
-    .bind_address("0.0.0.0")
+let config = RouterConfig {
+    name: "My Router".into(),
+    max_sessions: 1000,
+    session_timeout: 300,
+    features: vec!["param".into(), "event".into()],
+    security_mode: SecurityMode::Open,
+    max_subscriptions_per_session: 1000,
+    gesture_coalescing: true,
+    gesture_coalesce_interval_ms: 16,
+    rate_limiting_enabled: true,
+    max_messages_per_second: 1000,
+};
+
+let router = Router::new(config);
+```
+
+### Using RouterConfigBuilder
+
+```rust
+use clasp_router::RouterConfigBuilder;
+
+let config = RouterConfigBuilder::new()
+    .name("My Router")
+    .max_sessions(1000)
+    .session_timeout(300)
+    .gesture_coalescing(true)
+    .gesture_coalesce_interval_ms(16)
     .build();
+
+let router = Router::new(config);
 ```
 
-### Full Config
+### Rate Limiting
 
 ```rust
-let config = Config::builder()
-    // Network
-    .port(7330)
-    .bind_address("0.0.0.0")
-
-    // TLS
-    .tls_cert("/path/to/cert.pem")
-    .tls_key("/path/to/key.pem")
-
-    // Limits
-    .max_connections(10000)
-    .max_message_size(64 * 1024)
-    .max_subscriptions_per_client(1000)
-
-    // Security
-    .require_auth(true)
-    .token_secret("your-secret")
-
-    // Discovery
-    .mdns_enabled(true)
-    .mdns_name("My Router")
-
-    // Performance
-    .worker_threads(8)
-
-    .build();
+let config = RouterConfig {
+    rate_limiting_enabled: true,
+    max_messages_per_second: 500,  // Per client
+    ..Default::default()
+};
 ```
 
-### From File
-
-```rust
-let config = Config::from_file("clasp.yaml")?;
-```
+When a client exceeds the rate limit, excess messages are dropped and a warning is logged.
 
 ## Router Operations
 
-### Create and Run
+### Serve on WebSocket
 
 ```rust
-let router = Router::new(config).await?;
+let router = Router::new(RouterConfig::default());
 
-// Run in foreground (blocks)
-router.run().await?;
-
-// Or run in background
-let handle = tokio::spawn(async move {
-    router.run().await
-});
+// Blocks until error or shutdown
+router.serve_websocket("0.0.0.0:7330").await?;
 ```
 
-### Graceful Shutdown
+### Serve on QUIC (with TLS)
 
 ```rust
-use tokio::signal;
+let router = Router::new(RouterConfig::default());
 
-let router = Router::new(config).await?;
+router.serve_quic(
+    "0.0.0.0:7331".parse()?,
+    vec![cert_der],  // Certificate chain
+    key_der,         // Private key
+).await?;
+```
+
+### Run in Background
+
+```rust
+let router = Router::new(RouterConfig::default());
+
+// Clone for the spawned task
 let router_clone = router.clone();
 
-// Run in background
 tokio::spawn(async move {
-    router_clone.run().await
+    router_clone.serve_websocket("0.0.0.0:7330").await
 });
 
-// Wait for shutdown signal
-signal::ctrl_c().await?;
-
-// Graceful shutdown
-router.shutdown().await?;
+// Continue with other work...
 ```
 
-## Local Client
+### Multi-Protocol Server
 
-Get a client connected directly to the router (no network overhead):
+Serve multiple protocols simultaneously with shared state:
 
 ```rust
-let router = Router::new(config).await?;
-let client = router.local_client();
+use clasp_router::{Router, RouterConfig, MultiProtocolConfig, MqttServerConfig, OscServerConfig};
 
-// Use like any other client
-client.set("/local/value", 42).await?;
+let router = Router::new(RouterConfig::default());
 
-let value = client.get("/local/value").await?;
+let config = MultiProtocolConfig {
+    websocket_addr: Some("0.0.0.0:7330".into()),
+    mqtt: Some(MqttServerConfig {
+        bind_addr: "0.0.0.0:1883".into(),
+        namespace: "/mqtt".into(),
+        require_auth: false,
+        max_clients: 100,
+        session_timeout_secs: 300,
+        ..Default::default()
+    }),
+    osc: Some(OscServerConfig {
+        bind_addr: "0.0.0.0:8000".into(),
+        namespace: "/osc".into(),
+        session_timeout_secs: 30,
+        ..Default::default()
+    }),
+    ..Default::default()
+};
+
+// All protocols share the same router state
+router.serve_all(config).await?;
+```
+
+Protocol adapters require feature flags:
+- `mqtt-server` for MQTT support
+- `osc-server` for OSC support
+
+### Stop Router
+
+```rust
+// From another task or signal handler
+router.stop();
 ```
 
 ## Direct State Access
 
-Access router state without going through the client interface:
+Access router state directly:
 
 ```rust
-let router = Router::new(config).await?;
+let router = Router::new(RouterConfig::default());
 
-// Read state
-let value = router.state().get("/path/to/value").await?;
+// Get the state manager
+let state = router.state();
 
-// Write state
-router.state().set("/path/to/value", Value::Int(42)).await?;
-
-// List addresses
-let addresses = router.state().list("/sensors/**").await?;
-
-// Delete
-router.state().delete("/path/to/value").await?;
-```
-
-## Event Hooks
-
-### Connection Events
-
-```rust
-let router = Router::new(config).await?;
-
-router.on_client_connect(|client_id, info| {
-    println!("Client connected: {} from {}", client_id, info.remote_addr);
-});
-
-router.on_client_disconnect(|client_id, reason| {
-    println!("Client disconnected: {} - {:?}", client_id, reason);
-});
-```
-
-### Message Events
-
-```rust
-router.on_message(|msg, client_id| {
-    // Log all messages
-    tracing::debug!("From {}: {:?}", client_id, msg);
-});
-
-// Filter by type
-router.on_set(|address, value, client_id| {
-    println!("{} set {} = {:?}", client_id, address, value);
-});
-```
-
-## Message Handler
-
-Intercept and modify messages:
-
-```rust
-use clasp_router::{Router, Config, MessageHandler, Message};
-use async_trait::async_trait;
-
-struct MyHandler;
-
-#[async_trait]
-impl MessageHandler for MyHandler {
-    async fn handle(&self, msg: &Message, client_id: &str) -> Option<Message> {
-        // Return None to pass through unchanged
-        // Return Some(msg) to modify
-        // Return Some(error) to reject
-
-        if msg.address().unwrap_or("").starts_with("/admin/") {
-            // Block admin routes from non-admin clients
-            if !is_admin(client_id) {
-                return Some(Message::Error(ErrorMessage {
-                    id: msg.id(),
-                    code: 403,
-                    message: "Permission denied".into(),
-                }));
-            }
-        }
-
-        None  // Pass through
-    }
+// Read a value
+if let Some(value) = state.get("/sensors/temp") {
+    println!("Temperature: {:?}", value);
 }
 
-let config = Config::builder()
-    .port(7330)
-    .message_handler(Arc::new(MyHandler))
-    .build();
+// Get with full metadata
+if let Some(param_state) = state.get_state("/sensors/temp") {
+    println!("Value: {:?}, Revision: {}", param_state.value, param_state.revision);
+}
+
+// Get all matching a pattern
+let matches = state.get_matching("/sensors/**");
+for (address, param_state) in matches {
+    println!("{}: {:?}", address, param_state.value);
+}
+
+// Get a snapshot for late-joiner sync
+let snapshot = state.snapshot("/sensors/**");
 ```
 
-## Persistence
+## Token Validation
 
-### Enable State Persistence
+### Built-in CPSK Validator
 
 ```rust
-use clasp_router::PersistenceConfig;
+use clasp_router::CpskValidator;
 
-let config = Config::builder()
-    .port(7330)
-    .persistence(PersistenceConfig {
-        enabled: true,
-        backend: PersistenceBackend::Sqlite,
-        path: "/var/lib/clasp/state.db".into(),
-        sync_interval: Duration::from_secs(5),
-    })
-    .build();
+let validator = CpskValidator::new("your-pre-shared-key");
+let router = Router::new(RouterConfig::default())
+    .with_validator(validator);
 ```
 
-### Manual State Operations
+### Custom Validator
 
 ```rust
-// Save state manually
-router.save_state().await?;
+use clasp_router::TokenValidator;
+use clasp_core::{Capabilities, SignalAccess};
 
-// Load state
-router.load_state().await?;
+struct MyValidator;
 
-// Clear persisted state
-router.clear_state().await?;
-```
-
-## Statistics
-
-```rust
-let stats = router.stats();
-
-println!("Connections: {}", stats.connections);
-println!("Messages/sec: {}", stats.messages_per_second);
-println!("State entries: {}", stats.state_entries);
-println!("Subscriptions: {}", stats.subscriptions);
-println!("Uptime: {:?}", stats.uptime);
-```
-
-## Metrics
-
-### Prometheus Metrics
-
-```rust
-let config = Config::builder()
-    .port(7330)
-    .metrics_enabled(true)
-    .metrics_port(9090)
-    .build();
-
-// Metrics available at http://localhost:9090/metrics
-```
-
-### Custom Metrics
-
-```rust
-use clasp_router::metrics;
-
-// Register custom metric
-metrics::register_counter("my_custom_counter", "Description");
-
-// Increment
-metrics::counter_inc("my_custom_counter");
-
-// Gauge
-metrics::register_gauge("my_gauge", "Description");
-metrics::gauge_set("my_gauge", 42.0);
-```
-
-## Security
-
-### Token Validation
-
-```rust
-let config = Config::builder()
-    .port(7330)
-    .require_auth(true)
-    .token_secret("your-256-bit-secret")
-    .build();
-
-// Or with public key (RS256)
-let config = Config::builder()
-    .port(7330)
-    .require_auth(true)
-    .token_public_key("/path/to/public.pem")
-    .build();
-```
-
-### Custom Authentication
-
-```rust
-use clasp_router::{Authenticator, AuthResult};
-
-struct MyAuthenticator;
-
-#[async_trait]
-impl Authenticator for MyAuthenticator {
-    async fn authenticate(&self, token: &str) -> AuthResult {
-        // Validate token
-        if validate_token(token) {
-            AuthResult::Ok(Permissions {
-                read: vec!["/**".into()],
-                write: vec!["/user/**".into()],
-                emit: vec![],
-                subscribe: vec!["/**".into()],
+impl TokenValidator for MyValidator {
+    fn validate(&self, token: &str) -> Option<Capabilities> {
+        if token == "valid-token" {
+            Some(Capabilities {
+                read: vec![SignalAccess::Pattern("/**".into())],
+                write: vec![SignalAccess::Pattern("/user/**".into())],
+                ..Default::default()
             })
         } else {
-            AuthResult::Denied("Invalid token".into())
+            None
         }
     }
 }
 
-let config = Config::builder()
-    .port(7330)
-    .authenticator(Arc::new(MyAuthenticator))
-    .build();
+let router = Router::new(RouterConfig::default())
+    .with_validator(MyValidator);
 ```
 
-## Clustering
-
-### Multi-Router Setup
+## Router Statistics
 
 ```rust
-// Router 1
-let config1 = Config::builder()
-    .port(7330)
-    .cluster_enabled(true)
-    .cluster_peers(vec!["192.168.1.101:7330".into()])
-    .build();
+let router = Router::new(RouterConfig::default());
 
-// Router 2
-let config2 = Config::builder()
-    .port(7330)
-    .cluster_enabled(true)
-    .cluster_peers(vec!["192.168.1.100:7330".into()])
-    .build();
+// Get current counts
+println!("Sessions: {}", router.session_count());
+println!("Subscriptions: {}", router.subscription_count());
+println!("Active gestures: {}", router.active_gesture_count());
+println!("State entries: {}", router.state().len());
 ```
 
 ## Error Handling
 
 ```rust
-use clasp_router::Error;
+use clasp_router::RouterError;
 
-match router.run().await {
-    Ok(()) => println!("Router stopped"),
-    Err(Error::BindError(e)) => eprintln!("Failed to bind: {}", e),
-    Err(Error::TlsError(e)) => eprintln!("TLS error: {}", e),
+match router.serve_websocket("0.0.0.0:7330").await {
+    Ok(()) => println!("Router stopped normally"),
+    Err(RouterError::Io(e)) => eprintln!("IO error: {}", e),
+    Err(RouterError::Transport(e)) => eprintln!("Transport error: {}", e),
     Err(e) => eprintln!("Error: {:?}", e),
 }
 ```

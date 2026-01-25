@@ -29,7 +29,9 @@ async fn test_late_joiner(param_count: usize) -> (u64, Duration, String) {
         security_mode: SecurityMode::Open,
         max_subscriptions_per_session: 100,
         gesture_coalescing: true,
-        gesture_coalesce_interval_ms: 16,
+        gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
     });
 
     let addr = format!("127.0.0.1:{}", port);

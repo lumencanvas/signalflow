@@ -289,8 +289,8 @@ cd chat-client
 Edit `Cargo.toml`:
 ```toml
 [dependencies]
-clasp-client = "3.0"
-clasp-core = "3.0"
+clasp-client = "3.1"
+clasp-core = "3.1"
 tokio = { version = "1", features = ["full"] }
 chrono = "0.4"
 serde = { version = "1", features = ["derive"] }

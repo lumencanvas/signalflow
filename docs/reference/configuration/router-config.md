@@ -52,6 +52,31 @@ server:
     max_subscriptions_per_client: 1000
     max_state_entries: 1000000
 
+  # Rate Limiting
+  rate_limiting:
+    enabled: true
+    max_messages_per_second: 1000
+
+  # Gesture Coalescing
+  gesture:
+    coalescing: true
+    coalesce_interval_ms: 16
+
+  # Protocol Adapters
+  mqtt:
+    enabled: false
+    port: 1883
+    namespace: "/mqtt"
+    require_auth: false
+    max_clients: 100
+    session_timeout: 300
+
+  osc:
+    enabled: false
+    port: 8000
+    namespace: "/osc"
+    session_timeout: 30
+
   # Persistence
   persistence:
     enabled: false
@@ -239,6 +264,115 @@ Maximum state entries in router.
 
 - Type: `integer`
 - Default: `1000000`
+
+## Rate Limiting
+
+### rate_limiting.enabled
+
+Enable per-client rate limiting.
+
+- Type: `boolean`
+- Default: `true`
+
+### rate_limiting.max_messages_per_second
+
+Maximum messages per second per client. When exceeded, messages are dropped and a warning is logged.
+
+- Type: `integer`
+- Default: `1000`
+- Set to `0` for unlimited
+
+## Gesture Coalescing
+
+### gesture.coalescing
+
+Enable coalescing of high-frequency gesture move messages to reduce bandwidth.
+
+- Type: `boolean`
+- Default: `true`
+
+### gesture.coalesce_interval_ms
+
+Interval in milliseconds for coalescing gesture moves. 16ms equals approximately 60fps.
+
+- Type: `integer`
+- Default: `16`
+
+## Protocol Adapters
+
+Enable MQTT or OSC clients to connect directly to the router without external brokers.
+
+### mqtt.enabled
+
+Enable MQTT server adapter on the router.
+
+- Type: `boolean`
+- Default: `false`
+
+### mqtt.port
+
+Port for MQTT clients to connect.
+
+- Type: `integer`
+- Default: `1883`
+
+### mqtt.namespace
+
+Prefix for MQTT topics in CLASP address space.
+
+- Type: `string`
+- Default: `"/mqtt"`
+- Example: MQTT topic `sensors/temp` becomes CLASP address `/mqtt/sensors/temp`
+
+### mqtt.require_auth
+
+Require MQTT clients to authenticate with username/password.
+
+- Type: `boolean`
+- Default: `false`
+
+### mqtt.max_clients
+
+Maximum concurrent MQTT client connections.
+
+- Type: `integer`
+- Default: `100`
+
+### mqtt.session_timeout
+
+MQTT session timeout in seconds.
+
+- Type: `integer`
+- Default: `300`
+
+### osc.enabled
+
+Enable OSC server adapter on the router.
+
+- Type: `boolean`
+- Default: `false`
+
+### osc.port
+
+UDP port for OSC messages.
+
+- Type: `integer`
+- Default: `8000`
+
+### osc.namespace
+
+Prefix for OSC addresses in CLASP address space.
+
+- Type: `string`
+- Default: `"/osc"`
+- Example: OSC address `/synth/volume` becomes CLASP address `/osc/synth/volume`
+
+### osc.session_timeout
+
+OSC session timeout in seconds. Sessions are created per source IP:port and expire after inactivity.
+
+- Type: `integer`
+- Default: `30`
 
 ## Persistence
 

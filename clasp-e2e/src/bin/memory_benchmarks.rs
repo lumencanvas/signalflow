@@ -224,6 +224,8 @@ async fn main() {
         max_subscriptions_per_session: 10000,
         gesture_coalescing: false,
         gesture_coalesce_interval_ms: 0,
+            max_messages_per_second: 0,
+            rate_limiting_enabled: false,
     });
 
     let addr = format!("127.0.0.1:{}", port);

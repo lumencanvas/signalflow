@@ -59,7 +59,9 @@ clasp server --port 7330 \
 ### Rust
 
 ```rust
-let client = Client::connect("quic://localhost:7330").await?;
+use clasp_client::Clasp;
+
+let client = Clasp::connect_to("quic://localhost:7330").await?;
 ```
 
 ### JavaScript (Node.js)
@@ -92,14 +94,16 @@ data_stream.send(data_msg).await?;
 Resume connections without handshake:
 
 ```rust
-// First connection stores session ticket
-let client = Client::connect("quic://localhost:7330").await?;
-let ticket = client.session_ticket();
-client.disconnect().await?;
+use clasp_client::{Clasp, ClaspBuilder};
 
-// Resumed connection with 0-RTT
-let client = Client::builder("quic://localhost:7330")
-    .session_ticket(ticket)
+// First connection stores session ticket
+let client = Clasp::connect_to("quic://localhost:7330").await?;
+// Note: Session ticket API is transport-specific
+client.close().await;
+
+// Resumed connection
+let client = ClaspBuilder::new("quic://localhost:7330")
+    .name("my-client")
     .connect()
     .await?;
 ```

@@ -8,20 +8,20 @@ Protocol bridge implementations for CLASP.
 
 ```toml
 [dependencies]
-clasp-bridge = "3.0"
+clasp-bridge = "3.1"
 
 # Or select specific bridges
-clasp-bridge = { version = "3.0", features = ["osc", "midi"] }
+clasp-bridge = { version = "3.1", features = ["osc", "midi"] }
 ```
 
 ## Features
 
 ```toml
 # All bridges
-clasp-bridge = { version = "3.0", features = ["full"] }
+clasp-bridge = { version = "3.1", features = ["full"] }
 
 # Individual bridges
-clasp-bridge = { version = "3.0", features = [
+clasp-bridge = { version = "3.1", features = [
     "osc",
     "midi",
     "artnet",
@@ -38,11 +38,14 @@ clasp-bridge = { version = "3.0", features = [
 
 ```rust
 use clasp_bridge::osc::{OscBridge, OscConfig};
-use clasp_client::Client;
+use clasp_client::{Clasp, ClaspBuilder};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let client = Client::connect("ws://localhost:7330").await?;
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = ClaspBuilder::new("ws://localhost:7330")
+        .name("OSC Bridge")
+        .connect()
+        .await?;
 
     let config = OscConfig {
         bind_addr: "0.0.0.0:8000".parse()?,

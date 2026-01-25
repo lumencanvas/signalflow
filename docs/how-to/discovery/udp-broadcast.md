@@ -29,14 +29,13 @@ server:
 ### Rust
 
 ```rust
-use clasp_router::{Router, Config};
+use clasp_router::{Router, RouterConfig};
 
-let config = Config::builder()
-    .port(7330)
-    .udp_discovery_port(7331)
-    .build();
+let config = RouterConfig::default();
+let router = Router::new(config);
 
-let router = Router::new(config).await?;
+// Start router with WebSocket
+router.serve_websocket("0.0.0.0:7330").await?;
 ```
 
 ## Discover Routers
