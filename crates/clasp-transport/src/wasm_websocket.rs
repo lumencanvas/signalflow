@@ -87,6 +87,19 @@ impl TransportSender for WasmWebSocketSender {
         Ok(())
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        // WebSocket send in WASM is already non-blocking
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        self.ws
+            .send_with_u8_array(&data)
+            .map_err(|e| TransportError::SendFailed(format!("{:?}", e)))?;
+
+        Ok(())
+    }
+
     fn is_connected(&self) -> bool {
         self.state.borrow().connected && self.ws.ready_state() == web_sys::WebSocket::OPEN
     }

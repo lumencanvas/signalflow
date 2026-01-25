@@ -149,6 +149,18 @@ impl TransportSender for UdpSender {
         Ok(())
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        // UDP is inherently non-blocking - spawn a task for the async send
+        let socket = Arc::clone(&self.socket);
+        let remote = self.remote;
+        tokio::spawn(async move {
+            if let Err(e) = socket.send_to(&data, remote).await {
+                error!("UDP async send failed: {}", e);
+            }
+        });
+        Ok(())
+    }
+
     fn is_connected(&self) -> bool {
         *self.connected.lock()
     }

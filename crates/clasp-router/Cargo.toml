@@ -11,7 +11,7 @@ readme = "README.md"
 [features]
 default = ["websocket"]
 # Full transport support - use for native deployments (Droplet, VPS)
-full = ["websocket", "quic", "tcp"]
+full = ["websocket", "quic", "tcp", "mqtt-server", "osc-server"]
 # WebSocket only - works on all platforms including DO App Platform
 websocket = ["clasp-transport/websocket"]
 # QUIC requires UDP - works on Droplets/VPS, NOT on DO App Platform
@@ -21,6 +21,12 @@ quic = ["clasp-transport/quic"]
 tcp = []
 # WASM build - client-only, uses web-sys WebSocket
 wasm = ["clasp-transport/wasm", "wasm-bindgen", "wasm-bindgen-futures"]
+# MQTT server adapter - accept MQTT clients directly
+mqtt-server = ["mqttbytes", "serde_json"]
+# MQTTS (MQTT over TLS) support
+mqtts = ["mqtt-server", "tokio-rustls", "rustls-pemfile"]
+# OSC server adapter - accept OSC clients via UDP with session tracking
+osc-server = ["rosc", "serde_json"]
 
 [dependencies]
 clasp-core = { workspace = true }
@@ -47,6 +53,18 @@ uuid = { workspace = true }
 # WASM (optional)
 wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
+
+# MQTT server adapter (optional)
+mqttbytes = { version = "0.6", optional = true }
+serde_json = { workspace = true, optional = true }
+serde = { workspace = true }
+
+# MQTTS TLS support (optional)
+tokio-rustls = { version = "0.26", optional = true }
+rustls-pemfile = { version = "2.0", optional = true }
+
+# OSC server adapter (optional)
+rosc = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

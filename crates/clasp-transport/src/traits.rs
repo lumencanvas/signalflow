@@ -22,8 +22,12 @@ pub enum TransportEvent {
 /// Trait for sending data
 #[async_trait]
 pub trait TransportSender: Send + Sync {
-    /// Send data
+    /// Send data (blocking if buffer is full)
     async fn send(&self, data: Bytes) -> Result<()>;
+
+    /// Try to send data without blocking
+    /// Returns Ok(()) if sent, Err with BufferFull if the channel is full
+    fn try_send(&self, data: Bytes) -> Result<()>;
 
     /// Check if connected
     fn is_connected(&self) -> bool;

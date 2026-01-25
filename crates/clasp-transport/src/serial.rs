@@ -178,6 +178,25 @@ impl TransportSender for SerialSender {
         Ok(())
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        // Spawn a task to send asynchronously
+        let port = Arc::clone(&self.port);
+        let connected = Arc::clone(&self.connected);
+        tokio::spawn(async move {
+            use tokio::io::AsyncWriteExt;
+            let mut port = port.lock().await;
+            if let Err(e) = port.write_all(&data).await {
+                error!("Serial async send failed: {}", e);
+                *connected.lock() = false;
+            }
+        });
+        Ok(())
+    }
+
     fn is_connected(&self) -> bool {
         *self.connected.lock()
     }

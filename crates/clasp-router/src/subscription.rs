@@ -147,6 +147,18 @@ impl SubscriptionManager {
             }
         }
 
+        // CRITICAL: Always check "/**" key - globstar patterns that start with /**
+        // get indexed under "/**" but match everything. Without this check,
+        // subscriptions to "/**" would never match any addresses.
+        if let Some(keys) = self.by_prefix.get("/**") {
+            candidate_keys.extend(keys.iter().cloned());
+        }
+
+        // Also check "/*" key for single-level wildcard patterns at root
+        if let Some(keys) = self.by_prefix.get("/*") {
+            candidate_keys.extend(keys.iter().cloned());
+        }
+
         // Check only the candidate subscriptions
         for key in candidate_keys {
             if let Some(entry) = self.subscriptions.get(&key) {
@@ -213,5 +225,89 @@ mod tests {
 
         let subscribers = manager.find_subscribers("/test/foo/bar", None);
         assert!(subscribers.contains(&"session1".to_string()));
+    }
+
+    #[test]
+    fn test_root_globstar_subscription() {
+        // Test that "/**" subscriptions match all addresses
+        let manager = SubscriptionManager::new();
+
+        let sub = Subscription::new(
+            1,
+            "session1".to_string(),
+            "/**",
+            vec![],
+            SubscribeOptions::default(),
+        )
+        .unwrap();
+
+        manager.add(sub);
+
+        // Should match any address
+        let subscribers = manager.find_subscribers("/a/b/c", None);
+        assert!(
+            subscribers.contains(&"session1".to_string()),
+            "/** should match /a/b/c"
+        );
+
+        let subscribers = manager.find_subscribers("/foo", None);
+        assert!(
+            subscribers.contains(&"session1".to_string()),
+            "/** should match /foo"
+        );
+
+        let subscribers = manager.find_subscribers("/deeply/nested/path/here", None);
+        assert!(
+            subscribers.contains(&"session1".to_string()),
+            "/** should match deeply nested paths"
+        );
+    }
+
+    #[test]
+    fn test_multiple_globstar_patterns() {
+        // Test multiple globstar patterns coexisting
+        let manager = SubscriptionManager::new();
+
+        // Root globstar
+        manager.add(
+            Subscription::new(1, "global".to_string(), "/**", vec![], SubscribeOptions::default())
+                .unwrap(),
+        );
+
+        // Specific prefix globstar
+        manager.add(
+            Subscription::new(
+                2,
+                "lumen".to_string(),
+                "/lumen/**",
+                vec![],
+                SubscribeOptions::default(),
+            )
+            .unwrap(),
+        );
+
+        // Non-matching prefix globstar
+        manager.add(
+            Subscription::new(
+                3,
+                "other".to_string(),
+                "/other/**",
+                vec![],
+                SubscribeOptions::default(),
+            )
+            .unwrap(),
+        );
+
+        // /lumen/scene/0 should match both "global" (/**) and "lumen" (/lumen/**)
+        let subscribers = manager.find_subscribers("/lumen/scene/0", None);
+        assert!(subscribers.contains(&"global".to_string()));
+        assert!(subscribers.contains(&"lumen".to_string()));
+        assert!(!subscribers.contains(&"other".to_string()));
+
+        // /other/data should match "global" and "other"
+        let subscribers = manager.find_subscribers("/other/data", None);
+        assert!(subscribers.contains(&"global".to_string()));
+        assert!(subscribers.contains(&"other".to_string()));
+        assert!(!subscribers.contains(&"lumen".to_string()));
     }
 }

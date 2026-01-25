@@ -28,6 +28,10 @@ use crate::traits::{
 
 use clasp_core::WS_SUBPROTOCOL;
 
+/// Default channel buffer size for WebSocket connections
+/// Larger buffers help prevent message drops under load
+pub const DEFAULT_CHANNEL_BUFFER_SIZE: usize = 1000;
+
 /// WebSocket configuration
 #[derive(Debug, Clone)]
 pub struct WebSocketConfig {
@@ -37,6 +41,8 @@ pub struct WebSocketConfig {
     pub max_message_size: usize,
     /// Ping interval in seconds
     pub ping_interval: u64,
+    /// Channel buffer size for send/receive queues
+    pub channel_buffer_size: usize,
 }
 
 impl Default for WebSocketConfig {
@@ -45,6 +51,7 @@ impl Default for WebSocketConfig {
             subprotocol: WS_SUBPROTOCOL.to_string(),
             max_message_size: 64 * 1024, // 64KB
             ping_interval: 30,
+            channel_buffer_size: DEFAULT_CHANNEL_BUFFER_SIZE,
         }
     }
 }
@@ -89,6 +96,19 @@ impl TransportSender for WebSocketSender {
             .send(WsMessage::Binary(data.to_vec()))
             .await
             .map_err(|e| TransportError::SendFailed(e.to_string()))
+    }
+
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        self.tx
+            .try_send(WsMessage::Binary(data.to_vec()))
+            .map_err(|e| match e {
+                mpsc::error::TrySendError::Full(_) => TransportError::BufferFull,
+                mpsc::error::TrySendError::Closed(_) => TransportError::ConnectionClosed,
+            })
     }
 
     fn is_connected(&self) -> bool {
@@ -165,9 +185,9 @@ impl Transport for WebSocketTransport {
         // Split the WebSocket stream
         let (write, read) = ws_stream.split();
 
-        // Create channels
-        let (send_tx, mut send_rx) = mpsc::channel::<WsMessage>(100);
-        let (event_tx, event_rx) = mpsc::channel::<TransportEvent>(100);
+        // Create channels with larger buffers for better load handling
+        let (send_tx, mut send_rx) = mpsc::channel::<WsMessage>(DEFAULT_CHANNEL_BUFFER_SIZE);
+        let (event_tx, event_rx) = mpsc::channel::<TransportEvent>(DEFAULT_CHANNEL_BUFFER_SIZE);
 
         let connected = Arc::new(Mutex::new(true));
         let connected_write = connected.clone();
@@ -337,9 +357,10 @@ impl TransportServer for WebSocketServer {
         // Split the stream
         let (write, read) = ws_stream.split();
 
-        // Create channels
-        let (send_tx, mut send_rx) = mpsc::channel::<WsMessage>(100);
-        let (event_tx, event_rx) = mpsc::channel::<TransportEvent>(100);
+        // Create channels with configurable buffer size for better load handling
+        let buffer_size = self.config.channel_buffer_size;
+        let (send_tx, mut send_rx) = mpsc::channel::<WsMessage>(buffer_size);
+        let (event_tx, event_rx) = mpsc::channel::<TransportEvent>(buffer_size);
 
         let connected = Arc::new(Mutex::new(true));
         let connected_write = connected.clone();

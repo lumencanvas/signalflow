@@ -97,10 +97,22 @@ pub mod session;
 pub mod state;
 pub mod subscription;
 
+// Protocol adapters (feature-gated)
+#[cfg(any(feature = "mqtt-server", feature = "osc-server"))]
+pub mod adapters;
+
 pub use error::{Result, RouterError};
 pub use gesture::{GestureRegistry, GestureResult};
 pub use p2p::{analyze_address, P2PAddressType, P2PCapabilities};
-pub use router::{Router, RouterConfig, RouterConfigBuilder, TransportConfig};
+pub use router::{MultiProtocolConfig, Router, RouterConfig, RouterConfigBuilder, TransportConfig};
+#[cfg(feature = "quic")]
+pub use router::QuicServerConfig;
 pub use session::{Session, SessionId};
 pub use state::RouterState;
 pub use subscription::SubscriptionManager;
+
+// Re-export adapter configs
+#[cfg(feature = "mqtt-server")]
+pub use adapters::{MqttServerAdapter, MqttServerConfig};
+#[cfg(feature = "osc-server")]
+pub use adapters::{OscServerAdapter, OscServerConfig};

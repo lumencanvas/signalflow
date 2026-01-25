@@ -8,10 +8,10 @@
 
 [package]
 name = "clasp-relay"
-version = "3.0.1"
+version = "3.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "CLASP relay server using published crates"
+description = "CLASP multi-protocol relay server"
 
 [[bin]]
 name = "clasp-relay"
@@ -19,7 +19,16 @@ path = "src/main.rs"
 
 [features]
 default = ["websocket"]
+# WebSocket (default, works everywhere)
 websocket = ["clasp-router/websocket"]
+# QUIC (high-performance, requires UDP and TLS certificates)
+quic = ["clasp-router/quic", "rustls-pemfile"]
+# Full protocol support
+full = ["websocket", "quic", "mqtt-server", "osc-server"]
+# MQTT server adapter (accept MQTT clients)
+mqtt-server = ["clasp-router/mqtt-server"]
+# OSC server adapter (accept OSC clients)
+osc-server = ["clasp-router/osc-server"]
 
 [dependencies]
 # Published crates from crates.io
@@ -38,3 +47,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Error handling
 anyhow = "1.0"
+
+# TLS certificate parsing (for QUIC)
+rustls-pemfile = { version = "2.0", optional = true }

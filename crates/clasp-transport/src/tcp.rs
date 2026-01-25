@@ -21,6 +21,9 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 /// Maximum message size (64KB)
 const MAX_MESSAGE_SIZE: usize = 64 * 1024;
 
+/// Default channel buffer size for TCP connections
+const DEFAULT_CHANNEL_BUFFER_SIZE: usize = 1000;
+
 /// TCP configuration
 #[derive(Debug, Clone)]
 pub struct TcpConfig {
@@ -75,8 +78,8 @@ impl TcpTransport {
         }
 
         let connected = Arc::new(Mutex::new(true));
-        let (outgoing_tx, mut outgoing_rx) = mpsc::channel::<Bytes>(256);
-        let (incoming_tx, incoming_rx) = mpsc::channel::<TransportEvent>(256);
+        let (outgoing_tx, mut outgoing_rx) = mpsc::channel::<Bytes>(DEFAULT_CHANNEL_BUFFER_SIZE);
+        let (incoming_tx, incoming_rx) = mpsc::channel::<TransportEvent>(DEFAULT_CHANNEL_BUFFER_SIZE);
 
         let sender = TcpSender {
             tx: outgoing_tx,
@@ -200,6 +203,17 @@ impl TransportSender for TcpSender {
             .map_err(|_| TransportError::SendFailed("Channel closed".into()))
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !*self.connected.lock() {
+            return Err(TransportError::NotConnected);
+        }
+
+        self.tx.try_send(data).map_err(|e| match e {
+            mpsc::error::TrySendError::Full(_) => TransportError::BufferFull,
+            mpsc::error::TrySendError::Closed(_) => TransportError::ConnectionClosed,
+        })
+    }
+
     fn is_connected(&self) -> bool {
         *self.connected.lock()
     }
@@ -270,8 +284,8 @@ impl TransportServer for TcpServer {
         info!("TCP connection accepted from {}", peer_addr);
 
         let connected = Arc::new(Mutex::new(true));
-        let (outgoing_tx, mut outgoing_rx) = mpsc::channel::<Bytes>(256);
-        let (incoming_tx, incoming_rx) = mpsc::channel::<TransportEvent>(256);
+        let (outgoing_tx, mut outgoing_rx) = mpsc::channel::<Bytes>(DEFAULT_CHANNEL_BUFFER_SIZE);
+        let (incoming_tx, incoming_rx) = mpsc::channel::<TransportEvent>(DEFAULT_CHANNEL_BUFFER_SIZE);
 
         let sender = TcpSender {
             tx: outgoing_tx,

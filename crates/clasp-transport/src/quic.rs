@@ -32,6 +32,9 @@ use std::net::SocketAddr;
 /// ALPN protocol identifier for CLASP over QUIC
 pub const CLASP_ALPN: &[u8] = b"clasp/2";
 
+/// Default channel buffer size for QUIC connections
+const DEFAULT_CHANNEL_BUFFER_SIZE: usize = 1000;
+
 /// Certificate verification mode
 #[derive(Debug, Clone, Default)]
 pub enum CertVerification {
@@ -386,7 +389,7 @@ impl QuicConnection {
                 TransportError::ConnectionFailed(format!("Open stream failed: {}", e))
             })?;
 
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(DEFAULT_CHANNEL_BUFFER_SIZE);
         let connected = Arc::new(Mutex::new(true));
         let connected_clone = connected.clone();
 
@@ -437,7 +440,7 @@ impl QuicConnection {
             TransportError::ConnectionFailed(format!("Accept stream failed: {}", e))
         })?;
 
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(DEFAULT_CHANNEL_BUFFER_SIZE);
         let connected = Arc::new(Mutex::new(true));
         let connected_clone = connected.clone();
 
@@ -503,7 +506,7 @@ impl QuicConnection {
                 TransportError::ConnectionFailed(format!("Accept uni failed: {}", e))
             })?;
 
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(DEFAULT_CHANNEL_BUFFER_SIZE);
         let connected = Arc::new(Mutex::new(true));
         let connected_clone = connected.clone();
 
@@ -589,6 +592,26 @@ impl TransportSender for QuicSender {
             .map_err(|e| TransportError::SendFailed(format!("QUIC write failed: {}", e)))?;
 
         debug!("QUIC sent {} bytes", data.len());
+        Ok(())
+    }
+
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        // QUIC doesn't have a channel buffer - spawn a task to send asynchronously
+        // This makes the call non-blocking from the caller's perspective
+        let send = Arc::clone(&self.send);
+        let connected = Arc::clone(&self.connected);
+        tokio::spawn(async move {
+            let mut stream = send.lock().await;
+            if let Err(e) = stream.write_all(&data).await {
+                error!("QUIC async send failed: {}", e);
+                *connected.lock() = false;
+            }
+        });
+
         Ok(())
     }
 

@@ -286,6 +286,25 @@ impl TransportSender for BleSender {
         Ok(())
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        // BLE doesn't have a sync write, spawn a task for async send
+        let peripheral = self.peripheral.clone();
+        let tx_char = self.tx_char.clone();
+        let write_type = self.write_type;
+        let connected = Arc::clone(&self.connected);
+        tokio::spawn(async move {
+            if let Err(e) = peripheral.write(&tx_char, &data, write_type).await {
+                error!("BLE async send failed: {}", e);
+                *connected.lock() = false;
+            }
+        });
+        Ok(())
+    }
+
     fn is_connected(&self) -> bool {
         *self.connected.lock()
     }

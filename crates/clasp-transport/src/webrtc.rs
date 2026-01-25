@@ -575,6 +575,23 @@ impl TransportSender for WebRtcSender {
         Ok(())
     }
 
+    fn try_send(&self, data: Bytes) -> Result<()> {
+        if !self.is_connected() {
+            return Err(TransportError::NotConnected);
+        }
+
+        // WebRTC doesn't have a sync send, spawn a task for async send
+        let channel = Arc::clone(&self.channel);
+        let connected = Arc::clone(&self.connected);
+        tokio::spawn(async move {
+            if let Err(e) = channel.send(&data).await {
+                error!("WebRTC async send failed: {}", e);
+                *connected.lock() = false;
+            }
+        });
+        Ok(())
+    }
+
     fn is_connected(&self) -> bool {
         *self.connected.lock()
     }

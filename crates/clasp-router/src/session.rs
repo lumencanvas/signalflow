@@ -5,6 +5,7 @@ use clasp_core::{Action, Message, Scope, WelcomeMessage, PROTOCOL_VERSION};
 use clasp_transport::TransportSender;
 use parking_lot::RwLock;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
@@ -36,6 +37,10 @@ pub struct Session {
     pub subject: Option<String>,
     /// Scopes granted to this session
     scopes: Vec<Scope>,
+    /// Messages received in the current second (for rate limiting)
+    messages_this_second: AtomicU32,
+    /// The second when the message count was last reset (Unix timestamp)
+    last_rate_limit_second: AtomicU64,
 }
 
 impl Session {
@@ -54,6 +59,8 @@ impl Session {
             token: None,
             subject: None,
             scopes: Vec::new(),
+            messages_this_second: AtomicU32::new(0),
+            last_rate_limit_second: AtomicU64::new(0),
         }
     }
 
@@ -90,6 +97,14 @@ impl Session {
     /// Send a message to this session
     pub async fn send(&self, data: Bytes) -> Result<(), clasp_transport::TransportError> {
         self.sender.send(data).await?;
+        *self.last_activity.write() = Instant::now();
+        Ok(())
+    }
+
+    /// Try to send a message without blocking (for broadcasts)
+    /// Returns Ok if sent or queued, Err if buffer is full
+    pub fn try_send(&self, data: Bytes) -> Result<(), clasp_transport::TransportError> {
+        self.sender.try_send(data)?;
         *self.last_activity.write() = Instant::now();
         Ok(())
     }
@@ -143,6 +158,37 @@ impl Session {
     /// Get idle duration
     pub fn idle_duration(&self) -> std::time::Duration {
         self.last_activity.read().elapsed()
+    }
+
+    /// Check and increment rate limit counter
+    /// Returns true if within rate limit, false if exceeded
+    pub fn check_rate_limit(&self, max_per_second: u32) -> bool {
+        if max_per_second == 0 {
+            return true; // No rate limiting
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let last_second = self.last_rate_limit_second.load(Ordering::Relaxed);
+
+        if now != last_second {
+            // New second, reset counter
+            self.messages_this_second.store(1, Ordering::Relaxed);
+            self.last_rate_limit_second.store(now, Ordering::Relaxed);
+            true
+        } else {
+            // Same second, increment and check
+            let count = self.messages_this_second.fetch_add(1, Ordering::Relaxed) + 1;
+            count <= max_per_second
+        }
+    }
+
+    /// Get current message count for this second
+    pub fn messages_per_second(&self) -> u32 {
+        self.messages_this_second.load(Ordering::Relaxed)
     }
 }
 

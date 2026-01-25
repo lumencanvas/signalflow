@@ -21,6 +21,9 @@ pub enum TransportError {
     #[error("send failed: {0}")]
     SendFailed(String),
 
+    #[error("send buffer full")]
+    BufferFull,
+
     #[error("receive failed: {0}")]
     ReceiveFailed(String),
 

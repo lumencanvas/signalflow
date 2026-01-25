@@ -54,6 +54,9 @@ use crate::{
 };
 use std::time::Duration;
 
+/// Timeout for clients to complete the handshake (send Hello message)
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Transport configuration for multi-transport serving.
 ///
 /// Use with `Router::serve_multi()` to run multiple transports simultaneously.
@@ -81,6 +84,61 @@ pub enum TransportConfig {
     },
 }
 
+/// Multi-protocol server configuration.
+///
+/// Configure which protocols the router should accept connections on.
+/// All configured protocols share the same router state.
+///
+/// # Example
+///
+/// ```no_run
+/// use clasp_router::{Router, MultiProtocolConfig};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let router = Router::default();
+/// let config = MultiProtocolConfig {
+///     websocket_addr: Some("0.0.0.0:7330".into()),
+///     #[cfg(feature = "mqtt-server")]
+///     mqtt: None,
+///     #[cfg(feature = "osc-server")]
+///     osc: None,
+///     ..Default::default()
+/// };
+/// router.serve_all(config).await?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct MultiProtocolConfig {
+    /// WebSocket listen address (e.g., "0.0.0.0:7330")
+    #[cfg(feature = "websocket")]
+    pub websocket_addr: Option<String>,
+
+    /// QUIC configuration
+    #[cfg(feature = "quic")]
+    pub quic: Option<QuicServerConfig>,
+
+    /// MQTT server configuration
+    #[cfg(feature = "mqtt-server")]
+    pub mqtt: Option<crate::adapters::MqttServerConfig>,
+
+    /// OSC server configuration
+    #[cfg(feature = "osc-server")]
+    pub osc: Option<crate::adapters::OscServerConfig>,
+}
+
+/// QUIC server configuration
+#[cfg(feature = "quic")]
+#[derive(Debug, Clone)]
+pub struct QuicServerConfig {
+    /// Listen address
+    pub addr: SocketAddr,
+    /// TLS certificate (DER format)
+    pub cert: Vec<u8>,
+    /// TLS private key (DER format)
+    pub key: Vec<u8>,
+}
+
 /// Router configuration
 #[derive(Debug, Clone)]
 pub struct RouterConfig {
@@ -100,6 +158,10 @@ pub struct RouterConfig {
     pub gesture_coalescing: bool,
     /// Gesture move coalesce interval in milliseconds (default: 16ms = 60fps)
     pub gesture_coalesce_interval_ms: u64,
+    /// Maximum messages per second per client (0 = unlimited)
+    pub max_messages_per_second: u32,
+    /// Enable rate limiting
+    pub rate_limiting_enabled: bool,
 }
 
 impl Default for RouterConfig {
@@ -119,6 +181,8 @@ impl Default for RouterConfig {
             max_subscriptions_per_session: 1000, // 0 = unlimited
             gesture_coalescing: true,
             gesture_coalesce_interval_ms: 16,
+            max_messages_per_second: 1000, // 1000 msgs/sec default
+            rate_limiting_enabled: true,
         }
     }
 }
@@ -279,6 +343,17 @@ impl Router {
         while *self.running.read() {
             match server.accept().await {
                 Ok((sender, receiver, addr)) => {
+                    // Enforce max_sessions limit
+                    let current_sessions = self.sessions.len();
+                    if current_sessions >= self.config.max_sessions {
+                        warn!(
+                            "Rejecting connection from {}: max sessions reached ({}/{})",
+                            addr, current_sessions, self.config.max_sessions
+                        );
+                        // Connection will be closed when sender/receiver are dropped
+                        continue;
+                    }
+
                     info!("New connection from {}", addr);
                     self.handle_connection(Arc::new(sender), receiver, addr);
                 }
@@ -318,7 +393,12 @@ impl Router {
                     if let Ok(bytes) = codec::encode(&msg) {
                         for sub_session_id in subscribers {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                let _ = sub_session.send(bytes.clone()).await;
+                                if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                    warn!(
+                                        "Failed to flush gesture to {}: {} (buffer full)",
+                                        sub_session_id, e
+                                    );
+                                }
                             }
                         }
                     }
@@ -530,6 +610,156 @@ impl Router {
         Ok(())
     }
 
+    /// Serve all configured protocols simultaneously.
+    ///
+    /// This is the recommended way to run a multi-protocol CLASP server.
+    /// All protocols share the same router state, so clients connected via
+    /// different protocols can communicate seamlessly.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use clasp_router::{Router, MultiProtocolConfig};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let router = Router::default();
+    /// let config = MultiProtocolConfig {
+    ///     websocket_addr: Some("0.0.0.0:7330".into()),
+    ///     ..Default::default()
+    /// };
+    /// router.serve_all(config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn serve_all(&self, config: MultiProtocolConfig) -> Result<()> {
+        use futures::future::select_all;
+
+        let mut handles: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
+        let mut protocol_names: Vec<&str> = vec![];
+
+        // WebSocket server
+        #[cfg(feature = "websocket")]
+        if let Some(ref addr) = config.websocket_addr {
+            info!("Starting WebSocket server on {}", addr);
+            protocol_names.push("WebSocket");
+            let router = self.clone_internal();
+            let addr = addr.clone();
+            handles.push(tokio::spawn(async move {
+                router.serve_websocket(&addr).await
+            }));
+        }
+
+        // QUIC server
+        #[cfg(feature = "quic")]
+        if let Some(ref quic_config) = config.quic {
+            info!("Starting QUIC server on {}", quic_config.addr);
+            protocol_names.push("QUIC");
+            let router = self.clone_internal();
+            let addr = quic_config.addr;
+            let cert = quic_config.cert.clone();
+            let key = quic_config.key.clone();
+            handles.push(tokio::spawn(async move {
+                router.serve_quic(addr, cert, key).await
+            }));
+        }
+
+        // MQTT server adapter
+        #[cfg(feature = "mqtt-server")]
+        if let Some(mqtt_config) = config.mqtt {
+            info!("Starting MQTT server on {}", mqtt_config.bind_addr);
+            protocol_names.push("MQTT");
+            let adapter = crate::adapters::MqttServerAdapter::new(
+                mqtt_config,
+                Arc::clone(&self.sessions),
+                Arc::clone(&self.subscriptions),
+                Arc::clone(&self.state),
+            );
+            handles.push(tokio::spawn(async move {
+                adapter.serve().await
+            }));
+        }
+
+        // OSC server adapter
+        #[cfg(feature = "osc-server")]
+        if let Some(osc_config) = config.osc {
+            info!("Starting OSC server on {}", osc_config.bind_addr);
+            protocol_names.push("OSC");
+            let adapter = crate::adapters::OscServerAdapter::new(
+                osc_config,
+                Arc::clone(&self.sessions),
+                Arc::clone(&self.subscriptions),
+                Arc::clone(&self.state),
+            );
+            handles.push(tokio::spawn(async move {
+                adapter.serve().await
+            }));
+        }
+
+        if handles.is_empty() {
+            return Err(RouterError::Config("No protocols configured".into()));
+        }
+
+        info!(
+            "Multi-protocol server running with {} protocols: {}",
+            handles.len(),
+            protocol_names.join(", ")
+        );
+
+        *self.running.write() = true;
+
+        // Start session cleanup task
+        if self.config.session_timeout > 0 {
+            self.start_session_cleanup_task();
+        }
+
+        // Start gesture flush task if coalescing is enabled
+        if let Some(ref registry) = self.gesture_registry {
+            self.start_gesture_flush_task(Arc::clone(registry));
+        }
+
+        // Wait for any server to complete (usually due to error or shutdown)
+        loop {
+            if handles.is_empty() {
+                break;
+            }
+
+            let (result, _index, remaining) = select_all(handles).await;
+            handles = remaining;
+
+            match result {
+                Ok(Ok(())) => {
+                    // Server completed normally (shutdown)
+                    debug!("Protocol server completed normally");
+                }
+                Ok(Err(e)) => {
+                    error!("Protocol server error: {}", e);
+                    // Continue running other servers
+                }
+                Err(e) => {
+                    error!("Protocol server task panicked: {}", e);
+                    // Continue running other servers
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get shared state references for use by adapters
+    pub fn shared_state(
+        &self,
+    ) -> (
+        Arc<DashMap<SessionId, Arc<Session>>>,
+        Arc<SubscriptionManager>,
+        Arc<RouterState>,
+    ) {
+        (
+            Arc::clone(&self.sessions),
+            Arc::clone(&self.subscriptions),
+            Arc::clone(&self.state),
+        )
+    }
+
     /// Internal clone for spawning transport tasks.
     /// Shares all Arc state with the original.
     fn clone_internal(&self) -> Self {
@@ -572,10 +802,128 @@ impl Router {
 
         tokio::spawn(async move {
             let mut session: Option<Arc<Session>> = None;
+            let mut handshake_complete = false;
 
+            // Phase 1: Wait for Hello message with timeout
+            let handshake_result = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+                loop {
+                    match receiver.recv().await {
+                        Some(TransportEvent::Data(data)) => {
+                            // Decode and check if it's a Hello message
+                            match codec::decode(&data) {
+                                Ok((msg, _)) => {
+                                    if matches!(msg, Message::Hello(_)) {
+                                        return Some(data);
+                                    } else {
+                                        // Non-Hello message before handshake
+                                        warn!("Received non-Hello message before handshake from {}", addr);
+                                        return None;
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Decode error during handshake from {}: {}", addr, e);
+                                    return None;
+                                }
+                            }
+                        }
+                        Some(TransportEvent::Disconnected { .. }) | None => {
+                            return None;
+                        }
+                        Some(TransportEvent::Error(e)) => {
+                            error!("Transport error during handshake from {}: {}", addr, e);
+                            return None;
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await;
+
+            // Check handshake result
+            let hello_data = match handshake_result {
+                Ok(Some(data)) => data,
+                Ok(None) => {
+                    debug!("Handshake failed for {}", addr);
+                    return;
+                }
+                Err(_) => {
+                    warn!("Handshake timeout for {} after {:?}", addr, HANDSHAKE_TIMEOUT);
+                    return;
+                }
+            };
+
+            // Process the Hello message
+            if let Ok((msg, frame)) = codec::decode(&hello_data) {
+                if let Some(response) = handle_message(
+                    &msg,
+                    &frame,
+                    &session,
+                    &sender,
+                    &sessions,
+                    &subscriptions,
+                    &state,
+                    &config,
+                    security_mode,
+                    &token_validator,
+                    &p2p_capabilities,
+                    &gesture_registry,
+                )
+                .await
+                {
+                    match response {
+                        MessageResult::NewSession(s) => {
+                            session = Some(s);
+                            handshake_complete = true;
+                        }
+                        MessageResult::Send(bytes) => {
+                            let _ = sender.send(bytes).await;
+                        }
+                        MessageResult::Disconnect => {
+                            info!("Disconnecting client {} due to auth failure during handshake", addr);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if !handshake_complete {
+                debug!("Handshake incomplete for {}", addr);
+                return;
+            }
+
+            // Phase 2: Main message loop (after successful handshake)
             while *running.read() {
                 match receiver.recv().await {
                     Some(TransportEvent::Data(data)) => {
+                        // Check rate limit before processing
+                        if config.rate_limiting_enabled {
+                            if let Some(ref s) = session {
+                                if !s.check_rate_limit(config.max_messages_per_second) {
+                                    warn!(
+                                        "Rate limit exceeded for session {} ({} msgs/sec > {})",
+                                        s.id,
+                                        s.messages_per_second(),
+                                        config.max_messages_per_second
+                                    );
+                                    // Send error and continue (don't disconnect for rate limiting)
+                                    let error = Message::Error(ErrorMessage {
+                                        code: 429, // Too Many Requests
+                                        message: format!(
+                                            "Rate limit exceeded: {} messages/second",
+                                            config.max_messages_per_second
+                                        ),
+                                        address: None,
+                                        correlation_id: None,
+                                    });
+                                    if let Ok(bytes) = codec::encode(&error) {
+                                        let _ = sender.send(bytes).await;
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
                         // Decode message
                         match codec::decode(&data) {
                             Ok((msg, frame)) => {
@@ -607,8 +955,7 @@ impl Router {
                                             }
                                         }
                                         MessageResult::Broadcast(bytes, exclude) => {
-                                            broadcast_to_subscribers(&bytes, &sessions, &exclude)
-                                                .await;
+                                            broadcast_to_subscribers(&bytes, &sessions, &exclude);
                                         }
                                         MessageResult::Disconnect => {
                                             info!(
@@ -1005,9 +1352,15 @@ async fn handle_message(
 
                     if let Ok(bytes) = codec::encode(&broadcast_msg) {
                         // Send to all subscribers (including sender for confirmation)
+                        // Use try_send for non-blocking broadcast with backpressure
                         for sub_session_id in subscribers {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                let _ = sub_session.send(bytes.clone()).await;
+                                if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                    warn!(
+                                        "Failed to send SET to {}: {} (buffer full, dropping)",
+                                        sub_session_id, e
+                                    );
+                                }
                             }
                         }
                     }
@@ -1128,12 +1481,18 @@ async fn handle_message(
                     p2p_capabilities.register(&session.id);
 
                     // Broadcast to subscribers of the announce address
+                    // Use try_send for non-blocking broadcast
                     let subscribers = subscriptions.find_subscribers(&pub_msg.address, None);
                     if let Ok(bytes) = codec::encode(msg) {
                         for sub_session_id in subscribers {
                             if sub_session_id != session.id {
                                 if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                    let _ = sub_session.send(bytes.clone()).await;
+                                    if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                        warn!(
+                                            "Failed to send P2P announce to {}: {} (buffer full)",
+                                            sub_session_id, e
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1155,6 +1514,7 @@ async fn handle_message(
                     match registry.process(pub_msg) {
                         GestureResult::Forward(messages) => {
                             // Forward all messages (may include flushed move + end)
+                            // Use try_send for non-blocking broadcast
                             for forward_msg in messages {
                                 let msg_to_send = Message::Publish(forward_msg.clone());
                                 let subscribers = subscriptions
@@ -1164,7 +1524,12 @@ async fn handle_message(
                                         if sub_session_id != session.id {
                                             if let Some(sub_session) = sessions.get(&sub_session_id)
                                             {
-                                                let _ = sub_session.send(bytes.clone()).await;
+                                                if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                                    warn!(
+                                                        "Failed to send gesture to {}: {} (buffer full)",
+                                                        sub_session_id, e
+                                                    );
+                                                }
                                             }
                                         }
                                     }
@@ -1186,12 +1551,17 @@ async fn handle_message(
             // Find subscribers
             let subscribers = subscriptions.find_subscribers(&pub_msg.address, signal_type);
 
-            // Broadcast
+            // Broadcast using try_send for non-blocking delivery
             if let Ok(bytes) = codec::encode(msg) {
                 for sub_session_id in subscribers {
                     if sub_session_id != session.id {
                         if let Some(sub_session) = sessions.get(&sub_session_id) {
-                            let _ = sub_session.send(bytes.clone()).await;
+                            if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                warn!(
+                                    "Failed to send PUBLISH to {}: {} (buffer full)",
+                                    sub_session_id, e
+                                );
+                            }
                         }
                     }
                 }
@@ -1339,7 +1709,12 @@ async fn handle_message(
                         if let Ok(bytes) = codec::encode(&broadcast_msg) {
                             for sub_session_id in subscribers {
                                 if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                    let _ = sub_session.send(bytes.clone()).await;
+                                    if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                        warn!(
+                                            "Failed to send bundled SET to {}: {} (buffer full)",
+                                            sub_session_id, e
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1360,7 +1735,12 @@ async fn handle_message(
                     for sub_session_id in subscribers {
                         if sub_session_id != session.id {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                let _ = sub_session.send(bytes.clone()).await;
+                                if let Err(e) = sub_session.try_send(bytes.clone()) {
+                                    warn!(
+                                        "Failed to send bundled PUBLISH to {}: {} (buffer full)",
+                                        sub_session_id, e
+                                    );
+                                }
                             }
                         }
                     }
@@ -1383,15 +1763,21 @@ async fn handle_message(
     }
 }
 
-/// Broadcast to all sessions except one
-async fn broadcast_to_subscribers(
+/// Broadcast to all sessions except one (non-blocking)
+fn broadcast_to_subscribers(
     data: &Bytes,
     sessions: &Arc<DashMap<SessionId, Arc<Session>>>,
     exclude: &SessionId,
 ) {
     for entry in sessions.iter() {
         if entry.key() != exclude {
-            let _ = entry.value().send(data.clone()).await;
+            if let Err(e) = entry.value().try_send(data.clone()) {
+                warn!(
+                    "Failed to broadcast to {}: {} (buffer full)",
+                    entry.key(),
+                    e
+                );
+            }
         }
     }
 }
