@@ -32,8 +32,8 @@ osc-server = ["clasp-router/osc-server"]
 
 [dependencies]
 # Published crates from crates.io
-clasp-core = "3.0"
-clasp-router = "3.0"
+clasp-core = "3.2"
+clasp-router = "3.2"
 
 # Runtime
 tokio = { version = "1", features = ["full"] }
