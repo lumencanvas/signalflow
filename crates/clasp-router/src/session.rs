@@ -13,6 +13,11 @@ use uuid::Uuid;
 /// Session identifier
 pub type SessionId = String;
 
+/// Drop tracking configuration
+const DROP_NOTIFICATION_THRESHOLD: u32 = 100; // Drops before notification
+const DROP_WINDOW_SECONDS: u64 = 10; // Time window for counting drops
+const DROP_NOTIFICATION_COOLDOWN_SECONDS: u64 = 10; // Min time between notifications
+
 /// A connected client session
 pub struct Session {
     /// Unique session ID
@@ -41,6 +46,14 @@ pub struct Session {
     messages_this_second: AtomicU32,
     /// The second when the message count was last reset (Unix timestamp)
     last_rate_limit_second: AtomicU64,
+    /// Dropped messages in the current window
+    drops_in_window: AtomicU32,
+    /// Start of the current drop counting window (Unix timestamp)
+    drop_window_start: AtomicU64,
+    /// Last time a drop notification was sent (Unix timestamp)
+    last_drop_notification: AtomicU64,
+    /// Total drops since session started
+    total_drops: AtomicU64,
 }
 
 impl Session {
@@ -61,6 +74,10 @@ impl Session {
             scopes: Vec::new(),
             messages_this_second: AtomicU32::new(0),
             last_rate_limit_second: AtomicU64::new(0),
+            drops_in_window: AtomicU32::new(0),
+            drop_window_start: AtomicU64::new(0),
+            last_drop_notification: AtomicU64::new(0),
+            total_drops: AtomicU64::new(0),
         }
     }
 
@@ -189,6 +206,51 @@ impl Session {
     /// Get current message count for this second
     pub fn messages_per_second(&self) -> u32 {
         self.messages_this_second.load(Ordering::Relaxed)
+    }
+
+    /// Record a dropped message and check if notification is needed.
+    /// Returns true if a drop notification should be sent to the client.
+    pub fn record_drop(&self) -> bool {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Increment total drops
+        self.total_drops.fetch_add(1, Ordering::Relaxed);
+
+        // Check if we're in a new window
+        let window_start = self.drop_window_start.load(Ordering::Relaxed);
+        if now >= window_start + DROP_WINDOW_SECONDS {
+            // New window, reset counter
+            self.drops_in_window.store(1, Ordering::Relaxed);
+            self.drop_window_start.store(now, Ordering::Relaxed);
+            return false; // First drop in new window, don't notify yet
+        }
+
+        // Same window, increment and check threshold
+        let drops = self.drops_in_window.fetch_add(1, Ordering::Relaxed) + 1;
+        if drops >= DROP_NOTIFICATION_THRESHOLD {
+            // Check cooldown
+            let last_notification = self.last_drop_notification.load(Ordering::Relaxed);
+            if now >= last_notification + DROP_NOTIFICATION_COOLDOWN_SECONDS {
+                // Update notification time and signal to send notification
+                self.last_drop_notification.store(now, Ordering::Relaxed);
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Get the total number of dropped messages for this session
+    pub fn total_drops(&self) -> u64 {
+        self.total_drops.load(Ordering::Relaxed)
+    }
+
+    /// Get the drops in the current window
+    pub fn drops_in_window(&self) -> u32 {
+        self.drops_in_window.load(Ordering::Relaxed)
     }
 }
 

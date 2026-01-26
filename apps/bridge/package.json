@@ -1,6 +1,6 @@
 {
   "name": "clasp-bridge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "CLASP Bridge - Universal Creative Protocol Bridge",
   "homepage": "https://clasp.to",
   "main": "electron/main.js",

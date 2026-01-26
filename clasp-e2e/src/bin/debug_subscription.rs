@@ -34,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         gesture_coalesce_interval_ms: 0,
         max_messages_per_second: 0,
         rate_limiting_enabled: false,
+        ..Default::default()
     });
 
     let addr_clone = addr.clone();

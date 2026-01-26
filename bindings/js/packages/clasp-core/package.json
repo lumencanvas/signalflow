@@ -1,6 +1,6 @@
 {
   "name": "@clasp-to/core",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "CLASP protocol client for JavaScript/TypeScript - Creative Low-Latency Application Streaming Protocol",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

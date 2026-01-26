@@ -27,9 +27,10 @@
 use anyhow::Result;
 use clap::Parser;
 use clasp_core::SecurityMode;
-use clasp_router::{MultiProtocolConfig, Router, RouterConfig};
+use clasp_router::{MultiProtocolConfig, Router, RouterConfig, RouterStateConfig};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -92,6 +93,20 @@ struct Cli {
     /// Disable WebSocket (use other protocols only)
     #[arg(long)]
     no_websocket: bool,
+
+    /// Parameter TTL in seconds (0 = disabled, default: 3600 = 1 hour)
+    /// Parameters not updated within this time will be automatically removed.
+    #[arg(long, default_value = "3600")]
+    param_ttl: u64,
+
+    /// Signal TTL in seconds (0 = disabled, default: 3600 = 1 hour)
+    /// Signal definitions not accessed within this time will be automatically removed.
+    #[arg(long, default_value = "3600")]
+    signal_ttl: u64,
+
+    /// Disable all TTL expiration (parameters and signals persist indefinitely)
+    #[arg(long)]
+    no_ttl: bool,
 }
 
 #[tokio::main]
@@ -109,6 +124,37 @@ async fn main() -> Result<()> {
     tracing::info!("╔══════════════════════════════════════════════════════════════╗");
     tracing::info!("║           CLASP Multi-Protocol Relay Server                  ║");
     tracing::info!("╚══════════════════════════════════════════════════════════════╝");
+
+    // Create state store configuration based on CLI flags
+    let state_config = if cli.no_ttl {
+        tracing::info!("TTL disabled: parameters and signals persist indefinitely");
+        RouterStateConfig::unlimited()
+    } else {
+        let param_ttl = if cli.param_ttl > 0 {
+            Some(Duration::from_secs(cli.param_ttl))
+        } else {
+            None
+        };
+        let signal_ttl = if cli.signal_ttl > 0 {
+            Some(Duration::from_secs(cli.signal_ttl))
+        } else {
+            None
+        };
+        tracing::info!(
+            "TTL enabled: param_ttl={:?}, signal_ttl={:?}",
+            param_ttl,
+            signal_ttl
+        );
+        RouterStateConfig {
+            param_config: clasp_core::state::StateStoreConfig {
+                max_params: Some(100_000),
+                param_ttl,
+                eviction: clasp_core::state::EvictionStrategy::Lru,
+            },
+            signal_ttl,
+            max_signals: Some(100_000),
+        }
+    };
 
     // Create router configuration
     let config = RouterConfig {
@@ -128,6 +174,7 @@ async fn main() -> Result<()> {
         gesture_coalesce_interval_ms: 16,
         max_messages_per_second: 0, // No rate limiting for public relay
         rate_limiting_enabled: false,
+        state_config,
     };
 
     let router = Router::new(config);
@@ -247,6 +294,15 @@ async fn main() -> Result<()> {
         cli.max_sessions,
         cli.session_timeout
     );
+    if cli.no_ttl {
+        tracing::info!("TTL: disabled (unlimited parameter lifetime)");
+    } else {
+        tracing::info!(
+            "TTL: param={}s, signal={}s",
+            cli.param_ttl,
+            cli.signal_ttl
+        );
+    }
     tracing::info!("────────────────────────────────────────────────────────────────");
 
     // Create multi-protocol config

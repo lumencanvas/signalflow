@@ -155,6 +155,35 @@ let osc_config = OscServerConfig {
 | `gesture_coalesce_interval_ms` | u64 | 16 | Coalesce interval (16ms = 60fps) |
 | `max_messages_per_second` | u32 | 1000 | Rate limit per client (0 = unlimited) |
 | `rate_limiting_enabled` | bool | true | Enable rate limiting |
+| `state_config` | RouterStateConfig | Default (1h TTL) | State store configuration |
+
+### State Configuration (TTL)
+
+Parameters and signals can be configured to expire after a time-to-live period:
+
+```rust
+use clasp_router::{RouterConfig, RouterStateConfig};
+use std::time::Duration;
+
+let config = RouterConfig {
+    state_config: RouterStateConfig {
+        param_config: clasp_core::state::StateStoreConfig {
+            max_params: Some(100_000),
+            param_ttl: Some(Duration::from_secs(3600)), // 1 hour
+            eviction: clasp_core::state::EvictionStrategy::Lru,
+        },
+        signal_ttl: Some(Duration::from_secs(3600)), // 1 hour
+        max_signals: Some(100_000),
+    },
+    ..Default::default()
+};
+
+// Or use unlimited (no expiration):
+let unlimited_config = RouterConfig {
+    state_config: RouterStateConfig::unlimited(),
+    ..Default::default()
+};
+```
 
 ### Rate Limiting
 
@@ -169,6 +198,10 @@ let config = RouterConfig {
 ```
 
 When a client exceeds the rate limit, excess messages are dropped and a warning is logged.
+
+### Buffer Overflow Notifications
+
+When a client's receive buffer fills and messages are dropped, the router sends an ERROR 503 notification after 100 drops within 10 seconds. This helps slow clients detect they're missing messages. Notifications are rate-limited to 1 per 10 seconds per session.
 
 ## Architecture
 

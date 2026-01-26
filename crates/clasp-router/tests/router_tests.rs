@@ -33,6 +33,7 @@ async fn test_router_custom_config() {
         gesture_coalesce_interval_ms: 0,
         max_messages_per_second: 0,
         rate_limiting_enabled: false,
+        ..Default::default()
     };
     let router = Router::new(config);
     assert_eq!(router.session_count(), 0);

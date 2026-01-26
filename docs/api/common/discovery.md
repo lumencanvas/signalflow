@@ -14,12 +14,62 @@ Routers and desktop tools can advertise themselves over mDNS and/or UDP; embedde
 1. Discover available routers.
 2. Present choices to the user or auto‑select based on policy.
 
+### WAN Discovery (Rendezvous)
+
+For devices across the internet, CLASP provides a **rendezvous server** for WAN discovery:
+
+- **REST API**: Register, discover, refresh, and unregister devices via HTTP.
+- **Automatic keepalive**: Clients automatically refresh their registration before TTL expires.
+- **Tag filtering**: Discover devices by tag (e.g., "studio", "live", "dev").
+
+#### Rendezvous Configuration
+
+```rust
+use clasp_discovery::{Discovery, DiscoveryConfig, DeviceRegistration};
+use std::time::Duration;
+
+let config = DiscoveryConfig {
+    mdns: true,
+    broadcast: true,
+    rendezvous_url: Some("https://rendezvous.example.com".into()),
+    rendezvous_refresh_interval: Duration::from_secs(120), // Refresh every 2 minutes
+    rendezvous_tag: Some("studio".into()), // Filter by tag
+    ..Default::default()
+};
+
+let mut discovery = Discovery::with_config(config);
+
+// Register this device with the rendezvous server
+discovery.register_with_rendezvous(DeviceRegistration {
+    name: "My Device".into(),
+    endpoints: [("ws".into(), "wss://my-device.local:7330".into())].into(),
+    tags: vec!["studio".into()],
+    ..Default::default()
+});
+```
+
+#### Cascade Discovery
+
+Use `discover_all()` to try all discovery methods in sequence:
+
+```rust
+// Tries: mDNS → broadcast → rendezvous
+let devices = discovery.discover_all().await?;
+```
+
+Or use `discover_wan()` for rendezvous-only discovery:
+
+```rust
+let wan_devices = discovery.discover_wan().await?;
+```
+
 ### Browser Considerations
 
 Browsers cannot do raw mDNS or arbitrary UDP:
 
 - Browser clients usually connect to a known WebSocket endpoint (`wss://host:7330/clasp`).
 - A separate discovery UI or rendezvous service can provide that endpoint.
+- The rendezvous REST API is browser-accessible via fetch/XHR.
 
 ### Manual Configuration
 

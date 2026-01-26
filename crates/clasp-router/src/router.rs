@@ -49,7 +49,7 @@ use crate::{
     gesture::{GestureRegistry, GestureResult},
     p2p::{analyze_address, P2PAddressType, P2PCapabilities},
     session::{Session, SessionId},
-    state::RouterState,
+    state::{RouterState, RouterStateConfig},
     subscription::{Subscription, SubscriptionManager},
 };
 use std::time::Duration;
@@ -162,6 +162,8 @@ pub struct RouterConfig {
     pub max_messages_per_second: u32,
     /// Enable rate limiting
     pub rate_limiting_enabled: bool,
+    /// State store configuration (TTL, limits)
+    pub state_config: RouterStateConfig,
 }
 
 impl Default for RouterConfig {
@@ -183,6 +185,7 @@ impl Default for RouterConfig {
             gesture_coalesce_interval_ms: 16,
             max_messages_per_second: 1000, // 1000 msgs/sec default
             rate_limiting_enabled: true,
+            state_config: RouterStateConfig::default(), // 1 hour TTL by default
         }
     }
 }
@@ -263,11 +266,13 @@ impl Router {
             None
         };
 
+        let state = Arc::new(RouterState::with_config(config.state_config.clone()));
+
         Self {
             config,
             sessions: Arc::new(DashMap::new()),
             subscriptions: Arc::new(SubscriptionManager::new()),
-            state: Arc::new(RouterState::new()),
+            state,
             running: Arc::new(RwLock::new(false)),
             token_validator: None,
             p2p_capabilities: Arc::new(P2PCapabilities::new()),
@@ -401,12 +406,11 @@ impl Router {
                     if let Ok(bytes) = codec::encode(&msg) {
                         for sub_session_id in subscribers {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                    warn!(
-                                        "Failed to flush gesture to {}: {} (buffer full)",
-                                        sub_session_id, e
-                                    );
-                                }
+                                try_send_with_drop_tracking_sync(
+                                    sub_session.value(),
+                                    bytes.clone(),
+                                    &sub_session_id,
+                                );
                             }
                         }
                     }
@@ -1402,12 +1406,11 @@ async fn handle_message(
                         // Use try_send for non-blocking broadcast with backpressure
                         for sub_session_id in subscribers {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                    warn!(
-                                        "Failed to send SET to {}: {} (buffer full, dropping)",
-                                        sub_session_id, e
-                                    );
-                                }
+                                try_send_with_drop_tracking_sync(
+                                    sub_session.value(),
+                                    bytes.clone(),
+                                    &sub_session_id,
+                                );
                             }
                         }
                     }
@@ -1534,12 +1537,11 @@ async fn handle_message(
                         for sub_session_id in subscribers {
                             if sub_session_id != session.id {
                                 if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                    if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                        warn!(
-                                            "Failed to send P2P announce to {}: {} (buffer full)",
-                                            sub_session_id, e
-                                        );
-                                    }
+                                    try_send_with_drop_tracking_sync(
+                                        sub_session.value(),
+                                        bytes.clone(),
+                                        &sub_session_id,
+                                    );
                                 }
                             }
                         }
@@ -1571,13 +1573,11 @@ async fn handle_message(
                                         if sub_session_id != session.id {
                                             if let Some(sub_session) = sessions.get(&sub_session_id)
                                             {
-                                                if let Err(e) = sub_session.try_send(bytes.clone())
-                                                {
-                                                    warn!(
-                                                        "Failed to send gesture to {}: {} (buffer full)",
-                                                        sub_session_id, e
-                                                    );
-                                                }
+                                                try_send_with_drop_tracking_sync(
+                                                    sub_session.value(),
+                                                    bytes.clone(),
+                                                    &sub_session_id,
+                                                );
                                             }
                                         }
                                     }
@@ -1604,12 +1604,11 @@ async fn handle_message(
                 for sub_session_id in subscribers {
                     if sub_session_id != session.id {
                         if let Some(sub_session) = sessions.get(&sub_session_id) {
-                            if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                warn!(
-                                    "Failed to send PUBLISH to {}: {} (buffer full)",
-                                    sub_session_id, e
-                                );
-                            }
+                            try_send_with_drop_tracking_sync(
+                                sub_session.value(),
+                                bytes.clone(),
+                                &sub_session_id,
+                            );
                         }
                     }
                 }
@@ -1757,12 +1756,11 @@ async fn handle_message(
                         if let Ok(bytes) = codec::encode(&broadcast_msg) {
                             for sub_session_id in subscribers {
                                 if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                    if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                        warn!(
-                                            "Failed to send bundled SET to {}: {} (buffer full)",
-                                            sub_session_id, e
-                                        );
-                                    }
+                                    try_send_with_drop_tracking_sync(
+                                        sub_session.value(),
+                                        bytes.clone(),
+                                        &sub_session_id,
+                                    );
                                 }
                             }
                         }
@@ -1783,12 +1781,11 @@ async fn handle_message(
                     for sub_session_id in subscribers {
                         if sub_session_id != session.id {
                             if let Some(sub_session) = sessions.get(&sub_session_id) {
-                                if let Err(e) = sub_session.try_send(bytes.clone()) {
-                                    warn!(
-                                        "Failed to send bundled PUBLISH to {}: {} (buffer full)",
-                                        sub_session_id, e
-                                    );
-                                }
+                                try_send_with_drop_tracking_sync(
+                                    sub_session.value(),
+                                    bytes.clone(),
+                                    &sub_session_id,
+                                );
                             }
                         }
                     }
@@ -1811,6 +1808,51 @@ async fn handle_message(
     }
 }
 
+/// Try to send a message to a session with drop tracking.
+/// Records the drop and sends notification when threshold is exceeded.
+fn try_send_with_drop_tracking_sync(
+    session: &Arc<Session>,
+    data: Bytes,
+    session_id: &SessionId,
+) {
+    if let Err(e) = session.try_send(data) {
+        warn!(
+            "Failed to send to {}: {} (buffer full, dropping)",
+            session_id, e
+        );
+
+        // Record the drop and check if we should notify
+        if session.record_drop() {
+            // Send drop notification asynchronously
+            let session = Arc::clone(session);
+            let session_id = session_id.clone();
+            let drops = session.drops_in_window();
+            tokio::spawn(async move {
+                let error = Message::Error(ErrorMessage {
+                    code: 503, // Service Unavailable
+                    message: format!(
+                        "Buffer overflow: messages being dropped ({} drops in last 10 seconds)",
+                        drops
+                    ),
+                    address: None,
+                    correlation_id: None,
+                });
+                if let Ok(error_bytes) = codec::encode(&error) {
+                    // Use send() not try_send() for the notification to ensure it gets through
+                    if let Err(e) = session.send(error_bytes).await {
+                        warn!("Failed to send drop notification to {}: {}", session_id, e);
+                    } else {
+                        info!(
+                            "Sent buffer overflow notification to session {} ({} drops)",
+                            session_id, drops
+                        );
+                    }
+                }
+            });
+        }
+    }
+}
+
 /// Broadcast to all sessions except one (non-blocking)
 fn broadcast_to_subscribers(
     data: &Bytes,
@@ -1819,13 +1861,7 @@ fn broadcast_to_subscribers(
 ) {
     for entry in sessions.iter() {
         if entry.key() != exclude {
-            if let Err(e) = entry.value().try_send(data.clone()) {
-                warn!(
-                    "Failed to broadcast to {}: {} (buffer full)",
-                    entry.key(),
-                    e
-                );
-            }
+            try_send_with_drop_tracking_sync(entry.value(), data.clone(), entry.key());
         }
     }
 }

@@ -1,0 +1,14 @@
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/serde-375b64a36c3c197c.d: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/libserde-375b64a36c3c197c.rlib: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/libserde-375b64a36c3c197c.rmeta: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/serde-1271ce5b4ecddfd5/out

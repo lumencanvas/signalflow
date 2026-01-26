@@ -108,7 +108,7 @@ pub use p2p::{analyze_address, P2PAddressType, P2PCapabilities};
 pub use router::QuicServerConfig;
 pub use router::{MultiProtocolConfig, Router, RouterConfig, RouterConfigBuilder, TransportConfig};
 pub use session::{Session, SessionId};
-pub use state::RouterState;
+pub use state::{RouterState, RouterStateConfig};
 pub use subscription::SubscriptionManager;
 
 // Re-export adapter configs

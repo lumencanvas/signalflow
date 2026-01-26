@@ -1,0 +1,14 @@
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/thiserror-a92071a484aca9c5.d: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/thiserror-fe846bb29e958ccb/out/private.rs
+
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/libthiserror-a92071a484aca9c5.rlib: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/thiserror-fe846bb29e958ccb/out/private.rs
+
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/deps/libthiserror-a92071a484aca9c5.rmeta: /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/thiserror-fe846bb29e958ccb/out/private.rs
+
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/Users/obsidian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/thiserror-fe846bb29e958ccb/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/obsidian/Projects/lumencanvas/clasp/deploy/relay/target/release/build/thiserror-fe846bb29e958ccb/out

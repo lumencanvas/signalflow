@@ -158,6 +158,7 @@ async fn test_discovery_with_config() {
         broadcast: true,
         broadcast_port: 7331,
         timeout: Duration::from_secs(10),
+        ..Default::default()
     };
 
     let _discovery = Discovery::with_config(config);

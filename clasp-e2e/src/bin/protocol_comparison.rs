@@ -256,6 +256,7 @@ async fn main() {
         gesture_coalesce_interval_ms: 0,
         max_messages_per_second: 0,
         rate_limiting_enabled: false,
+        ..Default::default()
     });
 
     let addr = format!("127.0.0.1:{}", port);

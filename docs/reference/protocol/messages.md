@@ -318,6 +318,35 @@ Error response.
 - 400-499: State errors
 - 500-599: Router errors
 
+**Common error codes:**
+
+| Code | Name | Description |
+|------|------|-------------|
+| 400 | Bad Request | Invalid message format or parameters |
+| 403 | Forbidden | Permission denied for this operation |
+| 404 | Not Found | Address or resource not found |
+| 409 | Conflict | Revision conflict (optimistic locking) |
+| 423 | Locked | Parameter is locked by another session |
+| 503 | Buffer Overflow | Client buffer full, messages being dropped |
+
+#### Buffer Overflow Notification (503)
+
+When a client's receive buffer fills up and messages are being dropped, the router sends an ERROR 503 notification:
+
+```javascript
+{
+  type: "ERROR",
+  code: 503,
+  message: "Buffer overflow: messages being dropped (100 drops in last 10 seconds)"
+}
+```
+
+This notification is rate-limited to 1 per 10 seconds per session to avoid flooding slow clients. Clients receiving this error should:
+
+1. Process incoming messages faster
+2. Reduce subscription scope
+3. Increase local buffer size if possible
+
 ## Introspection Messages
 
 ### QUERY (Client → Router)

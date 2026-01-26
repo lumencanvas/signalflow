@@ -112,6 +112,7 @@ impl TestRouter {
             gesture_coalesce_interval_ms: 16,
             max_messages_per_second: 0, // Disable rate limiting for tests
             rate_limiting_enabled: false,
+            state_config: clasp_router::RouterStateConfig::unlimited(), // No TTL in tests
         })
         .await
     }

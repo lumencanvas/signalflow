@@ -49,6 +49,7 @@ impl TestRouter {
             gesture_coalesce_interval_ms: 0,
             max_messages_per_second: 0,
             rate_limiting_enabled: false,
+        ..Default::default()
         });
 
         let handle = tokio::spawn(async move {

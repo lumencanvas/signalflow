@@ -231,6 +231,7 @@ async fn test_timeline_routing() {
         gesture_coalesce_interval_ms: 0,
         max_messages_per_second: 0,
         rate_limiting_enabled: false,
+        ..Default::default()
     })
     .await;
 

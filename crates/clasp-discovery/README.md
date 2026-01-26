@@ -6,39 +6,100 @@ Network discovery for CLASP (Creative Low-Latency Application Streaming Protocol
 
 - **mDNS/DNS-SD** - Zero-configuration discovery on local networks
 - **UDP Broadcast** - Fallback discovery when mDNS is unavailable
-- **Service Announcement** - Advertise CLASP services to the network
+- **Rendezvous Server** - WAN discovery via HTTP REST API
+- **Cascade Discovery** - Automatically try mDNS → broadcast → rendezvous
+- **Auto-Keepalive** - Automatic registration refresh with rendezvous server
 
-## Usage
+## Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `mdns` | mDNS/DNS-SD discovery (default) |
+| `broadcast` | UDP broadcast discovery (default) |
+| `rendezvous` | WAN discovery via rendezvous server |
+
+## Basic Usage
 
 ```rust
 use clasp_discovery::Discovery;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let discovery = Discovery::new().await?;
+    let mut discovery = Discovery::new();
 
     // Start discovering devices
-    discovery.start().await?;
+    let mut rx = discovery.start().await?;
 
-    // Wait for devices
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-
-    // Get discovered devices
-    for device in discovery.devices() {
-        println!("Found: {} at {:?}", device.name, device.endpoints);
+    // Process discovery events
+    while let Some(event) = rx.recv().await {
+        match event {
+            clasp_discovery::DiscoveryEvent::Found(device) => {
+                println!("Found: {} at {:?}", device.name, device.endpoints);
+            }
+            clasp_discovery::DiscoveryEvent::Lost(id) => {
+                println!("Lost device: {}", id);
+            }
+            clasp_discovery::DiscoveryEvent::Error(e) => {
+                eprintln!("Discovery error: {}", e);
+            }
+        }
     }
 
     Ok(())
 }
 ```
 
-## Service Announcement
+## WAN Discovery (Rendezvous)
+
+For discovery across the internet, use the rendezvous feature:
+
+```toml
+[dependencies]
+clasp-discovery = { version = "3.2", features = ["rendezvous"] }
+```
 
 ```rust
-use clasp_discovery::Discovery;
+use clasp_discovery::{Discovery, DiscoveryConfig, DeviceRegistration};
+use std::time::Duration;
 
-let discovery = Discovery::new().await?;
-discovery.announce("My CLASP Server", 7330).await?;
+let config = DiscoveryConfig {
+    rendezvous_url: Some("https://rendezvous.example.com".into()),
+    rendezvous_refresh_interval: Duration::from_secs(120),
+    rendezvous_tag: Some("studio".into()),
+    ..Default::default()
+};
+
+let mut discovery = Discovery::with_config(config);
+
+// Register this device (starts automatic keepalive)
+discovery.register_with_rendezvous(DeviceRegistration {
+    name: "My Device".into(),
+    endpoints: [("ws".into(), "wss://my-device.local:7330".into())].into(),
+    tags: vec!["studio".into()],
+    ..Default::default()
+});
+
+// Discover all devices (mDNS → broadcast → rendezvous)
+let devices = discovery.discover_all().await?;
+
+// Or discover WAN devices only
+let wan_devices = discovery.discover_wan().await?;
+```
+
+## Rendezvous Server
+
+Run a rendezvous server for WAN discovery:
+
+```rust
+use clasp_discovery::rendezvous::{RendezvousServer, RendezvousConfig};
+
+let server = RendezvousServer::new(RendezvousConfig {
+    ttl: 300,           // 5 minute registration TTL
+    cleanup_interval: 60,
+    ..Default::default()
+});
+
+server.serve("0.0.0.0:7340").await?;
 ```
 
 ## mDNS Service Type

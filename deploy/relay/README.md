@@ -87,8 +87,23 @@ Options:
       --max-sessions <N>       Maximum clients [default: 1000]
       --session-timeout <SEC>  Session timeout [default: 300]
       --no-websocket           Disable WebSocket (use other protocols only)
+      --param-ttl <SEC>        Parameter TTL in seconds [default: 3600]
+      --signal-ttl <SEC>       Signal TTL in seconds [default: 3600]
+      --no-ttl                 Disable TTL (parameters persist indefinitely)
   -h, --help                   Print help
   -V, --version                Print version
+```
+
+### TTL Configuration
+
+By default, parameters and signals expire after 1 hour (3600 seconds) of inactivity to prevent memory accumulation. Configure with:
+
+```bash
+# 5 minute TTL for testing
+clasp-relay --param-ttl 300 --signal-ttl 300
+
+# Disable TTL (not recommended for long-running relays)
+clasp-relay --no-ttl
 ```
 
 ### Multi-Protocol Examples
