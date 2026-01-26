@@ -44,6 +44,11 @@ Example: cpsk_a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
 - Cryptographically secure random generation
 - Suitable for capability tokens requiring strong randomness
 
+**Note (v3.1.1):** Token generation was upgraded from a weak time-seeded LCG to UUID v4.
+This change **only affects how new tokens are generated** - all capability/scope mechanics
+(scoped permissions, pattern matching, token validation) remain unchanged. Existing
+registered tokens continue to work.
+
 ### TokenInfo Structure
 ```rust
 pub struct TokenInfo {

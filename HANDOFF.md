@@ -102,6 +102,14 @@ Implemented 8 security and stability fixes across the CLASP codebase, addressing
 - Token format changed from base62 to hex: `cpsk_<32-char-uuid>`
 - Added tests: `test_cpsk_token_uniqueness` (10K tokens), `test_cpsk_token_format`
 
+**Clarification**: This change **only affects token generation** (`CpskValidator::generate_token()`).
+All capability and scope mechanics remain unchanged:
+- Scoped permissions (`read:/path/**`, `write:/lights/*`, `admin:/**`) - unchanged
+- Token validation (HashMap lookup by token string) - unchanged
+- TokenInfo structure (scopes, expiration, metadata) - unchanged
+- Pattern matching for authorization - unchanged
+- Existing registered tokens - still valid
+
 ### Phase 2A: StateStore Limits
 **File**: `crates/clasp-core/src/state.rs`
 
