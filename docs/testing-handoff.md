@@ -1,10 +1,10 @@
-# Testing Infrastructure Handoff
+# Session Handoff
 
 **Date:** 2026-01-26
-**Version:** v3.3.0
-**Session Focus:** P2P API extensions, data transfer, routing modes, and release
+**Version:** v3.3.0 (post-release updates)
+**Session Focus:** P2P API extensions, rendezvous integration, release
 
-## What Was Accomplished in v3.3.0
+## What Was Accomplished
 
 ### 1. P2P Client API Extensions (`crates/clasp-client/src/client.rs`)
 - **`send_p2p(peer_session_id, data, reliable)`** - Send data directly to peers via WebRTC
@@ -27,16 +27,36 @@
 - **Test 7:** `test_p2p_routing_mode()` - Verifies routing mode affects send path
 - **Test 8:** `test_p2p_nonexistent_peer()` - Verifies connection timeout handling
 
-### 5. Documentation Updates
-- `crates/clasp-client/README.md` - Added P2P example with new API
-- `docs/api/common/p2p.md` - Documented new methods and events
-- `docs/testing.md` - Updated test commands for clasp-e2e
+### 5. Rendezvous Server Integration (`deploy/relay/`)
+- **Integrated rendezvous into relay server** - No separate rendezvous subdomain needed
+- Rendezvous enabled by default on port 7340
+- New CLI flags: `--rendezvous-port`, `--rendezvous-ttl`
+- Updated all examples to use `https://relay.clasp.to` instead of `rendezvous.clasp.to`
 
 ### 6. Release v3.3.0
 - All Rust crates published to crates.io
 - `@clasp-to/core` published to npm
 - `clasp-to` published to PyPI
 - GitHub release created with tag v3.3.0
+
+## Relay Server Architecture
+
+The relay server now includes:
+
+| Port | Service |
+|------|---------|
+| 7330 | WebSocket (CLASP protocol) |
+| 7340 | Rendezvous HTTP API |
+| 7331 | QUIC (optional, requires TLS certs) |
+| 1883 | MQTT (optional) |
+| 8000 | OSC (optional) |
+
+**Rendezvous API Endpoints:**
+- `POST /api/v1/register` - Register device
+- `GET /api/v1/discover` - Discover devices (filter by tag/feature)
+- `POST /api/v1/refresh/:id` - Refresh registration
+- `DELETE /api/v1/unregister/:id` - Unregister device
+- `GET /api/v1/health` - Health check
 
 ## Current State
 
@@ -53,12 +73,11 @@
 
 **Well Covered:**
 - ✅ Core protocol & framing (`clasp-core/tests/*`)
-- ✅ HTTP/MQTT/WebSocket bridge integration (`clasp-e2e/src/bin/*_integration_tests.rs`)
-- ✅ Bundle messages (`bundle_tests.rs`)
-- ✅ Lock & basic conflict resolution (`lock_tests.rs`)
-- ✅ Security model (JWT/CPSK tokens, scopes) (`security_tests.rs`, `security_pentest.rs`)
-- ✅ QUIC transport with TLS (`quic_tests.rs`)
-- ✅ **P2P connection, data transfer, routing modes** (`p2p-connection-tests.rs`) - NEW in v3.3.0
+- ✅ HTTP/MQTT/WebSocket bridge integration
+- ✅ Bundle messages, locks, conflict resolution
+- ✅ Security model (JWT/CPSK tokens, scopes)
+- ✅ QUIC transport with TLS
+- ✅ P2P connection, data transfer, routing modes
 
 **Remaining Gaps (Medium Priority):**
 - ⚠️ Token replay attack scenarios
@@ -66,73 +85,42 @@
 - ⚠️ TLS-encrypted WebSocket (`wss://`) tests
 - ⚠️ Multi-peer P2P mesh tests (4+ peers)
 
-**Low Priority / Future:**
-- Serial/BLE transport integration tests
-- Network degradation simulation (packet loss, latency)
-- NAT traversal edge cases (requires specific network topology)
-
-## How to Run Tests
-
-```bash
-# All workspace tests (fast)
-cargo test --workspace
-
-# P2P tests specifically
-cargo run -p clasp-e2e --bin p2p-connection-tests --features p2p
-
-# Full E2E suite
-cargo run -p clasp-e2e --bin run-all-tests
-
-# Python binding tests
-cd bindings/python && pytest
-```
-
-## Files Modified in v3.3.0
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `crates/clasp-client/src/client.rs` | Added `send_p2p`, `set_p2p_routing_mode`, `p2p_routing_mode` |
-| `crates/clasp-client/src/lib.rs` | Re-exported `SendResult`, `RoutingMode` |
-| `crates/clasp-client/src/p2p.rs` | Wired data callbacks, added connection timeout |
-| `crates/clasp-transport/src/webrtc.rs` | Added `on_data` callback and `DataCallback` type |
-| `clasp-e2e/src/bin/p2p_connection_tests.rs` | Added Tests 6, 7, 8 |
-| `crates/clasp-client/README.md` | Added P2P example |
-| `docs/api/common/p2p.md` | Documented new API |
-| `docs/testing.md` | Updated crate references |
-| All `Cargo.toml` / `package.json` / `pyproject.toml` | Version bump to 3.3.0 |
+| `deploy/relay/Cargo.toml` | Added clasp-discovery dependency, rendezvous feature |
+| `deploy/relay/src/main.rs` | Integrated rendezvous server startup |
+| `examples/*/p2p*.{js,py,rs}` | Updated to use `relay.clasp.to` |
+| `docs/api/common/discovery.md` | Documented relay integration |
+| `crates/clasp-discovery/README.md` | Updated rendezvous docs |
 
-## Next Steps (Priority Order)
+## Deployment Notes
+
+For production deployment of `relay.clasp.to`:
+
+1. **Reverse proxy (nginx/traefik)** should route:
+   - `wss://relay.clasp.to` → port 7330 (WebSocket)
+   - `https://relay.clasp.to/api/v1/*` → port 7340 (Rendezvous)
+
+2. **Or use single port** with path-based routing if using an ingress controller
+
+3. **Run relay with:**
+   ```bash
+   clasp-relay --host 0.0.0.0 --ws-port 7330 --rendezvous-port 7340
+   ```
+
+## Next Steps
+
+### Immediate
+1. Deploy updated relay to `relay.clasp.to` with rendezvous enabled
+2. Set up reverse proxy to route `/api/v1/*` to rendezvous port
 
 ### Medium Priority
-1. **Security: Token replay tests** (`security_pentest.rs`):
-   - Attempt to reuse an expired/revoked token
-   - Verify router rejects it
-
-2. **Transports: TCP large message test** (`transport_tests.rs`):
-   - Send message >64KB over TCP
-   - Verify frame boundary detection still works
-
-3. **Transports: TLS WebSocket test**:
-   - If `wss://` support exists, test TLS handshake with self-signed cert
-   - Verify CPSK auth still works over encrypted transport
-
-### Low Priority / Future
-4. Multi-peer P2P mesh tests (4+ peers, verify all can communicate)
-5. Serial/BLE transport integration tests (if those transports are implemented)
-6. Network degradation simulation (packet loss, latency injection)
-
-## Environment-Sensitive Tests
-
-Some test scenarios require specific network conditions:
-- NAT traversal edge cases
-- TURN server failover
-- Network degradation
-
-**Recommendation:** Keep these as optional/manual tests:
-```rust
-if std::env::var("CLASP_P2P_NETWORK_TESTS").is_ok() { ... }
-```
+3. Token replay attack tests
+4. TCP large message tests
+5. TLS WebSocket tests
 
 ---
 
-**Status:** ✅ v3.3.0 RELEASED - All packages published, all tests passing
+**Status:** ✅ v3.3.0 RELEASED + Rendezvous integrated into relay
