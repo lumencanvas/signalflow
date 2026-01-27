@@ -47,10 +47,12 @@ USER clasp
 
 # WebSocket port
 EXPOSE 7330
+# Rendezvous API port
+EXPOSE 7340
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD timeout 1 bash -c 'cat < /dev/null > /dev/tcp/localhost/7330' || exit 1
 
 ENTRYPOINT ["clasp-relay"]
-CMD ["--port", "7330", "--name", "relay.clasp.to"]
+CMD ["--ws-port", "7330", "--rendezvous-port", "7340", "--name", "relay.clasp.to"]

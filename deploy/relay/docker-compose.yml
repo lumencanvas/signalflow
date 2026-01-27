@@ -26,9 +26,10 @@ services:
       context: ../..
       dockerfile: deploy/relay/Dockerfile
       args:
-        FEATURES: websocket
+        FEATURES: websocket,rendezvous
     ports:
-      - "7330:7330"
+      - "7330:7330"  # WebSocket
+      - "7340:7340"  # Rendezvous API
     environment:
       - RUST_LOG=info
     restart: unless-stopped
